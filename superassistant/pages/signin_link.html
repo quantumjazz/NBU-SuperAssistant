@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ t.SIGNIN_LINK_TITLE }}{% endblock %}
+{% block content %}
+<h1>{{ t.SIGNIN_LINK_TITLE }}</h1>
+{% if error %}
+<p class="flash error" role="alert">{{ error }}</p>
+<p><a href="/">{{ t.SIGNIN_START_AGAIN }}</a></p>
+{% else %}
+<p>{{ t.SIGNIN_LINK_TEXT }}</p>
+<form method="post" action="/link/{{ token }}">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <button type="submit">{{ t.SIGNIN_LINK_BUTTON }}</button>
+</form>
+{% endif %}
+{% endblock %}
