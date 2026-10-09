@@ -176,6 +176,29 @@ def parse(stamp):
     return datetime.fromisoformat(stamp)
 
 
+# Dates people read are Sofia's, not UTC: a submission at 00:30 in Sofia is
+# that day's, though UTC still says yesterday.
+try:
+    from zoneinfo import ZoneInfo
+    LOCAL_ZONE = ZoneInfo("Europe/Sofia")
+except Exception:                       # no time-zone data on this machine
+    LOCAL_ZONE = timezone.utc
+
+
+def local_date(stamp):
+    """A stored moment as the date people read: DD.MM.YYYY, Sofia time."""
+    if not stamp:
+        return ""
+    return parse(stamp).astimezone(LOCAL_ZONE).strftime("%d.%m.%Y")
+
+
+def local_datetime(stamp):
+    """A stored moment as DD.MM.YYYY HH:MM, Sofia time."""
+    if not stamp:
+        return ""
+    return parse(stamp).astimezone(LOCAL_ZONE).strftime("%d.%m.%Y %H:%M")
+
+
 def connect(path):
     """One connection, rows readable by column name, foreign keys on."""
     connection = sqlite3.connect(str(path), timeout=30,

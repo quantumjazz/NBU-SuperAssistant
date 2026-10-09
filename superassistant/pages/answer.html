@@ -5,7 +5,7 @@
   <p id="answer-state">{{ t.ANSWER_UNKNOWN }}</p>
 {% else %}
   <h1>{{ t.ANSWER_TITLE_CONFIRM if choice == "confirm" else t.ANSWER_TITLE_DECLINE }}</h1>
-  <p>{{ t.ANSWER_INTRO.format(student=student, programme=programme, topic=topic) }}</p>
+  <p>{{ t.ANSWER_INTRO.format(student=student_name, programme=programme, topic=topic) }}</p>
   {% if state == "open" %}
     <form method="post">
       <input type="hidden" name="csrf" value="{{ csrf_token() }}">
@@ -14,10 +14,10 @@
       <button type="submit" id="record-answer">{{ t.ANSWER_RECORD_CONFIRM if choice == "confirm" else t.ANSWER_RECORD_DECLINE }}</button>
     </form>
   {% elif state == "recorded" %}
-    <p id="answer-state">{{ t.ANSWER_RECORDED.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at[:10]) }}</p>
+    <p id="answer-state">{{ t.ANSWER_RECORDED.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at|datetime) }}</p>
     {% if notice_failed %}<p class="error">{{ t.ANSWER_NOTICE_FAILED }}</p>{% endif %}
   {% elif state == "answered" %}
-    <p id="answer-state">{{ t.ANSWER_ALREADY.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at[:10]) }}</p>
+    <p id="answer-state">{{ t.ANSWER_ALREADY.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at|datetime) }}</p>
   {% elif state == "replaced" %}
     <p id="answer-state">{{ t.ANSWER_REPLACED }}</p>
   {% endif %}

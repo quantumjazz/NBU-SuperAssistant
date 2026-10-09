@@ -360,7 +360,7 @@ def test_staff_see_every_field_and_the_answer_with_its_comment_and_time(
     answered_at = applications.current_request(connection,
                                                record["id"])["answered_at"]
     connection.close()
-    assert answered_at in page
+    assert db.local_datetime(answered_at) in page
 
 
 def test_checks_and_corrections_keep_what_they_replace(

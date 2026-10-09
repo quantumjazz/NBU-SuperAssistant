@@ -115,3 +115,12 @@ def test_choices_must_name_an_entry_of_the_lists(tmp_path):
         {"programme": "АУ-РО", "sup_title": "доц. д-р"},
         ["programme", "sup_title"], loaded)
     assert refusals == [] and values["programme"] == "АУ-РО"
+
+
+def test_dates_people_read_are_sofia_time():
+    from superassistant import db
+    # 21:30 UTC on 9 October is 00:30 on 10 October in Sofia (UTC+3).
+    assert db.local_date("2026-10-09T21:30:00+00:00") == "10.10.2026"
+    assert db.local_datetime("2026-10-09T21:30:00+00:00") == "10.10.2026 00:30"
+    # And in winter, UTC+2.
+    assert db.local_date("2026-12-31T22:30:00+00:00") == "01.01.2027"

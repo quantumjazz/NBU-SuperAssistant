@@ -47,7 +47,7 @@ def _messages(refusals):
     return out
 
 
-def _render(record, tab, values=None, errors=None, status=200):
+def _render(record, tab, values=None, errors=None, status=200, again=None):
     lists = web.current_lists()
     shown = dict(record)
     shown.update(values or {})
@@ -59,7 +59,7 @@ def _render(record, tab, values=None, errors=None, status=200):
         current=applications.current_request(web.connection(), record["id"]),
         supervisor_label=applications.supervisor_label(record, lists),
         programme_label=supervision.programme_label(record, lists),
-        fields=texts.FIELD_LABELS), status
+        fields=texts.FIELD_LABELS, again=again or {}), status
 
 
 @blueprint.route("/application")
@@ -135,6 +135,6 @@ def choose_again():
     if refusals:
         flash(texts.FIX_BELOW, "error")
         typed = dict((f, request.form.get(f, "")) for f in fields)
-        return _render(record, 1, typed, _messages(refusals), 400)
+        return _render(record, 1, None, _messages(refusals), 400, typed)
     flash(texts.CHOSEN_AGAIN, "ok")
     return redirect("/application")

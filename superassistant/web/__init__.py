@@ -64,6 +64,8 @@ def create_app(settings=None):
         SESSION_COOKIE_SECURE=settings.base_url.startswith("https://"),
         MAX_CONTENT_LENGTH=2 * 1024 * 1024,
     )
+    app.jinja_env.filters["date"] = db.local_date
+    app.jinja_env.filters["datetime"] = db.local_datetime
     app.extensions["superassistant"] = {"settings": settings,
                                         "lists": loaded}
 

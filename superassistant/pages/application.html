@@ -9,12 +9,12 @@
   {% endif %}
   {% if errors[name] %}<p class="error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}
 {%- endmacro %}
-{% macro supervisor_fields(prefix="") -%}
+{% macro supervisor_fields(v) -%}
   <label for="professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
   <select id="professor" name="professor">
     <option value="">{{ t.SUPERVISOR_NONE }}</option>
     {% for code, p in lists.professors.items() %}
-      <option value="{{ code }}" {% if values.professor == code %}selected{% endif %}>{{ p.title }} {{ p.name }}</option>
+      <option value="{{ code }}" {% if v.professor == code %}selected{% endif %}>{{ p.title }} {{ p.name }}</option>
     {% endfor %}
   </select>
   {% if errors.professor %}<p class="error" id="professor-error">{{ errors.professor }}</p>{% endif %}
@@ -25,12 +25,16 @@
     <select id="sup_title" name="sup_title">
       <option value="">{{ t.SUPERVISOR_NONE }}</option>
       {% for title in lists.titles %}
-        <option value="{{ title }}" {% if values.sup_title == title %}selected{% endif %}>{{ title }}</option>
+        <option value="{{ title }}" {% if v.sup_title == title %}selected{% endif %}>{{ title }}</option>
       {% endfor %}
     </select>
     {% if errors.sup_title %}<p class="error" id="sup_title-error">{{ errors.sup_title }}</p>{% endif %}
-    {{ field("sup_name") }}
-    {{ field("sup_email", "email") }}
+    <label for="sup_name">{{ fields.sup_name }}</label>
+    <input type="text" id="sup_name" name="sup_name" value="{{ v.sup_name or "" }}">
+    {% if errors.sup_name %}<p class="error" id="sup_name-error">{{ errors.sup_name }}</p>{% endif %}
+    <label for="sup_email">{{ fields.sup_email }}</label>
+    <input type="email" id="sup_email" name="sup_email" value="{{ v.sup_email or "" }}">
+    {% if errors.sup_email %}<p class="error" id="sup_email-error">{{ errors.sup_email }}</p>{% endif %}
   </fieldset>
 {%- endmacro %}
 {% block title %}{{ t.NAV_APPLICATION_TITLE }}{% endblock %}
@@ -40,7 +44,7 @@
 {% if submitted %}
   <section id="status">
     <h2>{{ t.STATUS_TITLE }}</h2>
-    <p>{{ t.STATUS_SUBMITTED.format(record.submitted_at[:10]) }}</p>
+    <p>{{ t.STATUS_SUBMITTED.format(record.submitted_at|date) }}</p>
     {% if standing.thesis %}
       {% if standing.answer == "awaited" %}<p>{{ t.STATUS_AWAITED }}</p>
       {% elif standing.answer == "confirm" %}<p>{{ t.STATUS_CONFIRMED }}</p>
@@ -56,7 +60,7 @@
     <h2>{{ t.CHOOSE_AGAIN_TITLE }}</h2>
     <form method="post" action="/application/supervisor">
       <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-      {{ supervisor_fields() }}
+      {{ supervisor_fields(again or {}) }}
       <button type="submit">{{ t.CHOOSE_AGAIN }}</button>
     </form>
   </section>
@@ -129,7 +133,7 @@
       {% if errors.programme %}<p class="error" id="programme-error">{{ errors.programme }}</p>{% endif %}
       {{ field("topic") }}
       {{ field("average_grade") }}
-      {{ supervisor_fields() }}
+      {{ supervisor_fields(values) }}
     </div>
 
     <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>

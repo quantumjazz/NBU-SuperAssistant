@@ -6,7 +6,7 @@
 <h1>{{ t.STAFF_APPLICATION_TITLE.format(row.name or r.email) }}</h1>
 
 <dl class="fields" id="fields">
-  <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at }}</dd>
+  <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at|datetime }}</dd>
   <dt>{{ t.STAFF_EMAIL }}</dt><dd>{{ r.email }}</dd>
   <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
   {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
@@ -28,11 +28,11 @@
   <ul>
   {% for q, label in requests %}
     <li>
-      {{ t.STAFF_REQUEST_LINE.format(label, q.sup_email, q.sent_at or "—") }}
-      {% if q.answer %}<br>{{ t.STAFF_REQUEST_ANSWER.format(t.ANSWER_WORD[q.answer], q.answered_at) }}{% endif %}
+      {{ t.STAFF_REQUEST_LINE.format(label, q.sup_email, (q.sent_at|datetime) or "—") }}
+      {% if q.answer %}<br>{{ t.STAFF_REQUEST_ANSWER.format(t.ANSWER_WORD[q.answer], q.answered_at|datetime) }}{% endif %}
       {% if q.comment %}<br>{{ t.STAFF_REQUEST_COMMENT.format(q.comment) }}{% endif %}
       {% if q.reminders_sent %}<br>{{ t.STAFF_REMINDERS.format(q.reminders_sent) }}{% endif %}
-      {% if q.replaced_at %}<br>{{ t.STAFF_REQUEST_REPLACED.format(q.replaced_at) }}{% endif %}
+      {% if q.replaced_at %}<br>{{ t.STAFF_REQUEST_REPLACED.format(q.replaced_at|datetime) }}{% endif %}
     </li>
   {% endfor %}
   </ul>
@@ -43,7 +43,7 @@
   <h2>{{ t.STAFF_CHECKS_TITLE }}</h2>
   <ul>
   {% for c in checks %}
-    <li>{{ t.STAFF_CHECK_LINE.format(t.STAFF_CHECK[c.result], c.username, c.at) }}{% if c.note %}: {{ c.note }}{% endif %}</li>
+    <li>{{ t.STAFF_CHECK_LINE.format(t.STAFF_CHECK[c.result], c.username, c.at|datetime) }}{% if c.note %}: {{ c.note }}{% endif %}</li>
   {% endfor %}
   </ul>
   <form method="post" action="/staff/application/{{ r.id }}/check">
@@ -64,7 +64,7 @@
   <h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2>
   <ul>
   {% for c in corrections %}
-    <li>{{ t.STAFF_CORRECTION_LINE.format(fields.get(c.field, c.field), c.old_value, c.new_value, c.username, c.at) }}</li>
+    <li>{{ t.STAFF_CORRECTION_LINE.format(fields.get(c.field, c.field), c.old_value, c.new_value, c.username, c.at|datetime) }}</li>
   {% endfor %}
   </ul>
   <form method="post" action="/staff/application/{{ r.id }}/correct">

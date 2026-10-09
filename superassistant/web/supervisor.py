@@ -19,7 +19,7 @@ def _page(request_row, choice, state, notice_failed=False, status=200):
     lists = web.current_lists()
     return render_template(
         "answer.html", state=state, choice=choice, request_row=request_row,
-        student=applications.full_name(record), topic=record["topic"],
+        student_name=applications.full_name(record), topic=record["topic"],
         programme=supervision.programme_label(record, lists),
         notice_failed=notice_failed), status
 
