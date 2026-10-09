@@ -1,0 +1,12 @@
+# The owner's sample forms and reports hold real students' names: never committed (CLAUDE.md).
+examples/
+# A stale copy of constitution draft 2 the owner keeps locally.
+nbu-superassistant-CONSTITUTION.md
+.DS_Store
+__pycache__/
+*.pyc
+.venv*/
+.pytest_cache/
+.hypothesis/
+data/
+test-output/
