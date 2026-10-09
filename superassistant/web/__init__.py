@@ -147,10 +147,16 @@ def is_owner(record):
     return record is not None and accounts.is_owner(record, settings())
 
 
-def sign_in_student(email_key):
+def session_student_email():
+    """The address the signed-in student typed, as typed."""
+    return session.get("student_email")
+
+
+def sign_in_student(email_key, email):
     keep = session.get("csrf")
     session.clear()
     session["student"] = email_key
+    session["student_email"] = email
     session["csrf"] = keep or secrets.token_hex(16)
     session.permanent = True
 
