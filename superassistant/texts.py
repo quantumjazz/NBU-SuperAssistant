@@ -349,6 +349,36 @@ OWNER_PASSWORD_MISMATCH = "Двете пароли не съвпадат; пар
 
 # --- Documents and reports ---------------------------------------------------
 
+# Words the Word files take from the records. The rest of each document's
+# wording is in its template in templates/, which the owner edits in Word.
+DOC_PROGRAMME = "{degree} „{name}“, {form}"
+DOC_THESIS_ADJECTIVE = {"БП": "бакалавърска", "МП": "магистърска"}
+DOC_GRAD_THESIS = "{} теза"
+DOC_GRAD_EXAM = "държавен изпит"
+DOC_THESIS_EITHER = "БАКАЛАВЪРСКА/ МАГИСТЪРСКА"
+
+REPORTS_TITLE = "Доклади за утвърждаване на теми"
+REPORTS_INTRO = ("Докладът изброява заявленията за теза по една програма, "
+                 "чийто научен ръководител е потвърдил и чиято последна "
+                 "проверка е успешна. Всеки създаден доклад се пази тук.")
+REPORTS_PROGRAMME = "Програма"
+REPORTS_OPTION = "{label} – {faculty} – заявления за доклада: {count}"
+REPORTS_GENERATE = "Създай доклад"
+REPORTS_MADE = "Докладът е създаден."
+REPORTS_NOTHING = ("Няма заявление за доклада по програма {}: нито едно "
+                   "заявление за теза по нея не е потвърдено от научния "
+                   "ръководител с успешна последна проверка. Доклад не е "
+                   "създаден.")
+REPORTS_CHOOSE = "Изберете програма от списъка."
+REPORTS_KEPT = "Създадени доклади"
+REPORTS_NONE_KEPT = "Още няма създадени доклади."
+REPORTS_COL_DATE = "Дата"
+REPORTS_COL_PROGRAMME = "Програма"
+REPORTS_COL_FACULTY = "Факултет"
+REPORTS_COL_STUDENTS = "Студенти"
+REPORTS_COL_FILE = "Файл"
+REPORTS_DOWNLOAD = "Изтегли"
+
 
 
 # --- The command line --------------------------------------------------------

@@ -1,0 +1,382 @@
+"""The topic-approval report's rules (NOW.md requirement 7; proof 1): which
+faculty and dean a programme leads to, which applications a report lists and
+leaves out, that earlier reports are kept with their date and students, and
+that a programme with nothing to report makes no report. Over generated list
+files and generated applications; everyone is invented.
+"""
+
+import csv
+import hashlib
+import io
+import secrets
+import shutil
+import string
+import tempfile
+from pathlib import Path
+
+import docx
+import pytest
+from hypothesis import event, given, settings as hsettings, strategies as st
+
+from superassistant import db, documents, lists, reports
+from tests.conftest import (Client, insert_application, insert_check,
+                            insert_request, make_account, make_settings,
+                            prepare_data_dir)
+from tests.test_documents import line
+
+
+class Data(object):
+    """A fresh data directory for one generated example."""
+
+    def __enter__(self):
+        self.root = Path(tempfile.mkdtemp())
+        prepare_data_dir(self.root / "data")
+        self.settings = make_settings(self.root / "data")
+        self.lists = lists.load(self.settings.lists_dir)
+        self.connection = db.connect(self.settings.db_path)
+        self.account = add_account(self.connection)
+        return self
+
+    def __exit__(self, *exc):
+        self.connection.close()
+        shutil.rmtree(str(self.root), ignore_errors=True)
+
+
+def add_account(connection):
+    """A staff account written straight into the schema; no slow hashing,
+    since these tests never sign in with it."""
+    stamp = db.now()
+    name = "staff" + secrets.token_hex(4)
+    cursor = connection.execute(
+        "INSERT INTO accounts (username, username_key, email, email_key, "
+        "algorithm, salt, iterations, dklen, hash, session_tag, created_at, "
+        "approved_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (name, name, name + "@example.org", name + "@example.org", "none",
+         "00", 1, 1, "00", secrets.token_hex(8), stamp, stamp))
+    return cursor.lastrowid
+
+
+def write_csv(path, header, rows):
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow(row)
+    path.write_text(buffer.getvalue(), encoding="utf-8")
+
+
+def cell_text():
+    """A list entry: one line, no space at either end, any characters."""
+    return line(max_size=30)
+
+
+# --- Which faculty and dean a programme leads to -----------------------------
+
+@st.composite
+def list_files(draw):
+    titles = draw(st.lists(cell_text(), min_size=1, max_size=4, unique=True))
+    codes = draw(st.lists(st.text(string.ascii_letters + string.digits
+                                  + "АБВГДЕ-", min_size=1, max_size=6),
+                          min_size=1, max_size=4, unique=True))
+    faculties = [[code, draw(cell_text()), draw(st.sampled_from(titles)),
+                  draw(cell_text())] for code in codes]
+    programme_codes = draw(st.lists(
+        st.text(string.ascii_letters + "ЖЗИК-", min_size=1, max_size=6),
+        min_size=1, max_size=6, unique=True))
+    programmes = [[code, draw(st.sampled_from(lists.DEGREES)),
+                   draw(cell_text()), draw(st.sampled_from(lists.FORMS)),
+                   draw(st.sampled_from(codes))] for code in programme_codes]
+    return titles, faculties, programmes
+
+
+@hsettings(max_examples=50, deadline=None)
+@given(list_files(), st.data())
+def test_a_programme_leads_to_its_faculty_and_dean(files, data):
+    titles, faculties, programmes = files
+    with Data() as d:
+        lists_dir = d.settings.lists_dir
+        write_csv(lists_dir / lists.TITLES, lists.HEADERS[lists.TITLES],
+                  [[t] for t in titles])
+        write_csv(lists_dir / lists.FACULTIES,
+                  lists.HEADERS[lists.FACULTIES], faculties)
+        write_csv(lists_dir / lists.PROGRAMMES,
+                  lists.HEADERS[lists.PROGRAMMES], programmes)
+        write_csv(lists_dir / lists.PROFESSORS,
+                  lists.HEADERS[lists.PROFESSORS],
+                  [["prof", titles[0], "Петър Иванов", "p@example.org"]])
+        loaded = lists.load(lists_dir)
+        by_code = {row[0]: row for row in faculties}
+        for code, degree, name, form, faculty in programmes:
+            expected = by_code[faculty]
+            assert loaded.programme_faculty(code) == {
+                "name": expected[1], "dean_title": expected[2],
+                "dean": expected[3]}
+        assert loaded.programme_faculty("no such programme") is None
+
+        # And the report for one of them is addressed to that dean.
+        code, degree, name, form, faculty = data.draw(
+            st.sampled_from(programmes))
+        number = insert_application(
+            d.settings, "a@example.org", grad_type="thesis",
+            programme=code, name1="Ана", name2="Бойкова", name3="Вълчева",
+            fn="F1", topic="Тема", professor="prof")
+        insert_request(d.settings, number, answer="confirm")
+        insert_check(d.settings, number, "passed", d.account)
+        report_id = reports.generate(d.connection, d.settings, loaded, code,
+                                     d.account)
+        report = reports.get(d.connection, report_id)
+        assert report["faculty"] == faculty
+        body = [p.text for p in docx.Document(
+            str(reports.path(d.settings, report))).paragraphs]
+        _, faculty_name, dean_title, dean = by_code[faculty]
+        assert body[1] == (dean_title + " " + dean).upper()
+        assert body[2] == "ДЕКАН НА " + faculty_name.upper()
+
+
+# --- Which applications a report lists ---------------------------------------
+
+PROGRAMMES = ("АУ-РО", "БА-РО")
+NAMES = ["Ана", "Боян", "Вера", "Галин", "Дора", "Емил", "Жана", "Зорница",
+         "Ивайло", "Йоана", "Калин", "Лия"]
+
+
+@st.composite
+def generated_application(draw):
+    return {
+        "programme": draw(st.sampled_from(PROGRAMMES)),
+        # Weighted towards what qualifies, so both outcomes come up often.
+        "grad_type": draw(st.sampled_from(["thesis"] * 3 + ["exam"])),
+        "submitted": draw(st.sampled_from([True] * 3 + [False])),
+        "name": draw(st.sampled_from(NAMES)) + " " + draw(cell_text()),
+        "fn": "F" + draw(st.text(string.digits, min_size=1, max_size=6)),
+        "requests": draw(st.lists(st.tuples(
+            st.sampled_from(["confirm", "confirm", None, "decline"]),
+            st.sampled_from([False, False, True])), max_size=3)),
+        "checks": draw(st.lists(st.sampled_from(["passed", "passed",
+                                                 "not_passed"]),
+                                max_size=3)),
+    }
+
+
+def belongs(generated, programme):
+    """The rule, written again from NOW.md requirement 7."""
+    current = [answer for answer, replaced in generated["requests"]
+               if not replaced]
+    return (generated["programme"] == programme
+            and generated["grad_type"] == "thesis"
+            and generated["submitted"]
+            and bool(current) and current[-1] == "confirm"
+            and bool(generated["checks"])
+            and generated["checks"][-1] == "passed")
+
+
+def insert(d, generated, index):
+    first, last = generated["name"].split(" ", 1)
+    number = insert_application(
+        d.settings, "s{}@example.org".format(index),
+        submitted=generated["submitted"], grad_type=generated["grad_type"],
+        programme=generated["programme"], name1=first, name2="Тестова",
+        name3=last, fn=generated["fn"], topic="Тема " + str(index),
+        professor="ivanov")
+    for answer, replaced in generated["requests"]:
+        insert_request(d.settings, number, answer=answer, replaced=replaced)
+    for result in generated["checks"]:
+        insert_check(d.settings, number, result, d.account)
+    return number
+
+
+@hsettings(max_examples=60, deadline=None)
+@given(st.lists(generated_application(), max_size=8),
+       st.sampled_from(PROGRAMMES))
+def test_a_report_lists_exactly_the_confirmed_and_passed(applications,
+                                                         programme):
+    with Data() as d:
+        numbers = [insert(d, generated, index)
+                   for index, generated in enumerate(applications)]
+        expected = {number for number, generated in zip(numbers,
+                                                        applications)
+                    if belongs(generated, programme)}
+        event("listed" if expected else "nothing to report")
+        listed = reports.qualifying(d.connection, programme)
+        assert {row["id"] for row in listed} == expected
+        assert reports.counts(d.connection).get(programme, 0) == len(expected)
+
+        if not expected:
+            with pytest.raises(reports.NothingToReport):
+                reports.generate(d.connection, d.settings, d.lists,
+                                 programme, d.account)
+            assert reports.kept(d.connection) == []
+            assert list(d.settings.reports_dir.iterdir()) == []
+            return
+
+        report_id = reports.generate(d.connection, d.settings, d.lists,
+                                     programme, d.account)
+        kept = reports.students(d.connection, report_id)
+        assert [row["application_id"] for row in kept] == [
+            row["id"] for row in listed]
+        assert [row["position"] for row in kept] == list(
+            range(1, len(expected) + 1))
+        # In alphabetical order of the names as printed, then by F№.
+        keys = [(row["name"].casefold(), row["fn"].casefold())
+                for row in kept]
+        assert keys == sorted(keys)
+        table = docx.Document(str(reports.path(
+            d.settings, reports.get(d.connection, report_id)))).tables[0]
+        assert [[c.text for c in r.cells] for r in table.rows[1:]] == [
+            [str(row["position"]), row["fn"], row["name"], row["topic"],
+             row["supervisor"], ""] for row in kept]
+
+
+# --- Earlier reports are kept ----------------------------------------------
+
+def fingerprint(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@hsettings(max_examples=25, deadline=None)
+@given(st.lists(st.lists(generated_application(), min_size=1, max_size=4),
+                min_size=2, max_size=4))
+def test_earlier_reports_are_kept_with_their_date_and_students(rounds):
+    clock = [db.parse("2026-10-12T09:00:00+00:00")]
+    db.set_clock(lambda: clock[0])
+    try:
+        with Data() as d:
+            made = []
+            index = 0
+            for round_ in rounds:
+                for generated in round_:
+                    insert(d, generated, index)
+                    index += 1
+                # A check that now fails, for one already reported.
+                if made and made[-1]["students"]:
+                    insert_check(d.settings,
+                                 made[-1]["students"][0]["application_id"],
+                                 "not_passed", d.account)
+                clock[0] = clock[0].replace(day=clock[0].day + 1)
+                try:
+                    report_id = reports.generate(d.connection, d.settings,
+                                                 d.lists, "АУ-РО", d.account)
+                except reports.NothingToReport:
+                    continue
+                report = reports.get(d.connection, report_id)
+                made.append({
+                    "id": report_id, "row": dict(report),
+                    "students": [dict(r) for r in reports.students(
+                        d.connection, report_id)],
+                    "file": fingerprint(reports.path(d.settings, report))})
+            kept = reports.kept(d.connection)
+            assert [r["id"] for r in kept] == [m["id"] for m in
+                                               reversed(made)]
+            for earlier in made:
+                report = reports.get(d.connection, earlier["id"])
+                assert dict(report) == earlier["row"]
+                assert [dict(r) for r in reports.students(
+                    d.connection, earlier["id"])] == earlier["students"]
+                assert fingerprint(reports.path(d.settings, report)) == \
+                    earlier["file"]
+            assert len({m["row"]["filename"] for m in made}) == len(made)
+            assert len(list(d.settings.reports_dir.iterdir())) == len(made)
+            dates = [m["row"]["generated_at"] for m in made]
+            assert dates == sorted(dates) and len(set(dates)) == len(dates)
+    finally:
+        db.set_clock(None)
+
+
+def test_nothing_qualifying_makes_no_report(tmp_path):
+    data_dir = tmp_path / "data"
+    prepare_data_dir(data_dir)
+    settings = make_settings(data_dir)
+    connection = db.connect(settings.db_path)
+    try:
+        account = add_account(connection)
+        number = insert_application(settings, "a@example.org",
+                                    grad_type="thesis", programme="АУ-РО",
+                                    name1="Ана", fn="F1", professor="ivanov")
+        insert_request(settings, number, answer="confirm")
+        insert_check(settings, number, "not_passed", account)
+        with pytest.raises(reports.NothingToReport):
+            reports.generate(connection, settings, lists.load(
+                settings.lists_dir), "АУ-РО", account)
+        assert reports.kept(connection) == []
+        assert not settings.reports_dir.exists() or not list(
+            settings.reports_dir.iterdir())
+    finally:
+        connection.close()
+
+
+# --- The staff page --------------------------------------------------------
+
+def staff_client(app, record):
+    client = Client(app.test_client())
+    with client.raw.session_transaction() as session:
+        session["staff"] = record["id"]
+        session["tag"] = record["session_tag"]
+    return client
+
+
+def test_staff_generate_list_and_download_reports(settings, app, clock):
+    staff = make_account(settings)
+    client = staff_client(app, staff)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="АУ-РО",
+                                name1="Ана", name2="Бойкова",
+                                name3="Вълчева", fn="F300001",
+                                topic="Тема", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+
+    page = client.get("/staff/reports").get_data(as_text=True)
+    assert documents.programme_label("АУ-РО", app.extensions[
+        "superassistant"]["lists"]) in page
+    assert "заявления за доклада: 1" in page
+    assert reports_count(settings) == 0
+
+    reply = client.post("/staff/reports", {"programme": "БА-РО"},
+                        follow_redirects=True)
+    assert "Няма заявление за доклада" in reply.get_data(as_text=True)
+    assert reports_count(settings) == 0
+
+    reply = client.post("/staff/reports", {"programme": "АУ-РО"},
+                        follow_redirects=True)
+    page = reply.get_data(as_text=True)
+    assert "Докладът е създаден." in page
+    assert "12.10.2026" in page and "/staff/reports/1.docx" in page
+    reply = client.get("/staff/reports/1.docx")
+    assert reply.status_code == 200
+    assert reply.headers["Content-Disposition"].isascii()
+    table = docx.Document(io.BytesIO(reply.data)).tables[0]
+    assert [c.text for c in table.rows[1].cells][:3] == [
+        "1", "F300001", "Ана Бойкова Вълчева"]
+
+    clock.advance(days=1)
+    client.post("/staff/reports", {"programme": "АУ-РО"})
+    assert reports_count(settings) == 2
+    assert client.get("/staff/reports/1.docx").data == reply.data
+    assert client.get("/staff/reports/3.docx").status_code == 404
+    assert client.post("/staff/reports", {"programme": "nope"}).status_code \
+        == 302
+    assert reports_count(settings) == 2
+
+
+def reports_count(settings):
+    connection = db.connect(settings.db_path)
+    try:
+        return connection.execute("SELECT COUNT(*) FROM reports").fetchone()[0]
+    finally:
+        connection.close()
+
+
+def test_only_approved_staff_reach_reports(settings, app):
+    waiting = make_account(settings, username="waiting", approved=False)
+    student = Client(app.test_client())
+    with student.raw.session_transaction() as session:
+        session["student"] = "a@example.org"
+    for client in (Client(app.test_client()), student,
+                   staff_client(app, waiting)):
+        for url in ("/staff/reports", "/staff/reports/1.docx"):
+            reply = client.get(url)
+            assert reply.status_code == 302
+            assert reply.headers["Location"].endswith("/staff/sign-in")
+        reply = client.post("/staff/reports", {"programme": "АУ-РО"})
+        assert reply.status_code == 302
+    assert reports_count(settings) == 0
