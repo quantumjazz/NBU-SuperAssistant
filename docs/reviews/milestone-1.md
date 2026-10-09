@@ -15,3 +15,12 @@
 - **What changes** against `e94e3a4e…`: proof 5 now reads "The whole set of tests passes on Python 3.9 and on Python 3.12."; DEFERRED no longer lists Python 3.12. Nothing else.
 - **Frozen:** `NOW.md` SHA-256 `65d0ad16dea2463f9e159eccbdd595a15df461d64a265c3c1e11b848421f0fc5`, 2,017 words. Opus 5.5 APPROVED. Fable: not asked, under the owner's fast-path waiver of 10 October.
 - **Repository:** on the owner's "Make this folder a repository", the folder becomes a git repository on `main`. Its history does not match GitHub's `quantumjazz/NBU-SuperAssistant`; joining them is the owner's later step.
+
+## 2026-10-10 — Implemented; final candidate for Codex's review
+
+- **Plan:** `NOW.md` `65d0ad16…`. Implementer: Opus 5.5 (`claude-opus-5-5`), with one round of two delegated builders in isolated worktrees (sign-in, staff and the owner's page; Word templates and reports), merged and reviewed by Opus 5.5.
+- **Review target:** `fbaef2c` on `main`. Not pushed; this folder's history does not match GitHub's.
+- **Checks on `fbaef2c`** (Opus 5.5): Python 3.9.6, 88 passed and browser 5 passed; Python 3.12.14, 88 passed and browser 5 passed. Documents rendered with Quick Look and looked at; templates scanned for the samples' student text: none.
+- **Readings** (implementer's, for Codex and the owner): supervisor links are an HMAC of the session key, so reminders repeat them and only their hash is stored; staff cannot correct the graduation type; report rows are alphabetical by name; a code mistyped five times stops, its email's link still works; dates shown are Sofia's.
+- **Disclosure:** staff registration and sign-in have no rate limit; none is required.
+- **Outstanding:** Codex's review; the owner's inspection (Completion 1–5).
