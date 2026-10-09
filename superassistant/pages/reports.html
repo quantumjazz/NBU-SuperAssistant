@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ t.REPORTS_TITLE }}{% endblock %}
+{% block content %}
+<h1>{{ t.REPORTS_TITLE }}</h1>
+<p class="hint">{{ t.REPORTS_INTRO }}</p>
+
+<form method="post" action="/staff/reports">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <label for="programme">{{ t.REPORTS_PROGRAMME }}</label>
+  <select id="programme" name="programme" required>
+    {% for choice in choices %}
+    <option value="{{ choice.code }}">{{ choice.label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">{{ t.REPORTS_GENERATE }}</button>
+</form>
+
+<h2>{{ t.REPORTS_KEPT }}</h2>
+{% if kept %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t.REPORTS_COL_DATE }}</th>
+        <th>{{ t.REPORTS_COL_PROGRAMME }}</th>
+        <th>{{ t.REPORTS_COL_FACULTY }}</th>
+        <th>{{ t.REPORTS_COL_STUDENTS }}</th>
+        <th>{{ t.REPORTS_COL_FILE }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for report in kept %}
+      <tr>
+        <td>{{ report.date }}</td>
+        <td>{{ report.programme }}</td>
+        <td>{{ report.faculty }}</td>
+        <td>{{ report.students }}</td>
+        <td><a href="/staff/reports/{{ report.id }}.docx">{{ t.REPORTS_DOWNLOAD }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>{{ t.REPORTS_NONE_KEPT }}</p>
+{% endif %}
+{% endblock %}
