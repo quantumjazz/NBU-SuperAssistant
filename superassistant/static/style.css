@@ -30,3 +30,8 @@ tbody tr:last-child td { border-bottom: 2px solid var(--text); }
 tr.waiting td { background: var(--mark); }
 dl.fields dt { font-weight: bold; margin-top: 0.6rem; }
 dl.fields dd { margin: 0; white-space: pre-wrap; }
+[hidden] { display: none !important; }
+fieldset { border: 1px solid var(--line); border-radius: 4px; margin: 1rem 0; padding: 8px 12px 12px; }
+legend { font-weight: bold; padding: 0 4px; }
+label.choice { font-weight: normal; display: flex; gap: 8px; align-items: baseline; }
+.advice { padding: 10px 12px; border-left: 4px solid #333; background: #f4f4f4; }

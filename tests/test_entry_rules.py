@@ -1,0 +1,117 @@
+"""The entry rules, tested as rules over generated text (NOW.md requirement 2,
+proof 1: "what requirement 2 stores and refuses")."""
+
+import re
+import unicodedata
+
+from hypothesis import given, settings as hsettings, strategies as st
+
+from superassistant import applications
+
+LATIN = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+CYRILLIC = ("абвгдежзийклмнопрстуфхцчшщъьюяѝАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЬЮЯ")
+SEPARATORS = [" ", "-", " – ", ", ", ". ", "1", "2026", "/", "(", ")", "„", "“"]
+
+any_text = st.text(max_size=300)
+
+
+def _holdable(ch, multi):
+    if ch == "\n" and multi:
+        return True
+    return (unicodedata.category(ch) not in ("Cc", "Cs")
+            and ch not in ("￾", "￿"))
+
+
+@given(field=st.sampled_from(applications.ONE_LINE_FIELDS
+                             + applications.MULTI_LINE_FIELDS),
+       value=any_text)
+def test_stored_as_typed_trimmed_fn_in_capitals_or_refused(field, value):
+    stored = applications.normalise(field, value)
+    multi = field in applications.MULTI_LINE_FIELDS
+    expected = value.replace("\r\n", "\n").replace("\r", "\n") if multi \
+        else value
+    expected = expected.strip()
+    if field == "fn":
+        expected = expected.upper()
+    assert stored == expected
+    refusal = applications.check_entry(field, stored)
+    bad = [ch for ch in stored if not _holdable(ch, multi)]
+    if bad:
+        assert refusal is not None and refusal.reason == "control"
+        assert set(refusal.characters) == set(bad)
+    elif refusal is not None:
+        assert refusal.reason == "mixed"
+        assert field in applications.SCRIPT_CHECKED_FIELDS
+
+
+word = st.text(alphabet=LATIN + CYRILLIC, min_size=1, max_size=12)
+phrase = st.lists(st.tuples(word, st.sampled_from(SEPARATORS)), min_size=1,
+                  max_size=8).map(lambda pairs: "".join(w + s for w, s in pairs))
+
+
+def _oracle_mixed_words(text):
+    runs = re.findall("[" + LATIN + CYRILLIC + "]+", text)
+    return [r for r in runs
+            if any(c in LATIN for c in r) and any(c in CYRILLIC for c in r)]
+
+
+@given(field=st.sampled_from(applications.SCRIPT_CHECKED_FIELDS),
+       text=phrase)
+def test_a_word_mixing_latin_and_cyrillic_is_refused_with_its_letters(
+        field, text):
+    value = applications.normalise(field, text)
+    refusal = applications.check_entry(field, value)
+    mixed = _oracle_mixed_words(value)
+    if mixed:
+        assert refusal is not None and refusal.reason == "mixed"
+        shown = set(refusal.characters)
+        letters_in_mixed = set("".join(mixed))
+        assert shown and shown <= letters_in_mixed
+    else:
+        assert refusal is None
+
+
+@given(text=phrase)
+def test_fields_outside_the_rule_keep_mixed_words(text):
+    for field in ("phone", "average_grade") + applications.MULTI_LINE_FIELDS:
+        refusal = applications.check_entry(field,
+                                           applications.normalise(field, text))
+        assert refusal is None
+
+
+def test_the_examples_named_in_the_plan():
+    assert applications.check_entry("topic", "Внедряване на CRM-система") \
+        is None
+    assert applications.check_entry("topic", "SWOT-анализ на е-управлението") \
+        is None
+    refusal = applications.check_entry("name3", "Иванов".replace("а", "a"))
+    assert refusal.reason == "mixed" and refusal.characters == "a"
+    refusal = applications.check_entry("name1", "Иvan")
+    assert refusal.characters == "И"
+
+
+@hsettings(max_examples=50)
+@given(text=st.text(max_size=80))
+def test_a_line_break_is_refused_in_a_one_line_field_and_kept_in_the_proposal(
+        text):
+    one_line = applications.check_entry("topic",
+                                        applications.normalise("topic",
+                                                               "a\nb" + text))
+    assert one_line is not None and one_line.reason == "control"
+    kept = applications.normalise("plan", "Глава 1\r\nГлава 2")
+    assert kept == "Глава 1\nГлава 2"
+    assert applications.check_entry("plan", kept) is None
+
+
+def test_choices_must_name_an_entry_of_the_lists(tmp_path):
+    from superassistant import lists
+    lists.write_starter(tmp_path)
+    loaded = lists.load(tmp_path)
+    values, refusals = applications.clean(
+        {"programme": "НЕМА", "sup_title": "акад."}, ["programme", "sup_title"],
+        loaded)
+    assert sorted(r.field for r in refusals) == ["programme", "sup_title"]
+    values, refusals = applications.clean(
+        {"programme": "АУ-РО", "sup_title": "доц. д-р"},
+        ["programme", "sup_title"], loaded)
+    assert refusals == [] and values["programme"] == "АУ-РО"

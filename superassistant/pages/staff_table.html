@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ t.STAFF_TABLE_TITLE }}{% endblock %}
+{% block content %}
+<h1>{{ t.STAFF_TABLE_TITLE }}</h1>
+{% if not rows %}
+  <p>{{ t.STAFF_EMPTY }}</p>
+{% else %}
+  <p class="hint">{{ t.STAFF_LEGEND }}</p>
+  <div class="table-wrap">
+  <table id="applications">
+    <thead><tr>{% for c in t.STAFF_COLUMNS %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in rows %}
+      {% set s = row.standing %}
+      <tr class="{{ 'waiting' if s.waiting }}" data-id="{{ row.record.id }}">
+        <td><a href="/staff/application/{{ row.record.id }}">{{ row.name or row.record.email }}</a></td>
+        <td>{{ row.record.fn }}</td>
+        <td>{{ row.programme }}</td>
+        <td>{{ t.STAFF_TYPE.get(row.record.grad_type, "") }}</td>
+        <td>{{ row.record.topic if row.record.grad_type == "thesis" }}</td>
+        <td>{{ row.supervisor }}</td>
+        <td>{{ t.STAFF_ANSWER[s.answer] }}{% if s.waiting_for_supervisor %} <strong class="waiting-mark">· {{ t.STAFF_WAITING_SUPERVISOR }}</strong>{% endif %}</td>
+        <td>{{ t.STAFF_CHECK[s.check] }}{% if s.waiting_for_check %} <strong class="waiting-mark">· {{ t.STAFF_WAITING_CHECK }}</strong>{% endif %}{% if s.waiting_for_report %} <strong class="waiting-mark">· {{ t.STAFF_WAITING_REPORT }}</strong>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+{% endif %}
+{% endblock %}

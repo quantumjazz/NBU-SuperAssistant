@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% macro field(name, kind="text", hint="") -%}
+  <label for="{{ name }}">{{ fields[name] }}</label>
+  {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
+  {% if kind == "textarea" %}
+    <textarea id="{{ name }}" name="{{ name }}">{{ values[name] or "" }}</textarea>
+  {% else %}
+    <input type="{{ kind }}" id="{{ name }}" name="{{ name }}" value="{{ values[name] or "" }}">
+  {% endif %}
+  {% if errors[name] %}<p class="error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}
+{%- endmacro %}
+{% macro supervisor_fields(prefix="") -%}
+  <label for="professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
+  <select id="professor" name="professor">
+    <option value="">{{ t.SUPERVISOR_NONE }}</option>
+    {% for code, p in lists.professors.items() %}
+      <option value="{{ code }}" {% if values.professor == code %}selected{% endif %}>{{ p.title }} {{ p.name }}</option>
+    {% endfor %}
+  </select>
+  {% if errors.professor %}<p class="error" id="professor-error">{{ errors.professor }}</p>{% endif %}
+  <fieldset class="outside">
+    <legend>{{ t.SUPERVISOR_OUTSIDE }}</legend>
+    <p class="hint">{{ t.SUPERVISOR_OUTSIDE_HINT }}</p>
+    <label for="sup_title">{{ fields.sup_title }}</label>
+    <select id="sup_title" name="sup_title">
+      <option value="">{{ t.SUPERVISOR_NONE }}</option>
+      {% for title in lists.titles %}
+        <option value="{{ title }}" {% if values.sup_title == title %}selected{% endif %}>{{ title }}</option>
+      {% endfor %}
+    </select>
+    {% if errors.sup_title %}<p class="error" id="sup_title-error">{{ errors.sup_title }}</p>{% endif %}
+    {{ field("sup_name") }}
+    {{ field("sup_email", "email") }}
+  </fieldset>
+{%- endmacro %}
+{% block title %}{{ t.NAV_APPLICATION_TITLE }}{% endblock %}
+{% block content %}
+<h1>{{ t.NAV_APPLICATION_TITLE }}</h1>
+
+{% if submitted %}
+  <section id="status">
+    <h2>{{ t.STATUS_TITLE }}</h2>
+    <p>{{ t.STATUS_SUBMITTED.format(record.submitted_at[:10]) }}</p>
+    {% if standing.thesis %}
+      {% if standing.answer == "awaited" %}<p>{{ t.STATUS_AWAITED }}</p>
+      {% elif standing.answer == "confirm" %}<p>{{ t.STATUS_CONFIRMED }}</p>
+      {% elif standing.answer == "decline" %}<p>{{ t.STATUS_DECLINED }}</p>{% endif %}
+    {% endif %}
+    {% if standing.check == "passed" %}<p>{{ t.STATUS_CHECK_PASSED }}</p>
+    {% elif standing.check == "not_passed" %}<p>{{ t.STATUS_CHECK_NOT_PASSED }}</p>
+    {% else %}<p>{{ t.STATUS_NO_CHECK }}</p>{% endif %}
+  </section>
+
+  {% if standing.thesis and standing.answer == "decline" %}
+  <section id="choose-again">
+    <h2>{{ t.CHOOSE_AGAIN_TITLE }}</h2>
+    <form method="post" action="/application/supervisor">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      {{ supervisor_fields() }}
+      <button type="submit">{{ t.CHOOSE_AGAIN }}</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section id="forms">
+    <h2>{{ t.FORMS_TITLE }}</h2>
+    <ul>
+      <li><a href="/application/forms/zaiavlenie.docx">Заявление-декларация (.docx)</a></li>
+      {% if standing.thesis %}<li><a href="/application/forms/prilozhenie2.docx">Приложение 2 (.docx)</a></li>{% endif %}
+    </ul>
+  </section>
+
+  <section id="entered">
+    <h2>{{ t.ENTERED_TITLE }}</h2>
+    <dl class="fields">
+      <dt>{{ t.FIELD_LABELS.grad_type }}</dt><dd>{{ t.GRAD_THESIS if standing.thesis else t.GRAD_EXAM }}</dd>
+      {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ record[name] }}</dd>{% endfor %}
+      <dt>{{ t.EMAIL_LABEL }}</dt><dd>{{ record.email }}</dd>
+      {% if standing.thesis %}
+        <dt>{{ fields.phone }}</dt><dd>{{ record.phone }}</dd>
+        <dt>{{ fields.programme }}</dt><dd>{{ programme_label }}</dd>
+        <dt>{{ fields.topic }}</dt><dd>{{ record.topic }}</dd>
+        <dt>{{ fields.average_grade }}</dt><dd>{{ record.average_grade }}</dd>
+        <dt>{{ fields.professor }}</dt><dd>{{ supervisor_label }}</dd>
+        {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
+          <dt>{{ fields[name] }}</dt><dd>{{ record[name] }}</dd>
+        {% endfor %}
+      {% endif %}
+    </dl>
+  </section>
+
+{% else %}
+  {% set thesis = values.grad_type == "thesis" %}
+  <nav class="tabs" id="tabs">
+    <a href="/application?tab=1" class="{{ 'current' if tab == 1 }}">{{ t.TAB_1 }}</a>
+    <a href="/application?tab=2" id="tab2-link" class="{{ 'current' if tab == 2 }}" {% if not thesis %}hidden{% endif %}>{{ t.TAB_2 }}</a>
+  </nav>
+
+  <form method="post" action="/application" id="application-form" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="tab" value="{{ tab }}">
+
+  {% if tab == 1 %}
+    <p class="advice" id="advice">{{ t.ADVICE }}</p>
+    <p class="hint">{{ t.EMAIL_LINE.format(record.email) }}</p>
+    {{ field("name1") }}
+    {{ field("name2") }}
+    {{ field("name3") }}
+    {{ field("fn") }}
+
+    <fieldset>
+      <legend>{{ t.GRAD_TYPE }}</legend>
+      <label class="choice"><input type="radio" name="grad_type" value="thesis" {% if thesis %}checked{% endif %}> {{ t.GRAD_THESIS }}</label>
+      <label class="choice"><input type="radio" name="grad_type" value="exam" {% if values.grad_type == "exam" %}checked{% endif %}> {{ t.GRAD_EXAM }}</label>
+      {% if errors.grad_type %}<p class="error" id="grad_type-error">{{ errors.grad_type }}</p>{% endif %}
+      <p class="hint">{{ t.EXAM_ONLY_NAMES }}</p>
+    </fieldset>
+
+    <div class="thesis-only" id="thesis-fields" {% if not thesis %}hidden{% endif %}>
+      <h2>{{ t.THESIS_ONLY }}</h2>
+      {{ field("phone", "tel") }}
+      <label for="programme">{{ fields.programme }}</label>
+      <select id="programme" name="programme">
+        <option value="">{{ t.PROGRAMME_NONE }}</option>
+        {% for code, p in lists.programmes.items() %}
+          <option value="{{ code }}" {% if values.programme == code %}selected{% endif %}>{{ p.degree }} „{{ p.name }}“, {{ p.form }}</option>
+        {% endfor %}
+      </select>
+      {% if errors.programme %}<p class="error" id="programme-error">{{ errors.programme }}</p>{% endif %}
+      {{ field("topic") }}
+      {{ field("average_grade") }}
+      {{ supervisor_fields() }}
+    </div>
+
+    <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
+    <button type="submit" name="action" value="next" id="next-button" {% if not thesis %}hidden{% endif %}>{{ t.NEXT_TAB }}</button>
+    <button type="submit" name="action" value="submit" id="submit-exam" {% if thesis %}hidden{% endif %}>{{ t.SUBMIT }}</button>
+  {% else %}
+    <p>{{ t.STUDENT_LINE.format((values.name1 ~ " " ~ values.name2 ~ " " ~ values.name3)|trim, values.fn) }}</p>
+    <p>{{ t.TOPIC_LINE.format(values.topic) }}</p>
+    {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
+      {{ field(name, "textarea", t.FIELD_HINTS[name]) }}
+    {% endfor %}
+    <p class="hint">{{ t.SUBMIT_CONFIRM_HINT }}</p>
+    <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
+    <button type="submit" name="action" value="submit" id="submit-thesis">{{ t.SUBMIT }}</button>
+  {% endif %}
+  </form>
+
+  <script>
+  (function () {
+    var form = document.getElementById("application-form");
+    var radios = form ? form.querySelectorAll("input[name=grad_type]") : [];
+    function update() {
+      var chosen = form.querySelector("input[name=grad_type]:checked");
+      var thesis = chosen && chosen.value === "thesis";
+      var show = function (id, on) { var el = document.getElementById(id); if (el) { el.hidden = !on; } };
+      show("thesis-fields", thesis);
+      show("tab2-link", thesis);
+      show("next-button", thesis);
+      show("submit-exam", !thesis);
+    }
+    for (var i = 0; i < radios.length; i++) { radios[i].addEventListener("change", update); }
+  })();
+  </script>
+{% endif %}
+{% endblock %}

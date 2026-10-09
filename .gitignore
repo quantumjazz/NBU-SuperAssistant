@@ -10,3 +10,5 @@ __pycache__/
 .hypothesis/
 data/
 test-output/
+# Delegates' isolated worktrees.
+.claude/

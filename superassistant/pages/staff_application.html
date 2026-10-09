@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% set r = record %}
+{% block title %}{{ t.STAFF_APPLICATION_TITLE.format(row.name) }}{% endblock %}
+{% block content %}
+<p><a href="/staff">{{ t.BACK }}</a></p>
+<h1>{{ t.STAFF_APPLICATION_TITLE.format(row.name or r.email) }}</h1>
+
+<dl class="fields" id="fields">
+  <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at }}</dd>
+  <dt>{{ t.STAFF_EMAIL }}</dt><dd>{{ r.email }}</dd>
+  <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
+  {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
+  {% if r.grad_type == "thesis" %}
+    <dt>{{ fields.phone }}</dt><dd>{{ r.phone }}</dd>
+    <dt>{{ fields.programme }}</dt><dd>{{ programme_label }}</dd>
+    <dt>{{ fields.topic }}</dt><dd>{{ r.topic }}</dd>
+    <dt>{{ fields.average_grade }}</dt><dd>{{ r.average_grade }}</dd>
+    <dt>{{ fields.professor }}</dt><dd>{{ row.supervisor }}{% if not r.professor %} ({{ r.sup_email }}){% endif %}</dd>
+    {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
+      <dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>
+    {% endfor %}
+  {% endif %}
+</dl>
+
+{% if r.grad_type == "thesis" %}
+<section id="requests">
+  <h2>{{ t.STAFF_REQUESTS_TITLE }}</h2>
+  <ul>
+  {% for q, label in requests %}
+    <li>
+      {{ t.STAFF_REQUEST_LINE.format(label, q.sup_email, q.sent_at or "—") }}
+      {% if q.answer %}<br>{{ t.STAFF_REQUEST_ANSWER.format(t.ANSWER_WORD[q.answer], q.answered_at) }}{% endif %}
+      {% if q.comment %}<br>{{ t.STAFF_REQUEST_COMMENT.format(q.comment) }}{% endif %}
+      {% if q.reminders_sent %}<br>{{ t.STAFF_REMINDERS.format(q.reminders_sent) }}{% endif %}
+      {% if q.replaced_at %}<br>{{ t.STAFF_REQUEST_REPLACED.format(q.replaced_at) }}{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section id="checks">
+  <h2>{{ t.STAFF_CHECKS_TITLE }}</h2>
+  <ul>
+  {% for c in checks %}
+    <li>{{ t.STAFF_CHECK_LINE.format(t.STAFF_CHECK[c.result], c.username, c.at) }}{% if c.note %}: {{ c.note }}{% endif %}</li>
+  {% endfor %}
+  </ul>
+  <form method="post" action="/staff/application/{{ r.id }}/check">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <fieldset>
+      <legend>{{ t.STAFF_CHECK_FORM }}</legend>
+      <label class="choice"><input type="radio" name="result" value="passed"> {{ t.STAFF_CHECK_PASSED }}</label>
+      <label class="choice"><input type="radio" name="result" value="not_passed"> {{ t.STAFF_CHECK_NOT_PASSED }}</label>
+      {% if errors.result %}<p class="error">{{ errors.result }}</p>{% endif %}
+      <label for="note">{{ t.STAFF_CHECK_NOTE }}</label>
+      <input type="text" id="note" name="note">
+      <button type="submit" id="record-check">{{ t.STAFF_CHECK_RECORD }}</button>
+    </fieldset>
+  </form>
+</section>
+
+<section id="corrections">
+  <h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2>
+  <ul>
+  {% for c in corrections %}
+    <li>{{ t.STAFF_CORRECTION_LINE.format(fields.get(c.field, c.field), c.old_value, c.new_value, c.username, c.at) }}</li>
+  {% endfor %}
+  </ul>
+  <form method="post" action="/staff/application/{{ r.id }}/correct">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <fieldset>
+      <legend>{{ t.STAFF_CORRECT_FORM }}</legend>
+      <label for="field">{{ t.STAFF_CORRECT_FIELD }}</label>
+      <select id="field" name="field">
+        {% for name in correctable %}<option value="{{ name }}">{{ fields[name] }}</option>{% endfor %}
+      </select>
+      <label for="value">{{ t.STAFF_CORRECT_VALUE }}</label>
+      <textarea id="value" name="value"></textarea>
+      <p class="hint">{{ t.STAFF_CORRECT_PROGRAMME_HINT }} {% for code, p in lists.programmes.items() %}{{ code }} ({{ p.degree }} {{ p.name }}, {{ p.form }}){% if not loop.last %}; {% endif %}{% endfor %}</p>
+      {% if errors.correction %}<p class="error">{{ errors.correction }}</p>{% endif %}
+      <button type="submit">{{ t.STAFF_CORRECT_SAVE }}</button>
+    </fieldset>
+  </form>
+  {% if r.grad_type == "thesis" %}
+  <form method="post" action="/staff/application/{{ r.id }}/supervisor">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <fieldset>
+      <legend>{{ t.STAFF_SUPERVISOR_FORM }}</legend>
+      <p class="hint">{{ t.STAFF_SUPERVISOR_HINT }}</p>
+      <label for="professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
+      <select id="professor" name="professor">
+        <option value="">{{ t.SUPERVISOR_NONE }}</option>
+        {% for code, p in lists.professors.items() %}<option value="{{ code }}">{{ p.title }} {{ p.name }}</option>{% endfor %}
+      </select>
+      <p class="hint">{{ t.SUPERVISOR_OUTSIDE }}</p>
+      <label for="sup_title">{{ fields.sup_title }}</label>
+      <select id="sup_title" name="sup_title">
+        <option value="">{{ t.SUPERVISOR_NONE }}</option>
+        {% for title in lists.titles %}<option value="{{ title }}">{{ title }}</option>{% endfor %}
+      </select>
+      <label for="sup_name">{{ fields.sup_name }}</label>
+      <input type="text" id="sup_name" name="sup_name">
+      <label for="sup_email">{{ fields.sup_email }}</label>
+      <input type="email" id="sup_email" name="sup_email">
+      {% for key, message in errors.items() if key.startswith("supervisor_") %}<p class="error">{{ message }}</p>{% endfor %}
+      <button type="submit">{{ t.STAFF_SUPERVISOR_SAVE }}</button>
+    </fieldset>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
