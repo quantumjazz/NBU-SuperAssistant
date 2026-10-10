@@ -9,6 +9,8 @@ is a new row in `corrections`, a check a new row in `checks`, a changed
 supervisor a new row in `requests` that marks the earlier one replaced.
 """
 
+import fcntl
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -207,6 +209,11 @@ def local_datetime(stamp):
     return parse(stamp).astimezone(LOCAL_ZONE).strftime("%d.%m.%Y %H:%M")
 
 
+def local_day(stamp):
+    """A stored moment's calendar date in Sofia, as a date to count with."""
+    return parse(stamp).astimezone(LOCAL_ZONE).date()
+
+
 def connect(path):
     """One connection, rows readable by column name, foreign keys on."""
     connection = sqlite3.connect(str(path), timeout=30,
@@ -230,20 +237,39 @@ def transaction(connection):
 
 
 def migrate(path):
-    """Bring the file at path up to the latest schema, keeping every row."""
-    connection = connect(path)
+    """Bring the file at path up to the latest schema, keeping every row.
+
+    On the host the service and the reminder timer are separate processes
+    that may start together on a database not yet migrated. Each holds an
+    exclusive lock on a file beside the database ("<database>.migrate.lock")
+    while it reads the version and applies the steps, so the second waits
+    and then finds the schema already at the latest version, instead of
+    applying the same step again ("table already exists"). The lock file is
+    left in place: removing it would let a third process lock a new file
+    while the second still holds the old one.
+    """
+    lock_path = str(path) + ".migrate.lock"
+    descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        version = connection.execute("PRAGMA user_version").fetchone()[0]
-        for number, script in enumerate(MIGRATIONS, start=1):
-            if number <= version:
-                continue
-            # A file already at schema 1 was made by a start that wrote the
-            # starting lists: it is an installation, never a first start, so
-            # lists missing from it must stop the start, not be recreated.
-            known = ("INSERT INTO installation (key, value) VALUES ('lists', '"
-                     + now() + "');") if number == 2 and version >= 1 else ""
-            connection.executescript("BEGIN IMMEDIATE;" + script + ";"
-                                     + known + "PRAGMA user_version = "
-                                     + str(number) + ";COMMIT;")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        connection = connect(path)
+        try:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            for number, script in enumerate(MIGRATIONS, start=1):
+                if number <= version:
+                    continue
+                # A file already at schema 1 was made by a start that wrote
+                # the starting lists: it is an installation, never a first
+                # start, so lists missing from it must stop the start, not be
+                # recreated.
+                known = ("INSERT INTO installation (key, value) VALUES "
+                         "('lists', '" + now() + "');"
+                         ) if number == 2 and version >= 1 else ""
+                connection.executescript("BEGIN IMMEDIATE;" + script + ";"
+                                         + known + "PRAGMA user_version = "
+                                         + str(number) + ";COMMIT;")
+        finally:
+            connection.close()
     finally:
-        connection.close()
+        # Closing the descriptor releases the lock.
+        os.close(descriptor)

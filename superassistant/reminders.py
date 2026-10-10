@@ -1,9 +1,11 @@
 """`python -m superassistant remind`: remind supervisors who have not answered.
 
-Run by hand in this milestone; the host will later run it on a timer
-(deferred with the deployment). The rule is in supervision.due: three days
-after the request and three days after that reminder, at most twice, as the
-settings SUPERASSISTANT_REMINDER_DAYS and SUPERASSISTANT_REMINDER_COUNT say.
+On the host a systemd timer runs it every day at 09:00, Sofia time; it can
+also be run by hand. The rule is in supervision.due: three calendar days in
+Sofia after the request and three after that reminder, at most twice, as the
+settings SUPERASSISTANT_REMINDER_DAYS and SUPERASSISTANT_REMINDER_COUNT say,
+so a request mailed on Monday afternoon is reminded on Thursday and Sunday
+mornings. Running it again on the same day sends nothing more.
 """
 
 import sys
