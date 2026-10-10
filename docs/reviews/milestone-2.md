@@ -62,3 +62,30 @@
   - the faculty list of possible supervisors;
   - the list of students' faculty numbers and addresses.
 - **Change:** `docs/deployment.md` only, worded to match.
+
+## 2026-10-10 — Deployed on the laptop-server
+
+- **Code:** `4ed7ec7`. Its code is the same as `bdb42be`.
+  - Pushed to the owner's new public repository `quantumjazz/NBU-SuperAssistant`.
+  - Cloned to `/home/victor/apps/nbu-superassistant`.
+- **Laptop checks** (Opus 5.5, over ssh):
+  - On Python 3.12.3, 211 passed. The browser tests were not run there.
+  - The records folder `/home/victor/nbu-superassistant-data` (mode 700) is new.
+  - The owner's list of 22 professors is accepted by the start's list check.
+- **Settings:** `.env.production` (mode 600, ignored by git). The Resend key was copied on the laptop from CourseBench's file and never displayed.
+- **Owner's sudo steps:**
+  - The service and timer units were installed and enabled.
+  - The account `victor` was registered through `ssh -L` before the address was public, then named owner.
+  - A tunnel line was added; `cloudflared ingress validate` passed. The earlier config is kept as `config.yml.bak-20261010-224504`.
+  - A DNS CNAME was created and cloudflared restarted.
+- **Evidence:**
+  - `https://nbu-superassistant.visiometrica.com/healthz` answers ok.
+  - The session cookie is `Secure; HttpOnly; SameSite=Lax`.
+  - `/owner` and `/application` redirect a visitor who is not signed in.
+  - The start line names the https address, mail `send` through smtp.resend.com:587 and the CF-Connecting-IP header.
+  - `mail-test` to vavramov@nbu.bg was accepted and reached the inbox (the owner's screenshot).
+  - CourseBench answers 200.
+  - The timer's next run is 11 October at 09:00 EEST.
+- **Outstanding:**
+  - Codex's review of `4ed7ec7`;
+  - the owner's hands-on checks.
