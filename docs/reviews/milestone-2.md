@@ -89,3 +89,22 @@
 - **Outstanding:**
   - Codex's review of `4ed7ec7`;
   - the owner's hands-on checks.
+
+## 2026-10-10 — The live pilot checked; Приложение 2 fixed in `e3b51b9`
+
+- **The owner's test:** one thesis application, with the owner as the student. The supervisor is доц. д-р Екатерина Цветанова-Георгиева; her request was sent at 22:54. `victor` recorded the staff check as passed at 22:57. Her answer is pending. Owner (verbatim): "everything looks good; check yourself".
+- **Opus 5.5's read-only check** (two delegated agents, one round): the records, the mail and the logs are as designed.
+  - The sign-in was spent once and stored hashed.
+  - The request went to the address in the professors list.
+  - The per-source limit was keyed by Cloudflare's visitor address, not 127.0.0.1.
+  - The journal holds no error and no token.
+  - If she does not answer, the reminders go on 13 and 16 October at 09:00.
+- **Found:** rendered through Word, Приложение 2 put the supervisor's slot at the left edge of the next line. This is a milestone-1 template defect: milestone 1 rendered the form only with Quick Look.
+- **Fixed in `e3b51b9`:**
+  - The year is replaced by dots of equal width.
+  - A regression test pins the line's width.
+  - Checked by eye through Word against the sample.
+  - Python 3.9.6 and 3.12.14: 212 passed and browser 7 passed.
+  - Pushed. The laptop pulled it; it reads templates for each document, so no restart was needed.
+- **DEFERRED until real students (8.7):** the sign-in limit of 10 an hour per visitor counts one public address, so students on one campus network would share it.
+- **Outstanding:** Codex's review, now of `e3b51b9`; then the supervisor's answer and the report.
