@@ -232,8 +232,14 @@ def build_prilozhenie(path):
     year = [i for i, text in texts.items() if re.search(r"20\d\d", text)]
     if len(year) != 1 or texts[1] != "…………….":
         raise BuildError("the date line has changed")
-    texts[1] = "………………………"
-    del texts[year[0]]
+    # The year goes and nothing else moves. This line places the supervisor's
+    # slot under "Научен ръководител:" with tabs, so the text before them
+    # keeps the sample's width: " ……" is exactly as wide as " 2025" in Times
+    # New Roman, regular or bold (a space and two ellipses, 250 + 2 × 1000
+    # units, against a space and four digits, 250 + 4 × 500). Longer dots
+    # pushed the tabs on and dropped the slot to the next line's left edge,
+    # as Word showed on 10 October 2026.
+    texts[year[0]] = " ……"
     set_runs(handed_in, texts)
     return document
 

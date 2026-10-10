@@ -270,6 +270,39 @@ def test_prilozhenie2_keeps_line_breaks_and_leaves_dates_blank(data):
     assert not re.search(r"\d", handed_in[0].split("\t")[0])
 
 
+# Advance widths in Times New Roman, in thousandths of an em, regular and
+# bold alike: what decides where the date line's tabs land.
+TIMES_WIDTHS = {" ": 250, "…": 1000, ".": 250, "г": 500,
+                **{digit: 500 for digit in "0123456789"}}
+SAMPLE_DATE_LINE = ["Дата на предаване: ", "…………….", " 2025", " г."]
+
+
+def test_prilozhenie2_date_line_keeps_the_samples_width():
+    """The supervisor's slot is placed with tabs after the date, so the text
+    before the first tab must be as wide as in the department's sample, or
+    Word drops the slot to the next line's left edge (seen in Word on 10
+    October 2026, when longer dots had replaced "……………. 2025"). Only the
+    year is replaced, by dots of the same width, and no digit is left."""
+    template = docx.Document(str(documents.TEMPLATES
+                                 / documents.PRILOZHENIE2))
+    (line,) = [p for p in template.paragraphs
+               if p.text.startswith("Дата на предаване:")]
+    before_tab = []
+    for run in line.runs:
+        if "\t" in run.text:
+            break
+        before_tab.append(run.text)
+    assert before_tab[0] == SAMPLE_DATE_LINE[0]
+    assert before_tab[1] == SAMPLE_DATE_LINE[1]
+
+    def width(text):
+        return sum(TIMES_WIDTHS[ch] for ch in text)
+
+    assert [width(t) for t in before_tab[1:]] == \
+        [width(t) for t in SAMPLE_DATE_LINE[1:]]
+    assert not re.search(r"\d", "".join(before_tab))
+
+
 def test_prilozhenie2_for_an_unlisted_programme_names_both_degrees():
     the_lists = lists.Lists(["доц. д-р"], {}, {}, {})
     record = {"name1": "Ана", "name2": "Бойкова", "name3": "Вълчева",
