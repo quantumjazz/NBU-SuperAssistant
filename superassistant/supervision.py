@@ -18,7 +18,6 @@ the relay refuses leaves nothing recorded as sent.
 import base64
 import hashlib
 import hmac
-from datetime import timedelta
 
 from superassistant import accounts, applications, db, limits, mail, texts
 
@@ -286,18 +285,24 @@ def due(connection, settings):
     """Requests whose supervisor should be reminded now (8.4).
 
     Standing, unanswered, sent, fewer reminders than the setting allows, and
-    the request or its latest reminder at least the set days old, so a second
-    run on the same day finds nothing more.
+    the request or its latest reminder mailed at least the set days earlier,
+    counted in calendar days in Sofia, not in hours: with 3 days, a request
+    mailed on Monday at 14:00 is due from Thursday's first moment in Sofia,
+    so the daily run at 09:00 reminds on Thursday and again on Sunday. A
+    reminder sent today makes today the day of the latest mail, so a second
+    run on the same Sofia day finds nothing more (the days are at least 1).
     """
-    cutoff = (db.now_dt() - timedelta(days=settings.reminder_days)).isoformat(
-        timespec="seconds")
-    return connection.execute(
+    today = db.local_day(db.now())
+    standing = connection.execute(
         "SELECT requests.* FROM requests JOIN applications ON applications.id"
         " = requests.application_id WHERE requests.replaced_at IS NULL AND "
         "requests.answer IS NULL AND requests.sent_at IS NOT NULL AND "
-        "requests.reminders_sent < ? AND requests.last_mailed_at <= ? AND "
-        "applications.submitted_at IS NOT NULL ORDER BY requests.id",
-        (settings.reminder_count, cutoff)).fetchall()
+        "requests.reminders_sent < ? AND requests.last_mailed_at IS NOT NULL "
+        "AND applications.submitted_at IS NOT NULL ORDER BY requests.id",
+        (settings.reminder_count,)).fetchall()
+    return [request for request in standing
+            if (today - db.local_day(request["last_mailed_at"])).days
+            >= settings.reminder_days]
 
 
 def remind(connection, settings, lists):
