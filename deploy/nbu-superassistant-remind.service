@@ -1,0 +1,40 @@
+# The daily reminder run: `python -m superassistant remind`, once, started by
+# nbu-superassistant-remind.timer. It reminds the supervisors who have not
+# answered a request, as SUPERASSISTANT_REMINDER_DAYS and
+# SUPERASSISTANT_REMINDER_COUNT say (docs/deployment.md, "The reminder
+# timer").
+#
+# Install it together with the timer; the timer is what is enabled, not this
+# file:
+#   sudo cp deploy/nbu-superassistant-remind.service /etc/systemd/system/
+#   sudo cp deploy/nbu-superassistant-remind.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now nbu-superassistant-remind.timer
+#
+# Run it once by hand, and read what it did:
+#   sudo systemctl start nbu-superassistant-remind.service
+#   sudo journalctl -u nbu-superassistant-remind -n 20 --no-pager
+#
+# Paths assume the clone is at /home/victor/apps/nbu-superassistant, as in
+# nbu-superassistant.service; change them together. WorkingDirectory is what
+# lets `python -m superassistant` find the package. The run reads the same
+# settings file as the service, so it opens the same records and builds
+# supervisors' links with the same key.
+#
+# It ends with status 1 when a reminder could not be sent, and systemctl then
+# shows this unit as failed until the next run; the journal names each one.
+
+[Unit]
+Description=NBU-SuperAssistant reminders to supervisors
+# The timer's run at boot, after a 09:00 missed while the laptop was off
+# (Persistent=true), must wait for the network, or no reminder reaches the
+# relay.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=victor
+WorkingDirectory=/home/victor/apps/nbu-superassistant
+EnvironmentFile=/home/victor/apps/nbu-superassistant/.env.production
+ExecStart=/home/victor/apps/nbu-superassistant/.venv/bin/python -m superassistant remind

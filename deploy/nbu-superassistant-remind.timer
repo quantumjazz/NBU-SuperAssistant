@@ -1,0 +1,22 @@
+# Starts nbu-superassistant-remind.service every day at 09:00 Sofia time.
+#
+# Install: see nbu-superassistant-remind.service. When it runs next:
+#   systemctl list-timers nbu-superassistant-remind.timer
+#
+# The time zone is written here, so the run is at 09:00 in Sofia whatever the
+# laptop's own zone (Europe/Sofia as well), summer time included.
+#
+# Persistent=true: a 09:00 missed while the laptop was off runs once at the
+# next boot. A missed day loses nothing: reminders count calendar days from
+# the last mail actually sent, so a late run sends what is due, and the next
+# reminder counts from the day this one went.
+
+[Unit]
+Description=Daily NBU-SuperAssistant reminders at 09:00 Europe/Sofia
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Europe/Sofia
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -12,5 +12,8 @@ data/
 test-output/
 # Delegates' isolated worktrees.
 .claude/
-# The host's settings file holds the relay password and the session key.
+# Settings files hold secrets (the host's holds the Resend key and may hold
+# the session key): never committed. .env.production.example is the template
+# (docs/deployment.md).
 .env.production
+.env

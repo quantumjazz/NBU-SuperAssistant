@@ -1,0 +1,58 @@
+# NBU-SuperAssistant as a service the operating system keeps running.
+# Modelled on CourseBench's deploy/coursebench.service.
+#
+# The settings, the Resend key among them, are read from a chmod 600 file in
+# the clone rather than from Environment= lines here, so they are not readable
+# by every account on the machine the way a unit file in /etc/systemd/system
+# is.
+#
+# Install:  sudo cp deploy/nbu-superassistant.service /etc/systemd/system/
+#           sudo systemctl daemon-reload
+#           sudo systemctl enable --now nbu-superassistant
+#
+# Paths assume the clone is at /home/victor/apps/nbu-superassistant. If it is
+# somewhere else, change WorkingDirectory, EnvironmentFile and the path in
+# ExecStart together, and the same three lines in
+# nbu-superassistant-remind.service. A virtual environment records its own
+# location, so a moved clone needs its .venv rebuilt rather than copied.
+# The records are not in the clone: they are in the folder the settings file
+# names, /home/victor/nbu-superassistant-data.
+
+[Unit]
+Description=NBU-SuperAssistant
+After=network.target
+
+[Service]
+Type=simple
+User=victor
+WorkingDirectory=/home/victor/apps/nbu-superassistant
+EnvironmentFile=/home/victor/apps/nbu-superassistant/.env.production
+
+# ONE worker. Every gunicorn worker runs the start itself (the checks, the
+# migrations, the lists), so with one worker a single process owns the start,
+# and the daily reminder run (nbu-superassistant-remind.service) is the only
+# other process the host starts on the records by itself. Eight threads serve
+# eight requests at once, which is more than the pilot needs.
+#
+# NO access log, deliberately: there is no --access-logfile, and gunicorn
+# writes none without it. The addresses of students' sign-in links
+# (/link/<token>) and of supervisors' answer pages (/answer/<token>/...) carry
+# their tokens, and an access log would write every one of them into the
+# journal, where anyone who reads the journal could open those pages. Do not
+# add it.
+#
+# --timeout 60: nothing here works for long inside a request; generating a
+# report takes seconds. --graceful-timeout 30 lets requests under way finish
+# when the service is restarted.
+ExecStart=/home/victor/apps/nbu-superassistant/.venv/bin/gunicorn \
+    --workers 1 --threads 8 --worker-class gthread \
+    --timeout 60 --graceful-timeout 30 \
+    --bind 127.0.0.1:8791 \
+    --error-logfile - \
+    wsgi:app
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
