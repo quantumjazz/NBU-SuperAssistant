@@ -35,6 +35,10 @@ MAIL_FAILED = "Писмото не можа да бъде изпратено."
 MAIL_INTENDED_FOR = "[Режим за разработка] Писмото е предназначено за: {}"
 MAIL_CONSOLE_HEADER = "писмо (не е изпратено, режим console)"
 MAIL_CONSOLE_FOOTER = "край на писмото"
+MAIL_DEV_CONSOLE = ("Режим за разработка: писмата не се изпращат, а се "
+                    "отпечатват в прозореца на Terminal, в който работи "
+                    "приложението.")
+MAIL_DEV_OWNER = "Режим за разработка: всички писма отиват само до {}."
 
 # --- Student sign-in ---------------------------------------------------------
 
@@ -234,14 +238,14 @@ CLI_REMINDER_FAILED = ("Напомнянето до {} (заявление {}) �
 NAV_APPLICATION = "Заявление"
 NAV_STAFF = "Заявления"
 NAV_REPORTS = "Доклади"
-NAV_OWNER = "Сметки"
+NAV_OWNER = "Профили"
 
 STAFF_REGISTER_TITLE = "Регистрация на служител"
-STAFF_REGISTER_INTRO = ("Новата сметка не вижда нищо, докато собственикът "
-                        "не я одобри.")
+STAFF_REGISTER_INTRO = ("Новият профил не вижда нищо, докато собственикът "
+                        "не го одобри.")
 STAFF_USERNAME = "Потребителско име"
 STAFF_USERNAME_HINT = "Без знака „@“."
-STAFF_EMAIL = "Електронна поща"
+STAFF_EMAIL = "Служебна електронна поща"
 STAFF_PASSWORD = "Парола"
 STAFF_PASSWORD_AGAIN = "Паролата отново"
 STAFF_REGISTER_BUTTON = "Регистрирай"
@@ -251,21 +255,24 @@ STAFF_REGISTER_ERRORS = {
     "email": "Въведете адрес на електронна поща.",
     "password": "Въведете парола.",
     "username-taken": "Това потребителско име вече е заето.",
-    "email-taken": "Този адрес вече има сметка.",
+    "email-taken": "Този адрес вече има профил.",
     "mismatch": "Двете пароли не съвпадат.",
 }
-STAFF_REGISTERED_TITLE = "Сметката е създадена"
-STAFF_REGISTERED_WAITING = ("Сметката чака одобрение от собственика. След "
+STAFF_REGISTERED_TITLE = "Профилът е създаден"
+STAFF_REGISTERED_WAITING = ("Профилът чака одобрение от собственика. След "
                             "това ще влизате с потребителското име или "
                             "адреса си и паролата.")
-STAFF_REGISTERED_OWNER = ("Това е сметката на собственика и не чака "
+STAFF_REGISTERED_OWNER = ("Това е профилът на собственика и не чака "
                           "одобрение; можете да влезете.")
 STAFF_SIGNIN_TITLE = "Вход за служители"
 STAFF_LOGIN = "Потребителско име или електронна поща"
 STAFF_SIGNIN_BUTTON = "Влез"
 STAFF_SIGNIN_FAILED = "Потребителското име, адресът или паролата не са верни."
-STAFF_SIGNIN_WAITING = "Сметката още чака одобрение от собственика."
-STAFF_TO_REGISTER = "Нямате сметка? Регистрирайте се."
+STAFF_SIGNIN_WAITING = "Профилът още чака одобрение от собственика."
+NO_OWNER_YET = ("Още не е посочен собственик, който да одобрява профили: "
+                "собственикът задава SUPERASSISTANT_OWNER_USERNAME (своето "
+                "потребителско име) и стартира приложението отново.")
+STAFF_TO_REGISTER = "Нямате профил? Регистрирайте се."
 STAFF_TO_SIGNIN = "Към входа за служители"
 STAFF_TO_STUDENTS = "Вход за студенти"
 
@@ -287,7 +294,7 @@ STAFF_WAITING_REPORT = "чака доклад"
 STAFF_LEGEND = "Оцветените редове чакат действие."
 STAFF_APPLICATION_TITLE = "Заявление на {}"
 STAFF_SUBMITTED_AT = "Подадено на"
-STAFF_EMAIL = "Електронна поща на студента"
+STAFF_STUDENT_EMAIL = "Електронна поща на студента"
 STAFF_REQUESTS_TITLE = "Молби до научен ръководител"
 STAFF_REQUEST_LINE = "{} ({}), изпратена на {}"
 STAFF_REQUEST_ANSWER = "Отговор: {} на {}"
@@ -323,12 +330,12 @@ STAFF_SUPERVISOR_MAIL_FAILED = ("Нищо не е променено: молба
 
 # --- The owner's page --------------------------------------------------------
 
-OWNER_TITLE = "Сметки на служителите"
+OWNER_TITLE = "Профили на служителите"
 OWNER_WAITING = "Чакат одобрение"
-OWNER_NONE_WAITING = "Няма сметки, които чакат одобрение."
+OWNER_NONE_WAITING = "Няма профили, които чакат одобрение."
 OWNER_APPROVE = "Одобри"
-OWNER_APPROVED = "Сметката „{}“ е одобрена."
-OWNER_ALL = "Всички сметки"
+OWNER_APPROVED = "Профилът „{}“ е одобрен."
+OWNER_ALL = "Всички профили"
 OWNER_COL_USERNAME = "Потребителско име"
 OWNER_COL_EMAIL = "Електронна поща"
 OWNER_COL_STATE = "Състояние"
@@ -384,11 +391,11 @@ REPORTS_DOWNLOAD = "Изтегли"
 # --- The command line --------------------------------------------------------
 
 CLI_NO_OWNER_SETTING = ("SUPERASSISTANT_OWNER_USERNAME не е зададено, затова "
-                        "няма сметка на собственика, чиято парола да се "
+                        "няма профил на собственика, чиято парола да се "
                         "смени.")
-CLI_NO_RECORDS = ("В {} няма записи, затова няма сметка „{}“ "
+CLI_NO_RECORDS = ("В {} няма записи, затова няма профил „{}“ "
                   "(SUPERASSISTANT_DATA_DIR).")
-CLI_NO_ACCOUNT = ("Никоя сметка в {} няма потребителското име „{}“, което "
+CLI_NO_ACCOUNT = ("Никой профил в {} няма потребителското име „{}“, което "
                   "SUPERASSISTANT_OWNER_USERNAME назовава.")
 CLI_PASSWORD_PROMPT = "Нова парола за „{}“: "
 CLI_PASSWORD_AGAIN = "Новата парола отново: "

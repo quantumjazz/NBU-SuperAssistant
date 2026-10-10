@@ -85,7 +85,10 @@ def create_app(settings=None):
 
     @app.context_processor
     def _globals():
-        return {"t": texts, "csrf_token": csrf_token,
+        mode = settings.effective_mail_mode()
+        mail_note = (texts.MAIL_DEV_CONSOLE if mode == "console" else
+                     texts.MAIL_DEV_OWNER.format(settings.owner_email))
+        return {"t": texts, "csrf_token": csrf_token, "mail_note": mail_note,
                 "student": session_student(), "staff": session_staff(),
                 "is_owner": is_owner(session_staff())}
 

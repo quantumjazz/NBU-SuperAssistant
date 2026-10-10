@@ -101,3 +101,55 @@ def test_a_refused_message_raises(settings, outbox):
     outbox.refuse = True
     with pytest.raises(mail.MailFailed):
         mail.send(settings, mail.Message("someone@example.org", "Т", "Т"))
+
+
+def test_no_wording_is_defined_twice():
+    """A name assigned twice in texts.py silently replaces the first: the
+    staff registration page once showed the student's email label so."""
+    import ast
+    import collections
+    from pathlib import Path
+    source = (Path(__file__).resolve().parent.parent / "superassistant"
+              / "texts.py").read_text(encoding="utf-8")
+    seen = collections.Counter(
+        target.id for node in ast.parse(source).body
+        if isinstance(node, ast.Assign) for target in node.targets
+        if isinstance(target, ast.Name))
+    assert [name for name, count in seen.items() if count > 1] == []
+
+
+def test_every_page_says_where_mail_goes(tmp_path, client):
+    from superassistant import texts
+    page = client.get("/").get_data(as_text=True)
+    assert texts.MAIL_DEV_OWNER.format("owner@example.org") in page
+    settings = make_settings(tmp_path / "console", mail_mode="")
+    console = create_app(settings).test_client()
+    assert texts.MAIL_DEV_CONSOLE in console.get("/").get_data(as_text=True)
+
+
+def test_a_waiting_account_is_told_how_an_owner_is_named(client, settings):
+    from superassistant import texts
+    response = client.post("/staff/register", data={
+        "username": "first", "email": "first@example.org",
+        "password": "парола-1", "password2": "парола-1"})
+    assert texts.NO_OWNER_YET in response.get_data(as_text=True)
+    response = client.post("/staff/sign-in", data={"login": "first",
+                                                   "password": "парола-1"})
+    assert response.status_code == 403
+    assert texts.NO_OWNER_YET in response.get_data(as_text=True)
+
+
+def test_with_an_owner_named_the_hint_is_not_shown(tmp_path):
+    from superassistant import texts
+    from tests.conftest import Client
+    data_dir = tmp_path / "data"
+    prepare_data_dir(data_dir)
+    settings = make_settings(data_dir, owner_username="boss")
+    make_account(settings, "boss", approved=False)
+    client = Client(create_app(settings).test_client())
+    response = client.post("/staff/register", data={
+        "username": "second", "email": "second@example.org",
+        "password": "парола-2", "password2": "парола-2"})
+    page = response.get_data(as_text=True)
+    assert texts.STAFF_REGISTERED_WAITING in page
+    assert texts.NO_OWNER_YET not in page

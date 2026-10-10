@@ -121,7 +121,16 @@ def staff_register():
     return render_template(
         "staff_register.html", form=form, error="",
         done=texts.STAFF_REGISTERED_OWNER if owner
-        else texts.STAFF_REGISTERED_WAITING)
+        else _waiting(texts.STAFF_REGISTERED_WAITING))
+
+
+def _waiting(sentence):
+    """A waiting account is told how an owner gets named, if none is yet:
+    otherwise the first account can only register and sign in round and
+    round, waiting for an owner who cannot exist."""
+    if web.settings().owner_username:
+        return sentence
+    return sentence + " " + texts.NO_OWNER_YET
 
 
 @blueprint.route("/staff/sign-in", methods=["GET", "POST"])
@@ -137,6 +146,6 @@ def staff_sign_in():
                                error=texts.STAFF_SIGNIN_FAILED), 400
     if not accounts.approved(record, web.settings()):
         return render_template("staff_signin.html", login=login,
-                               error=texts.STAFF_SIGNIN_WAITING), 403
+                               error=_waiting(texts.STAFF_SIGNIN_WAITING)), 403
     web.sign_in_staff(record)
     return redirect("/staff")

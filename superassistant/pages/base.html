@@ -15,7 +15,7 @@
       {% if staff %}
         <a href="/staff">{{ t.NAV_STAFF if t.NAV_STAFF is defined else 'Заявления' }}</a>
         <a href="/staff/reports">{{ t.NAV_REPORTS if t.NAV_REPORTS is defined else 'Доклади' }}</a>
-        {% if is_owner %}<a href="/owner">{{ t.NAV_OWNER if t.NAV_OWNER is defined else 'Сметки' }}</a>{% endif %}
+        {% if is_owner %}<a href="/owner">{{ t.NAV_OWNER if t.NAV_OWNER is defined else 'Профили' }}</a>{% endif %}
       {% endif %}
       <form method="post" action="/sign-out" class="inline">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
@@ -24,6 +24,7 @@
     </nav>
     {% endif %}
   </header>
+  {% if mail_note %}<p class="dev-note" id="dev-note">{{ mail_note }}</p>{% endif %}
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}

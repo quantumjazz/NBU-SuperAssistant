@@ -7,7 +7,7 @@
 
 <dl class="fields" id="fields">
   <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at|datetime }}</dd>
-  <dt>{{ t.STAFF_EMAIL }}</dt><dd>{{ r.email }}</dd>
+  <dt>{{ t.STAFF_STUDENT_EMAIL }}</dt><dd>{{ r.email }}</dd>
   <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
   {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
   {% if r.grad_type == "thesis" %}
