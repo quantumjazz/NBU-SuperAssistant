@@ -108,3 +108,22 @@
   - Pushed. The laptop pulled it.
 - **DEFERRED until real students (8.7):** the sign-in limit of 10 an hour per visitor counts one public address, so students on one campus network would share it.
 - **Outstanding:** Codex's review, now of `e3b51b9`; then the supervisor's answer and the report.
+
+## 2026-10-11 — Codex's review of `e3b51b9`: M2-C1 disputed, M2-C2 and M2-C3 fixed in `c479104`
+
+- **Review** (Codex, relayed by the owner): CHANGES REQUESTED at `e3b51b9`. The Приложение 2 fix is verified. The three findings:
+  - M2-C1 asks that a carriage return be kept inside a settings-file value;
+  - M2-C2 asks that a backup or restore stop every writer;
+  - M2-C3 asks that no backup overwrite another, and that a restore keep the current records.
+  - Codex's checks: 212 + 7 passed on each Python.
+- **M2-C1, disputed with evidence:**
+  - The host's systemd 255 was given Codex's line through a transient unit. The value it set was "re_FAKE_before", so a carriage return ends a line there.
+  - The reader already matched that. The proposed change would have made it disagree.
+  - The behaviour is kept, made explicit, and pinned by a test holding the file systemd was given.
+- **M2-C2 and M2-C3, fixed in `docs/deployment.md`:**
+  - Stop the timer, wait out a running reminder, stop the service.
+  - Backups get per-second names, written under `noclobber` and `umask 077`.
+  - A restore keeps the current records in a before-restore folder, and starts nothing after a failed step.
+  - Both procedures were run from the doc's blocks on the laptop, against fake records.
+- **Checks on `c479104`** (Opus 5.5): Python 3.9.6 and 3.12.14, 213 passed and browser 7 passed on each.
+- **Outstanding:** Codex's review of `c479104`, covering M2-C1's evidence and the M2-C2 and M2-C3 fixes only.
