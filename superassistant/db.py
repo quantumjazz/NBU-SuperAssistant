@@ -137,6 +137,14 @@ MIGRATIONS = [
         PRIMARY KEY (report_id, position)
     );
     """,
+    # Version 2: what the installation has done once, kept with the records,
+    # so a lists folder deleted later is never mistaken for a first start.
+    """
+    CREATE TABLE installation (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """,
 ]
 
 APPLICATION_TEXT_FIELDS = (

@@ -37,13 +37,22 @@ def prepare(settings):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.reports_dir.mkdir(parents=True, exist_ok=True)
     db.migrate(settings.db_path)
-    # The starting lists are written once, on the first installation. A list
-    # missing later is an error to report, never one to quietly replace: the
-    # owner may have changed every entry since.
-    if not settings.lists_dir.exists():
-        lists.write_starter(settings.lists_dir)
     connection = db.connect(settings.db_path)
     try:
+        # The starting lists are written once, on the first start, and that
+        # start is recorded in the database, not read from the lists folder:
+        # a list or the whole folder missing later is an error to report,
+        # never one to quietly replace, as the owner may have changed every
+        # entry since.
+        with db.transaction(connection):
+            first = connection.execute(
+                "SELECT 1 FROM installation WHERE key = 'lists'"
+            ).fetchone() is None
+            if first:
+                lists.write_starter(settings.lists_dir)
+                connection.execute(
+                    "INSERT INTO installation (key, value) VALUES "
+                    "('lists', ?)", (db.now(),))
         try:
             loaded = lists.load(settings.lists_dir)
             lists.check_used(loaded, connection)

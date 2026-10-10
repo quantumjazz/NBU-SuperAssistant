@@ -354,3 +354,142 @@ def test_the_report_header_is_times_new_roman_12_pt():
     assert runs and all(r.font.size is not None and r.font.size.pt == 12
                         for r in runs)
     assert all(r.font.name == "Times New Roman" for r in runs)
+
+
+# --- Second round (Codex on bd50873) -------------------------------------------
+
+def test_after_thesis_to_exam_staff_still_see_the_thesis_and_its_answers(
+        client, new_client, settings, outbox, staff):
+    as_student(client, "kept@example.org")
+    submit_thesis(client)
+    new_client().post(link_from(outbox.messages[0], "decline"),
+                      data={"comment": "Нямам място този семестър."})
+    record = record_for(settings, "kept@example.org")
+    viewer = as_staff(new_client(), staff)
+    base = "/staff/application/{}".format(record["id"])
+    assert viewer.post(base + "/type",
+                       data={"grad_type": "exam"}).status_code == 302
+    page = viewer.get(base).get_data(as_text=True)
+    connection = connect(settings)
+    (request,) = applications.requests_of(connection, record["id"])
+    connection.close()
+    for shown in (THESIS_TAB_1["topic"], "Обосновка", "втори ред",
+                  "Глава 2", "доц. д-р Петър Иванов", "p.ivanov@example.org",
+                  "Не потвърждавам", "Нямам място този семестър.",
+                  db.local_datetime(request["answered_at"]),
+                  db.local_datetime(request["replaced_at"]),
+                  "Запазени данни за теза"):
+        assert shown in page, shown
+
+
+@pytest.mark.parametrize("typed, expected", [
+    ({"sup_name": "Анна Стефанова".replace("а", "a"), "sup_title": "проф. д-р",
+      "sup_email": "a@example.net"}, "смесени латински и кирилски"),
+    ({"sup_name": "Анна\x0bСтефанова", "sup_title": "проф. д-р",
+      "sup_email": "a@example.net"}, "U+000B"),
+    ({"professor": "nobody"}, "Изберете стойност от списъка"),
+])
+def test_a_refused_type_change_says_what_is_wrong(
+        client, new_client, settings, outbox, staff, typed, expected):
+    submit_exam(client, "detail{}@example.org".format(len(expected)))
+    record = record_for(settings, "detail{}@example.org".format(
+        len(expected)))
+    viewer = as_staff(new_client(), staff)
+    data = {"grad_type": "thesis"}
+    data.update(typed)
+    response = viewer.post("/staff/application/{}/type".format(record["id"]),
+                           data=data)
+    page = response.get_data(as_text=True)
+    assert response.status_code == 400
+    assert expected in page
+    assert "За теза липсват" not in page
+
+
+def test_only_genuinely_empty_fields_are_called_missing(
+        client, new_client, settings, outbox, staff):
+    submit_exam(client, "empty@example.org")
+    record = record_for(settings, "empty@example.org")
+    viewer = as_staff(new_client(), staff)
+    page = viewer.post("/staff/application/{}/type".format(record["id"]),
+                       data={"grad_type": "thesis", "professor": "ivanov"}
+                       ).get_data(as_text=True)
+    assert "За теза липсват" in page
+    assert "Тема на тезата" in page and "смесени" not in page
+
+
+def test_a_lists_folder_removed_after_installation_stops_the_start(tmp_path):
+    import shutil
+    settings = make_settings(tmp_path / "data")
+    create_app(settings)
+    shutil.rmtree(str(settings.lists_dir))
+    with pytest.raises(StartupError) as raised:
+        create_app(settings)
+    assert "missing" in str(raised.value)
+    assert not settings.lists_dir.exists()          # nothing recreated
+
+
+def test_the_first_start_is_recorded_with_the_records(tmp_path):
+    settings = make_settings(tmp_path / "data")
+    create_app(settings)
+    connection = connect(settings)
+    assert connection.execute("SELECT key FROM installation").fetchall()[0][
+        0] == "lists"
+    connection.close()
+
+
+def test_an_installation_from_schema_1_keeps_its_rows_and_its_lists(tmp_path):
+    """Schema 2 adds the installation table; an installation made before it
+    keeps every row, and its lists, edited or not, are not rewritten."""
+    import sqlite3
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    path = data_dir / "superassistant.sqlite3"
+    connection = sqlite3.connect(str(path))
+    connection.executescript(db.MIGRATIONS[0] + ";PRAGMA user_version = 1;")
+    connection.execute(
+        "INSERT INTO applications (email, email_key, created_at, updated_at,"
+        " name1) VALUES ('old@example.org', 'old@example.org', 'x', 'x', "
+        "'Старо')")
+    connection.commit()
+    connection.close()
+    lists.write_starter(data_dir / "lists")
+    edited = (data_dir / "lists" / lists.TITLES)
+    edited.write_text("звание\nпроф. д-р\nдоц. д-р\nгл. ас. д-р\nас. д-р\n"
+                      "акад.\n", encoding="utf-8")
+    settings = make_settings(data_dir)
+    create_app(settings)
+    connection = connect(settings)
+    assert connection.execute("SELECT name1 FROM applications").fetchone()[0] \
+        == "Старо"
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == len(
+        db.MIGRATIONS)
+    connection.close()
+    assert "акад." in edited.read_text(encoding="utf-8")
+
+
+def test_the_signature_block_is_kept_together_in_a_filled_report(settings):
+    from docx.text.paragraph import Paragraph
+    from superassistant import documents
+    loaded = lists.load(settings.lists_dir)
+    rows = [documents.report_row(i + 1, {
+        "id": i, "name1": "Име", "name2": "Бащино", "name3": "Ф" + str(i),
+        "fn": "F{}".format(i), "topic": "Тема", "professor": "ivanov",
+        "sup_name": "", "sup_title": "", "programme": "АУ-РО",
+        "grad_type": "thesis"}, loaded) for i in range(3)]
+    document = Document(io.BytesIO(documents.doklad_temi(
+        "АУ-РО", rows, "2026-10-10T09:00:00+00:00", loaded)))
+    body = list(document.element.body.iterchildren())
+    after = [Paragraph(el, document)
+             for el in body[body.index(document.tables[0]._tbl) + 1:]
+             if el.tag.endswith("}p")]
+    texts = [p.text for p in after]
+    dated = max(i for i, text in enumerate(texts) if "Дата:" in text)
+    block = after[:dated + 1]
+    assert any("Приложение" in p.text for p in block)
+    assert any("Виктор Аврамов/" in p.text for p in block)
+    assert all(p.paragraph_format.keep_together for p in block)
+    assert all(p.paragraph_format.keep_with_next for p in block[:-1])
+    assert after[dated] is after[-1]                # no empty page-maker after
+    header = document.tables[0].rows[0]
+    assert {r.font.size.pt for c in header.cells for p in c.paragraphs
+            for r in p.runs} == {12.0}

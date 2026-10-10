@@ -207,7 +207,7 @@ def test_staff_table_one_application_and_a_check(live_server, open_page):
     expect(row).to_contain_text(texts.STAFF_WAITING_CHECK)
 
     table.get_by_role("link", name="Десислава Петкова Маринова").click()
-    fields = desk.locator("#fields")
+    fields = desk.locator("main")
     for value in ("F201234", "0888 123 456", "5,75", STUDENT[4],
                   "Раздел plan"):
         expect(fields).to_contain_text(value)

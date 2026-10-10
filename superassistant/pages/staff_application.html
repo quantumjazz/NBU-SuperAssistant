@@ -10,19 +10,22 @@
   <dt>{{ t.STAFF_STUDENT_EMAIL }}</dt><dd>{{ r.email }}</dd>
   <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
   {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
-  {% if r.grad_type == "thesis" %}
+</dl>
+{% if r.grad_type == "thesis" or retained %}
+{% if r.grad_type != "thesis" %}<h2 id="retained">{{ t.STAFF_RETAINED_THESIS }}</h2>{% endif %}
+<dl class="fields" id="thesis-fields">
     <dt>{{ fields.phone }}</dt><dd>{{ r.phone }}</dd>
     <dt>{{ fields.programme }}</dt><dd>{{ programme_label }}</dd>
     <dt>{{ fields.topic }}</dt><dd>{{ r.topic }}</dd>
     <dt>{{ fields.average_grade }}</dt><dd>{{ r.average_grade }}</dd>
-    <dt>{{ fields.professor }}</dt><dd>{{ row.supervisor }}{% if not r.professor %} ({{ r.sup_email }}){% endif %}</dd>
+    <dt>{{ fields.professor }}</dt><dd>{{ supervisor_label }}{% if not r.professor and r.sup_email %} ({{ r.sup_email }}){% endif %}</dd>
     {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
       <dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>
     {% endfor %}
-  {% endif %}
 </dl>
+{% endif %}
 
-{% if r.grad_type == "thesis" %}
+{% if requests %}
 <section id="requests">
   <h2>{{ t.STAFF_REQUESTS_TITLE }}</h2>
   <ul>

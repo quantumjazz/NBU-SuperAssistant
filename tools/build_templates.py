@@ -310,6 +310,7 @@ def build_report(path):
     if [c.text for c in table.rows[0].cells] != HEADER:
         raise BuildError("the report's columns have changed")
     header_to_12pt(table)
+    keep_signature_together(document)
     rows = table._tbl.findall(qn("w:tr"))
     model = rows[1]
     model_run = model.find(".//" + qn("w:r"))
@@ -342,6 +343,31 @@ def header_to_12pt(table):
                     size = marks.find(qn("w:rPr")).find(qn(name))
                     if size is not None:
                         size.set(qn("w:val"), "24")
+
+
+def keep_signature_together(document):
+    """The block after the table, from „Приложение“ to the date, moves to the
+    next page as one rather than splitting: with 12 pt headers a three-student
+    report left the date alone on page 2 in Word. The empty paragraph that
+    ended the document, which could make a page of its own, is removed."""
+    from docx.text.paragraph import Paragraph
+    body = document.element.body
+    table = document.tables[0]._tbl
+    after = list(body.iterchildren())
+    after = after[after.index(table) + 1:]
+    paragraphs = [Paragraph(el, document) for el in after
+                  if el.tag == qn("w:p")]
+    while paragraphs and not paragraphs[-1].text.strip() \
+            and paragraphs[-1]._p.find(".//" + qn("w:sectPr")) is None \
+            and len(paragraphs) > 1 and "Дата" in paragraphs[-2].text:
+        body.remove(paragraphs.pop()._p)
+    dated = [i for i, p in enumerate(paragraphs) if "Дата" in p.text]
+    if not dated:
+        raise BuildError("the date line after the table is missing")
+    for paragraph in paragraphs[:dated[-1] + 1]:
+        paragraph.paragraph_format.keep_together = True
+    for paragraph in paragraphs[:dated[-1]]:
+        paragraph.paragraph_format.keep_with_next = True
 
 
 # --- Saving, with neutral metadata ---------------------------------------------

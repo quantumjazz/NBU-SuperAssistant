@@ -14,6 +14,11 @@ from superassistant import web
 
 blueprint = Blueprint("staff", __name__)
 
+# Thesis entries a state-exam application may still hold, from before staff
+# corrected its type or from the student's draft: shown, never dropped.
+RETAINED = ("phone", "programme", "topic", "average_grade", "professor",
+            "sup_name", "sup_email") + applications.MULTI_LINE_FIELDS
+
 CORRECTABLE = ("name1", "name2", "name3", "fn", "phone", "programme", "topic",
                "average_grade") + applications.MULTI_LINE_FIELDS
 
@@ -59,6 +64,8 @@ def _render(record, errors=None, status=200):
         "staff_application.html", row=_row(connection, record, lists),
         record=record, lists=lists, errors=errors or {},
         requests=[(r, supervision.request_label(r, lists)) for r in requests],
+        retained=any(record[f] for f in RETAINED),
+        supervisor_label=applications.supervisor_label(record, lists),
         checks=applications.checks_of(connection, record["id"]),
         corrections=applications.corrections_of(connection, record["id"]),
         correctable=CORRECTABLE,
@@ -172,10 +179,22 @@ def change_type(application_id):
         flash(texts.STAFF_NOTHING_CHANGED, "ok")
         return redirect("/staff/application/{}".format(record["id"]))
     if refusals:
-        labels = ", ".join(texts.FIELD_LABELS.get(r.field, r.field)
-                           for r in refusals)
         flash(texts.FIX_BELOW, "error")
-        return _render(record, {"type": texts.STAFF_TYPE_MISSING.format(
-            labels)}, 400)
+        return _render(record, {"type": _type_errors(refusals)}, 400)
     flash(texts.STAFF_TYPE_CHANGED, "ok")
     return redirect("/staff/application/{}".format(record["id"]))
+
+
+def _type_errors(refusals):
+    """What a refused type change says: the missing fields together, and each
+    other refusal in the words the student's form uses for it."""
+    from superassistant.web.student import _messages
+    label = lambda r: texts.FIELD_LABELS.get(r.field, r.field)
+    missing = [label(r) for r in refusals if r.reason == "required"]
+    detailed = _messages([r for r in refusals if r.reason != "required"])
+    sentences = [label(r) + ": " + detailed[r.field] for r in refusals
+                 if r.reason != "required"]
+    if missing:
+        sentences.insert(0, texts.STAFF_TYPE_MISSING.format(
+            ", ".join(missing)))
+    return " ".join(sentences)

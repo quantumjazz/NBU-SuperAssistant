@@ -333,6 +333,7 @@ STAFF_TYPE_HINT = ("Към теза: данните за теза трябва �
 STAFF_TYPE_SAVE = "Запиши вида"
 STAFF_TYPE_CHANGED = "Видът на дипломиране е поправен."
 STAFF_TYPE_MISSING = "За теза липсват: {}."
+STAFF_RETAINED_THESIS = "Запазени данни за теза"
 STAFF_SUPERVISOR_MAIL_FAILED = ("Нищо не е променено: молбата не можа да бъде "
                                 "изпратена.")
 
