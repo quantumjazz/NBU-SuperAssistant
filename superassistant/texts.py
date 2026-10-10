@@ -414,3 +414,32 @@ CLI_PASSWORD_EMPTY = "Паролата не може да е празна; ни�
 CLI_PASSWORD_MISMATCH = "Двете пароли не съвпадат; нищо не е променено."
 CLI_PASSWORD_SET = ("Паролата на „{}“ е сменена; всички браузъри, влезли с "
                     "предишната, са изведени.")
+
+CLI_MAIL_TEST_USAGE = ("Употреба: python -m superassistant mail-test <адрес>\n"
+                       "Изпраща едно пробно писмо за <адрес> според режима "
+                       "за поща (SUPERASSISTANT_MAIL_MODE).")
+CLI_MAIL_TEST_BAD_ADDRESS = ("„{}“ не прилича на адрес на електронна поща; "
+                             "нищо не е изпратено.")
+CLI_MAIL_TEST_UNCONFIGURED = ("Пощата не е настроена, затова нищо не е "
+                              "изпратено: {}")
+CLI_MAIL_TEST_MODE_UNSET = "console (SUPERASSISTANT_MAIL_MODE не е зададено)"
+CLI_MAIL_TEST_PLAN_CONSOLE = ("Режим {mode}: писмото за {address} ще бъде "
+                              "отпечатано тук, без да бъде изпратено.")
+CLI_MAIL_TEST_PLAN_OWNER = ("Режим owner: писмото за {address} ще отиде до "
+                            "{owner}, с {address} написан най-отгоре.\n"
+                            "  Сървър за поща: {relay}\n"
+                            "  Подател: {sender}")
+CLI_MAIL_TEST_PLAN_SEND = ("Режим send: писмото ще отиде до {address}.\n"
+                           "  Сървър за поща: {relay}\n"
+                           "  Подател: {sender}")
+CLI_MAIL_TEST_PRINTED = "Писмото е отпечатано по-горе; нищо не е изпратено."
+CLI_MAIL_TEST_ACCEPTED = ("Сървърът за поща прие писмото.\n\n"
+                          "Прието не значи доставено: проверете пощенската "
+                          "кутия и папката за спам.")
+CLI_MAIL_TEST_REFUSED = ("Писмото не е изпратено: сървърът за поща не го "
+                         "прие или не можа да бъде достигнат.\n{}")
+CLI_MAIL_TEST_SUBJECT = "Пробно писмо от NBU-SuperAssistant"
+CLI_MAIL_TEST_TEXT = ("Това е пробното писмо от командата "
+                      "`python -m superassistant mail-test {address}`.\n\n"
+                      "Щом го четете, писмата на NBU-SuperAssistant "
+                      "({base_url}) стигат до тази пощенска кутия.\n")
