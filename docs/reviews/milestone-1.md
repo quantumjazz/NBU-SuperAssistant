@@ -37,3 +37,10 @@
 - **Disposition:** all nine fixed in `bd50873` by Opus 5.5 (`claude-opus-5-5`), with a regression each, shown to fail on `aa278fc` and pass on `bd50873`. Mail bounds chosen: 30 an hour per supervisor, 10 decline notices per student, 300 in all.
 - **Checks on `bd50873`** (Opus 5.5): Python 3.9.6 and 3.12.14, 108 passed and browser 7 passed each. The report rendered and looked at; templates rescanned: no student text, no printed year.
 - **Outstanding:** Codex's review of the fixes; the owner's inspection.
+
+## 2026-10-10 — Codex's second round on `bd50873`: fixed in `159925f` and `cc688ff`
+
+- **Review** (Codex, relayed by the owner): four points still open, in M1-C4 (retained thesis data and answers hidden after a change to a state exam; type-change refusals called missing), M1-C5 (a removed lists folder recreated) and M1-C9 (the 12 pt header splitting the signature block across pages).
+- **Disposition:** all four fixed in `159925f` by Opus 5.5 (`claude-opus-5-5`). An independent read-only check of `159925f` (two delegated agents, one round) confirmed them and found three gaps inside the same points, fixed in `cc688ff`: an upgraded schema-1 installation recreating missing lists; a filled-in invalid address called missing; a retained title alone hidden. Each fix has a regression shown to fail on the commit before it.
+- **Checks on `cc688ff`** (Opus 5.5): Python 3.9.6 and 3.12.14, 123 passed and browser 7 passed each. Reports with 1, 3 and 12 invented students exported to PDF by Microsoft Word: the signature block is whole on the last page.
+- **Outstanding:** Codex's review of these fixes; the owner's inspection.
