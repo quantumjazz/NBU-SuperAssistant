@@ -52,3 +52,13 @@
   - smtp.resend.com offers SMTPUTF8.
 - **Open for the owner:** anyone who reaches the public address can make the service mail any address. How the pilot's limit is kept until 8.7 is undecided.
 - **Outstanding:** Codex's review, the push and the install.
+
+## 2026-10-10 — The pilot gets no gate; two lists will lock it down later
+
+- **Supersedes** the "Open for the owner" line of the entry above.
+- **Owner** (verbatim): "there is no way we are building the possibility that a user can sign in, select a role 'advisor' and be one"; "we will create roles that an admin (me) can assign"; "I will provide a list of emails … the members of the list (my faculty) = possible advisors, also a freeform will enable the selection of other advisoer, eg members of other departments (utill we add them) and even professors from other universities"; "at some point we will lock this down further when i add the list of all student numbers and mails"; "both list are a future taks, of course".
+- **So:** nothing gates the pilot in this milestone. The code already matches the design: supervisors have no accounts, staff accounts need the owner's approval, and a supervisor is chosen from the professors list or typed.
+- **DEFERRED** (future tasks, owner):
+  - the faculty list of possible supervisors;
+  - the list of students' faculty numbers and addresses.
+- **Change:** `docs/deployment.md` only, worded to match.

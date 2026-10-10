@@ -40,14 +40,16 @@ mailboxes, so every address the pilot uses must belong to somebody who
 agreed: a student's sign-in address, a supervisor typed into an application,
 and every entry in the professors list.
 
-Nothing in the service enforces that. Once the address is public, anyone who
-finds it can sign in as a student with a mailbox of their own and submit an
-application naming a supervisor at any address, typed in: NBU-SuperAssistant
-then mails that person a request carrying the visitor's own text, and up to
-two reminders, from `nbu-superassistant@visiometrica.com`, spending the Resend
-quota CourseBench shares (*Mail*). The limit above holds only while nobody
-but the testers uses the address. How it is kept is the owner's decision,
-recorded in `docs/reviews/milestone-2.md`.
+Nobody gives themselves a role. A supervisor has no account and acts only
+through the links in the email the request comes in; a staff account sees
+nothing until the owner approves it; the owner is the account the settings
+name. What the pilot does not check yet is who signs in as a student and
+which address is typed for a supervisor from outside the professors list
+(another department, another university): a student who types one makes the
+pilot mail that address the request and its reminders. Two lists the owner
+will add later lock this down further: the department's supervisors with
+their addresses, and the students with their faculty numbers and addresses
+(`docs/reviews/milestone-2.md`).
 
 Every command below runs on the laptop-server, as `victor`, in an ssh
 session from the Mac (`ssh victor@192.168.1.102`), unless it says "on the
@@ -564,10 +566,10 @@ That is why the service writes no access log (see the comment in
 `deploy/nbu-superassistant.service`), and why an unexpected error is logged
 with its route (`/link/<token>`) rather than its address.
 
-Anyone can use the public pages: sign in as a student with any mailbox,
-submit an application naming any supervisor's address, and so make the
-service send that address a request and its reminders. See the pilot's limit
-at the top.
+Until the owner's lists of students and supervisors are added, anyone with
+a mailbox can sign in as a student, and a supervisor typed from outside the
+professors list is mailed at the address typed. See the pilot's users at the
+top.
 
 ## If it will not start
 
