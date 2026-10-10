@@ -30,3 +30,10 @@
 - **Why:** the owner's first look (verbatim: "note the loop, i cannot create my owner's account"; "it should be 'work mail'"; "it should be 'нямате профил'") found a duplicated wording name that put the student's email label on staff registration, and no way out for the first account before an owner is named.
 - **Fix commit:** `aa278fc`; the fixes and their tests are listed in its message. Checks (Opus 5.5): 92 passed and browser 5 passed on Python 3.9 and on 3.12.
 - **Outstanding:** Codex's review of the whole milestone at the new target; the owner's inspection.
+
+## 2026-10-10 — Codex's review of `aa278fc`: changes requested, fixed in `bd50873`
+
+- **Review** (Codex, relayed by the owner): CHANGES REQUESTED on `aa278fc`, findings M1-C1..C8 [P2] and M1-C9 [P3]: a refusal losing the graduation choice; hidden thesis fields blocking a state exam; controls trimmed instead of refused; no staff correction of the graduation type; missing lists recreated at start; unprintable list text and shifted line numbers; a spoofable rate-limit source; mail paths without a bound; a 10 pt report header. Codex's checks on `aa278fc`: 92 and 5 passed on Python 3.9 and 3.12.
+- **Disposition:** all nine fixed in `bd50873` by Opus 5.5 (`claude-opus-5-5`), with a regression each, shown to fail on `aa278fc` and pass on `bd50873`. Mail bounds chosen: 30 an hour per supervisor, 10 decline notices per student, 300 in all.
+- **Checks on `bd50873`** (Opus 5.5): Python 3.9.6 and 3.12.14, 108 passed and browser 7 passed each. The report rendered and looked at; templates rescanned: no student text, no printed year.
+- **Outstanding:** Codex's review of the fixes; the owner's inspection.
