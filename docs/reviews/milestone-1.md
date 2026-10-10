@@ -24,3 +24,9 @@
 - **Readings** (implementer's, for Codex and the owner): supervisor links are an HMAC of the session key, so reminders repeat them and only their hash is stored; staff cannot correct the graduation type; report rows are alphabetical by name; a code mistyped five times stops, its email's link still works; dates shown are Sofia's.
 - **Disclosure:** staff registration and sign-in have no rate limit; none is required.
 - **Outstanding:** Codex's review; the owner's inspection (Completion 1–5).
+
+## 2026-10-10 — Review target superseded: `aa278fc` replaces `fbaef2c`
+
+- **Why:** the owner's first look (verbatim: "note the loop, i cannot create my owner's account"; "it should be 'work mail'"; "it should be 'нямате профил'") found a duplicated wording name that put the student's email label on staff registration, and no way out for the first account before an owner is named.
+- **Fix commit:** `aa278fc`; the fixes and their tests are listed in its message. Checks (Opus 5.5): 92 passed and browser 5 passed on Python 3.9 and on 3.12.
+- **Outstanding:** Codex's review of the whole milestone at the new target; the owner's inspection.
