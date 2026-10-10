@@ -27,3 +27,28 @@
   - the typed-supervisor message;
   - DMARC;
   - a paid Resend plan.
+
+## 2026-10-10 — Implemented; review target `bdb42be` for Codex
+
+- **Implementer:** Opus 5.5 (`claude-opus-5-5`).
+  - One round of three delegated builders, in isolated worktrees, merged in `0534b19`.
+  - One round of four read-only reviewers on `0534b19`. Every finding was reproduced and fixed in `bdb42be`, each fix with a regression shown to fail on `0534b19`.
+- **Changed:**
+  - mail mode `send`;
+  - the visitor's address from `SUPERASSISTANT_CLIENT_IP_HEADER`, an IPv6 visitor counted by its /64;
+  - `.env.production`, read by `wsgi.py` and the host commands, which refuse a value systemd would read differently;
+  - refusals for a hosted installation;
+  - `/healthz`, `mail-test` and a startup line;
+  - errors logged by route, never by address;
+  - reminders by calendar day in Sofia;
+  - migrations under a lock;
+  - the service and the 09:00 timer (Europe/Sofia), `.env.production.example` and `docs/deployment.md`.
+- **Accepted behaviour changed on purpose:**
+  - a mode sends to the intended recipient: `test_no_mode_sends_to_the_intended_recipient` is replaced, and its assertions are kept;
+  - reminders count calendar days.
+- **Checks on `bdb42be`** (Opus 5.5):
+  - Python 3.9.6 and 3.12.14: 211 passed and browser 7 passed on each.
+  - gunicorn 26.2, with the unit's arguments, answered `/healthz`.
+  - smtp.resend.com offers SMTPUTF8.
+- **Open for the owner:** anyone who reaches the public address can make the service mail any address. How the pilot's limit is kept until 8.7 is undecided.
+- **Outstanding:** Codex's review, the push and the install.
