@@ -51,3 +51,11 @@
 - **Checks on `cc688ff`:** Codex, Python 3.9 and 3.12, 123 passed and browser 7 passed each, no skips; reports with 1, 3 and 12 invented students checked by content and by eye. Opus 5.5, the same counts.
 - **DEFERRED** (Codex, non-blocking): a typed supervisor address entered with name and title empty gets the generic missing-supervisor message; the migration race between simultaneous starts, to the deployment.
 - **Phase:** READY FOR OWNER ACCEPTANCE. Outstanding: the owner's inspection, `NOW.md` Completion 1–5, on the Mac with mail mode "owner".
+
+## 2026-10-10 — COMPLETE: accepted by the owner
+
+- **Owner acceptance** (verbatim, to Opus 5.5's question how to handle the laptop proposal): "I accept now and we move further". The five checks of `NOW.md` Completion were not performed on the Mac; the owner moved hands-on testing to the laptop, starting there from a new database.
+- **On the samples' name in domain.md** (verbatim): "there are no real names, we start from scratch on the laptop, eg new database". History is pushed unchanged.
+- **Accepted code:** `cc688ff`, approved by Codex and Opus 5.5 (entry above). `NOW.md` `65d0ad16…` stays frozen.
+- **DEFERRED to the next milestone:** deployment to the laptop-server (service, Cloudflare Tunnel at a visiometrica.com address, HTTPS, trusting Cloudflare's forwarded address only from the tunnel), a verified Resend sending domain, mail to the intended recipients, the reminder timer; plus Codex's two deferred items above.
+- **Status:** COMPLETE.
