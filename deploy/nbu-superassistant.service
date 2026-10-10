@@ -44,11 +44,16 @@ EnvironmentFile=/home/victor/apps/nbu-superassistant/.env.production
 # --timeout 60: nothing here works for long inside a request; generating a
 # report takes seconds. --graceful-timeout 30 lets requests under way finish
 # when the service is restarted.
+# --no-control-socket: gunicorn 26 opens a control socket at
+# ~/.gunicorn/gunicorn.ctl unless told otherwise, and CourseBench's
+# gunicorn, running as the same user, already holds that path. Nothing
+# here uses the control interface, so it is off rather than shared.
 ExecStart=/home/victor/apps/nbu-superassistant/.venv/bin/gunicorn \
     --workers 1 --threads 8 --worker-class gthread \
     --timeout 60 --graceful-timeout 30 \
     --bind 127.0.0.1:8791 \
     --error-logfile - \
+    --no-control-socket \
     wsgi:app
 
 Restart=always

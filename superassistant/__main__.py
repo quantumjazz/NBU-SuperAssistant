@@ -27,8 +27,12 @@ def main(argv=None):
     if not argv or argv[0] not in COMMANDS:
         sys.stderr.write(__doc__)
         return 2
-    from superassistant.settings import load_settings_file
-    load_settings_file()
+    from superassistant.settings import SettingsFileError, load_settings_file
+    try:
+        load_settings_file()
+    except SettingsFileError as exc:
+        sys.stderr.write("NBU-SuperAssistant cannot start: " + str(exc) + "\n")
+        return 1
     module_name, _, function = COMMANDS[argv[0]].partition(":")
     module = __import__(module_name, fromlist=[function])
     return getattr(module, function)(argv[1:])

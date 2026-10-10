@@ -10,15 +10,13 @@ the worker again and again.
 
 import sys
 
-from superassistant.settings import load_settings_file
-
-load_settings_file()
-
-from superassistant.web import StartupError, create_app  # noqa: E402
+from superassistant.settings import SettingsFileError, load_settings_file
+from superassistant.web import StartupError, create_app
 
 try:
+    load_settings_file()
     app = create_app()
-except StartupError as exc:
+except (SettingsFileError, StartupError) as exc:
     sys.stderr.write("NBU-SuperAssistant cannot start: " + str(exc) + "\n")
     sys.stderr.flush()
     sys.exit(3)

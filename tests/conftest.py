@@ -136,7 +136,10 @@ class Sent(object):
         # Serialized as smtplib's send_message serializes it: with the utf8
         # policy (SMTPUTF8) when an address is not ASCII, as a student's
         # typed address in mode "send" can be; the default policy cannot
-        # fold such an address and raises.
+        # fold such an address and raises. smtplib does so only with a
+        # relay that offers SMTPUTF8; the pilot's does (smtp.resend.com's
+        # EHLO on port 587 listed smtputf8 on 10 October 2026), so this fake
+        # is that relay.
         addresses = str(envelope["From"]) + str(envelope["To"])
         international = any(ord(ch) > 127 for ch in addresses)
         policy = envelope.policy.clone(utf8=True) if international else None

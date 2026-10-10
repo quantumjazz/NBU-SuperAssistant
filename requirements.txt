@@ -1,3 +1,6 @@
 flask>=3.0
 docxtpl>=0.16
-gunicorn>=22.0
+# The host (Python 3.12) runs gunicorn 26, whose --no-control-socket the
+# unit uses; gunicorn 26 does not install on the Mac's Python 3.9.
+gunicorn>=26.1; python_version >= "3.10"
+gunicorn>=22.0; python_version < "3.10"

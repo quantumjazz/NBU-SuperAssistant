@@ -7,8 +7,11 @@ exit. Invented people, temporary folders and the fake relay only: nothing is
 sent, and the subprocesses read no settings file but the test's own.
 """
 
+import errno
 import importlib
 import io
+import ipaddress
+import logging
 import os
 import shutil
 import string
@@ -133,7 +136,22 @@ def test_the_visitor_is_the_named_headers_first_value_else_the_connection(
     expected = first if header and value is not None and first else remote
     with apps_by_header[header].test_request_context(
             "/", headers=sent, environ_base={"REMOTE_ADDR": remote}):
-        assert web.source() == expected
+        assert web.source() == counted_as(expected)
+
+
+def counted_as(address):
+    """The model: an IPv6 visitor counts by its /64, the block one machine
+    is given; an IPv4-mapped one as its IPv4 address; anything else as
+    written."""
+    try:
+        ip = ipaddress.ip_address(address)
+        if ip.version == 6 and ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        if ip.version == 6:
+            return str(ipaddress.ip_network(address + "/64", strict=False))
+    except ValueError:
+        pass
+    return address
 
 
 def test_behind_the_tunnel_each_visitor_has_its_own_limit(tmp_path, outbox,
@@ -163,6 +181,27 @@ def test_behind_the_tunnel_each_visitor_has_its_own_limit(tmp_path, outbox,
     assert fallback == [302] * limits.MAIL_PER_SOURCE
     assert ask(300, " , 198.51.100.3") == 429
     assert ask(301, "198.51.100.3") == 302
+
+
+def test_an_ipv6_visitor_is_counted_by_its_64_bit_block(tmp_path, outbox,
+                                                        clock):
+    """Opus 5.5's review of 0534b19, F3: one machine on IPv6 holds a whole
+    /64, so counting each address on its own let one visitor sign in 40
+    times where an IPv4 visitor gets 10."""
+    app = create_app(make_settings(tmp_path / "data",
+                                   client_ip_header="CF-Connecting-IP"))
+
+    def ask(number, value):
+        return Client(app.test_client()).post(
+            "/sign-in", data={"email": "w{}@example.org".format(number)},
+            headers={"CF-Connecting-IP": value},
+            environ_base={"REMOTE_ADDR": "127.0.0.1"}).status_code
+
+    codes = [ask(n, "2001:db8:1:2::{:x}".format(n + 1))
+             for n in range(limits.MAIL_PER_SOURCE + 1)]
+    assert codes == [302] * limits.MAIL_PER_SOURCE + [429]
+    assert ask(100, "2001:db8:1:3::1") == 302      # the next /64: another
+    assert ask(101, "2001:db8:1:2:ffff::9") == 429  # the same /64 again
 
 
 # --- 3. The settings file -----------------------------------------------------
@@ -214,8 +253,10 @@ def test_a_missing_settings_file_changes_nothing(tmp_path):
 
 
 NAMES = st.from_regex(r"[A-Z_][A-Z0-9_]{0,15}", fullmatch=True)
+# Values systemd's EnvironmentFile reads exactly as written: no quotes and
+# no backslashes, which systemd would remove and the reader refuses.
 VALUES = st.text(alphabet=string.ascii_letters + string.digits
-                 + "=:/@.-_ #\"'", max_size=30).map(str.strip)
+                 + "=:/@.-_ #", max_size=30).map(str.strip)
 NOISE = st.sampled_from(["", "   ", "# a comment", "#NAME=commented",
                          "no equals sign here", "export NAME=1", "=1"])
 
@@ -233,6 +274,89 @@ def test_a_settings_file_sets_what_the_shell_has_not(
     expected = dict(file_values)
     expected.update(shell)
     assert environ == expected
+
+
+@pytest.mark.parametrize("value", ['"re_FAKE_123"', "'re_FAKE_123'",
+                                   "re_FA\\KE_123", "re_FAKE_123\\"])
+def test_a_value_systemd_would_read_differently_is_refused(tmp_path, value):
+    """Opus 5.5's review of 0534b19, F1: systemd removes quotes and
+    backslashes that the reader kept, so a host command (mail-test) and the
+    service could use different passwords or folders. The reader refuses
+    such a line instead, naming its number and setting, never its value, and
+    sets nothing from the file."""
+    path = write(tmp_path / ".env.production", [
+        "# the pilot's settings",
+        "SUPERASSISTANT_SMTP_HOST=smtp.example.org",
+        "SUPERASSISTANT_SMTP_PASSWORD=" + value,
+    ])
+    environ = {}
+    with pytest.raises(settings_module.SettingsFileError) as caught:
+        load_settings_file(path, environ)
+    message = str(caught.value)
+    assert "SUPERASSISTANT_SMTP_PASSWORD" in message
+    assert "line 3" in message
+    assert "re_FA" not in message
+    assert environ == {}
+
+
+def test_only_a_newline_ends_a_line_and_only_blanks_are_trimmed(tmp_path):
+    """Opus 5.5's review of 0534b19, F1: str.splitlines() and str.strip()
+    also act on form feeds, NEL and no-break spaces; systemd does not."""
+    path = tmp_path / ".env.production"
+    path.write_text("SUPERASSISTANT_SMTP_PASSWORD=re_a\x0cbc\u00a0\r\n"
+                    "SUPERASSISTANT_SMTP_HOST=\tsmtp.example.org \r\n",
+                    encoding="utf-8")
+    environ = {}
+    load_settings_file(path, environ)
+    assert environ == {"SUPERASSISTANT_SMTP_PASSWORD": "re_a\x0cbc\u00a0",
+                       "SUPERASSISTANT_SMTP_HOST": "smtp.example.org"}
+
+
+# Taken when this module is imported, before any test repoints it.
+REAL_SETTINGS_FILE = settings_module.SETTINGS_FILE
+
+
+def test_the_settings_file_is_the_clones_whatever_the_working_directory(
+        tmp_path, monkeypatch):
+    """Opus 5.5's review of 0534b19, T4: a host command run from anywhere
+    opens the records the service opens."""
+    monkeypatch.chdir(str(tmp_path))
+    assert REAL_SETTINGS_FILE == CLONE / ".env.production"
+    assert REAL_SETTINGS_FILE.is_absolute()
+    assert CLONE_DIR == CLONE
+
+
+@pytest.mark.parametrize("command, arguments", [
+    ("remind", []), ("owner-password", ["--stdin"]),
+    ("mail-test", ["tester@example.org"])])
+def test_every_host_command_reads_the_settings_file(
+        tmp_path, monkeypatch, capsys, outbox, command, arguments):
+    """Opus 5.5's review of 0534b19, T3: not only mail-test. A settings
+    file naming another records folder and an address no start accepts
+    makes each command refuse, naming what came from the file."""
+    path = write(tmp_path / ".env.production", [
+        "SUPERASSISTANT_BASE_URL=ftp://from-the-file",
+        "SUPERASSISTANT_DATA_DIR=" + str(tmp_path / "file-data"),
+        "SUPERASSISTANT_OWNER_USERNAME=owner",
+        "SUPERASSISTANT_MAIL_MODE=from-the-file",
+    ])
+    monkeypatch.setattr(settings_module, "SETTINGS_FILE", path)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("new-password-1\n"))
+    assert cli.main([command] + arguments) == 1
+    said = capsys.readouterr().err
+    assert "from-the-file" in said or "file-data" in said, said
+    assert outbox.messages == []
+
+
+def test_a_refused_settings_file_stops_a_host_command_in_one_line(
+        tmp_path, monkeypatch, capsys):
+    path = write(tmp_path / ".env.production", [
+        'SUPERASSISTANT_SMTP_PASSWORD="re_FAKE_123"'])
+    monkeypatch.setattr(settings_module, "SETTINGS_FILE", path)
+    assert cli.main(["remind"]) == 1
+    said = capsys.readouterr().err
+    assert said.startswith("NBU-SuperAssistant cannot start: ")
+    assert said.count("\n") == 1 and "re_FAKE" not in said
 
 
 def test_host_commands_read_the_settings_file_first(tmp_path, monkeypatch,
@@ -274,7 +398,11 @@ GOOD_HOSTS = st.one_of(
                   r"(\.[a-z0-9]([a-z0-9-]{0,8}[a-z0-9])?){0,3}",
                   fullmatch=True),
     st.sampled_from(["localhost", "LOCALHOST", "127.0.0.1", "[::1]",
-                     "Example.ORG", "192.0.2.10", "[2001:db8::1]"]))
+                     "Example.ORG", "192.0.2.10", "[2001:db8::1]",
+                     # Near misses of this machine, hosted all the same
+                     # (Opus 5.5's review of 0534b19, T5).
+                     "127.0.0.2", "127.1.2.3", "0.0.0.0",
+                     "localhost.localdomain", "[::ffff:127.0.0.1]"]))
 BAD_HOSTS = st.sampled_from(["", "exa mple.org", "пример.бг", "[::1",
                              "host!", "a_b c"])
 GOOD_PORTS = st.one_of(st.none(), st.integers(1, 65535).map(str))
@@ -406,6 +534,21 @@ def test_a_hosted_installation_sends_its_mail(tmp_path, mode, refused):
     assert bool(problem) == refused
 
 
+@pytest.mark.parametrize("name", ["reminder_days", "reminder_count"])
+@pytest.mark.parametrize("value", ["3 # calendar days", "three", "2.5"])
+def test_a_reminder_setting_that_is_no_whole_number_is_refused_by_name(
+        tmp_path, monkeypatch, name, value):
+    """Opus 5.5's review of 0534b19, F4: a traceback, not the sentence the
+    host's journal is meant to show."""
+    setting = "SUPERASSISTANT_" + name.upper()
+    monkeypatch.setenv(setting, value)
+    monkeypatch.setenv("SUPERASSISTANT_DATA_DIR", str(tmp_path / "data"))
+    problem = from_env().problem()
+    assert setting in problem and "whole number" in problem
+    with pytest.raises(StartupError):
+        create_app()
+
+
 def test_every_refusal_is_named_at_once(tmp_path):
     settings = Settings(tmp_path, base_url="http://pilot.example.org",
                         mail_mode="console", data_dir_explicit=False)
@@ -447,6 +590,24 @@ def test_healthz_says_503_when_the_records_cannot_be_written(tmp_path,
         assert response.get_json() == {
             "status": "data directory is not writable"}
         assert str(tmp_path) not in response.get_data(as_text=True)
+
+
+def test_healthz_says_503_when_the_disk_refuses_the_write(tmp_path, outbox,
+                                                         monkeypatch):
+    """Opus 5.5's review of 0534b19, T2: the failure a host actually has is
+    a full disk, which permission bits (os.access) never show."""
+    settings = make_settings(tmp_path / "data")
+    client = create_app(settings).test_client()
+    before = sorted(os.listdir(str(settings.data_dir)))
+
+    def full(descriptor):
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(os, "fsync", full)
+    response = client.get("/healthz")
+    assert response.status_code == 503
+    assert response.get_json() == {"status": "data directory is not writable"}
+    assert sorted(os.listdir(str(settings.data_dir))) == before
 
 
 # --- 7. mail-test -------------------------------------------------------------
@@ -648,3 +809,33 @@ def test_wsgi_reads_the_settings_file_and_the_environment_wins(tmp_path):
     assert "CF-Connecting-IP" in line and "pilot@example.org" in line
     for secret in ("s3cr3t", "relay-user-name"):
         assert secret not in started.stderr + started.stdout
+
+
+# --- The journal never holds a token -----------------------------------------
+
+@pytest.mark.parametrize("path, broken", [
+    ("/link/SECRET-TOKEN-abc123", "superassistant.web.auth.signin"),
+    ("/answer/SECRET-TOKEN-abc123/confirm",
+     "superassistant.web.supervisor.supervision"),
+])
+def test_an_error_on_a_token_page_logs_its_route_not_its_token(
+        tmp_path, outbox, monkeypatch, caplog, capsys, path, broken):
+    """Opus 5.5's review of 0534b19, F5: the unit writes no access log
+    because these addresses carry tokens, but Flask's own error log wrote
+    "Exception on <path>" to the journal."""
+    app = create_app(make_settings(tmp_path / "data"))
+    module_path, _, name = broken.rpartition(".")
+    module = importlib.import_module(module_path)
+
+    class Broken(object):
+        def __getattr__(self, attribute):
+            raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(module, name, Broken())
+    with caplog.at_level(logging.ERROR):
+        response = app.test_client().get(path)
+    assert response.status_code == 500
+    logged = caplog.text + capsys.readouterr().err
+    assert "SECRET-TOKEN" not in logged
+    assert "database is locked" in logged        # the error itself is kept
+    assert "<token>" in logged                    # and the route it was on

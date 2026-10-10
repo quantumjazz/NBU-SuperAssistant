@@ -41,6 +41,14 @@ SETTINGS_FILE = CLONE_DIR / ".env.production"
 
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
+# What systemd's EnvironmentFile trims around a name and a value. Not
+# str.strip(), which also takes form feeds, NEL and no-break spaces.
+_BLANKS = " \t\r"
+
+
+class SettingsFileError(Exception):
+    """The settings file holds a line systemd would read differently."""
+
 
 def load_settings_file(path=None, environ=None):
     """Read KEY=VALUE lines from the settings file into the environment.
@@ -49,11 +57,18 @@ def load_settings_file(path=None, environ=None):
     anchored to the clone, not the working directory, so a host command run
     from anywhere opens the records the service opens; and never overriding a
     variable already set, so the service unit's own environment always wins.
-    Without python-dotenv: only the subset systemd's EnvironmentFile also
-    reads is meant to be used. Blank lines and lines starting with "#" are
-    skipped; so is a line with no "=" or with no variable name before it,
-    as systemd skips them. Values are taken as written, without quotes. A
-    name given twice takes its later value, as in systemd.
+    Without python-dotenv: only the subset systemd's EnvironmentFile reads
+    exactly as written is accepted. Blank lines and lines starting with "#"
+    are skipped; so is a line with no "=" or with no variable name before
+    it, as systemd skips them. A name given twice takes its later value, as
+    in systemd.
+
+    systemd removes quotes around a value and the backslashes in it, so the
+    service would get "re_x" where a reader taking the line as written gets
+    '"re_x"', and the host commands (mail-test above all) would test other
+    settings than the service runs with. A value starting with a quote or
+    holding a backslash is therefore refused, with SettingsFileError naming
+    the line and the setting but never the value, and nothing is set.
 
     A missing file is no error: a development copy has none. Returns the
     names it set.
@@ -65,14 +80,22 @@ def load_settings_file(path=None, environ=None):
     except FileNotFoundError:
         return []
     values = {}
-    for line in text.splitlines():
-        line = line.strip()
+    for number, line in enumerate(text.split("\n"), start=1):
+        line = line.strip(_BLANKS)
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        key = key.strip()
-        if _NAME.fullmatch(key):
-            values[key] = value.strip()
+        key = key.strip(_BLANKS)
+        if not _NAME.fullmatch(key):
+            continue
+        value = value.strip(_BLANKS)
+        if value[:1] in ("\"", "'") or "\\" in value:
+            raise SettingsFileError(
+                "{}, line {}: {} is written with quotes or a backslash, "
+                "which systemd would remove, so the service and the host "
+                "commands would read different values. Write it bare: "
+                "KEY=value, no quotes.".format(path, number, key))
+        values[key] = value
     loaded = []
     for key, value in values.items():
         if key not in environ:
@@ -188,8 +211,13 @@ class Settings(object):
         self.owner_email = (owner_email or "").strip()
         self.owner_username = (owner_username or "").strip()
         self.base_url = (base_url or "").rstrip("/")
-        self.reminder_days = int(reminder_days)
-        self.reminder_count = int(reminder_count)
+        # Kept as given too, so a value that is no whole number is refused
+        # by name (problems) rather than raised as a traceback here.
+        self.reminder_numbers = {
+            "SUPERASSISTANT_REMINDER_DAYS": reminder_days,
+            "SUPERASSISTANT_REMINDER_COUNT": reminder_count}
+        self.reminder_days = _whole_number(reminder_days)
+        self.reminder_count = _whole_number(reminder_count)
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
         self.smtp_security = smtp_security
@@ -235,7 +263,12 @@ class Settings(object):
     def problems(self):
         """Why these settings cannot run, as sentences; empty if they can."""
         found = self.mail_problems()
-        if self.reminder_days < 1 or self.reminder_count < 0:
+        if self.reminder_days is None or self.reminder_count is None:
+            for name, given in sorted(self.reminder_numbers.items()):
+                if _whole_number(given) is None:
+                    found.append(name + " is " + repr(given)
+                                 + "; it must be a whole number.")
+        elif self.reminder_days < 1 or self.reminder_count < 0:
             found.append("SUPERASSISTANT_REMINDER_DAYS must be at least 1 and "
                          "SUPERASSISTANT_REMINDER_COUNT at least 0.")
         address = base_url_problem(self.base_url)
@@ -307,6 +340,14 @@ class Settings(object):
             except OSError:
                 pass
         return self.secret_key
+
+
+def _whole_number(given):
+    """given as an int, or None if it is no whole number."""
+    try:
+        return int(given)
+    except (TypeError, ValueError):
+        return None
 
 
 def _env(name, default=""):

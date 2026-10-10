@@ -5,7 +5,8 @@ also be run by hand. The rule is in supervision.due: three calendar days in
 Sofia after the request and three after that reminder, at most twice, as the
 settings SUPERASSISTANT_REMINDER_DAYS and SUPERASSISTANT_REMINDER_COUNT say,
 so a request mailed on Monday afternoon is reminded on Thursday and Sunday
-mornings. Running it again on the same day sends nothing more.
+mornings. Running it again on the same day sends nothing more, except
+the reminders an earlier run could not send.
 """
 
 import sys

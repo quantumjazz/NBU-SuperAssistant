@@ -40,6 +40,15 @@ mailboxes, so every address the pilot uses must belong to somebody who
 agreed: a student's sign-in address, a supervisor typed into an application,
 and every entry in the professors list.
 
+Nothing in the service enforces that. Once the address is public, anyone who
+finds it can sign in as a student with a mailbox of their own and submit an
+application naming a supervisor at any address, typed in: NBU-SuperAssistant
+then mails that person a request carrying the visitor's own text, and up to
+two reminders, from `nbu-superassistant@visiometrica.com`, spending the Resend
+quota CourseBench shares (*Mail*). The limit above holds only while nobody
+but the testers uses the address. How it is kept is the owner's decision,
+recorded in `docs/reviews/milestone-2.md`.
+
 Every command below runs on the laptop-server, as `victor`, in an ssh
 session from the Mac (`ssh victor@192.168.1.102`), unless it says "on the
 Mac".
@@ -126,6 +135,28 @@ it prints `0`, CourseBench's file has no `COURSEBENCH_SMTP_PASSWORD` line with
 a value, and nothing was copied. Running the first line again is harmless: it
 still leaves exactly one password line.
 
+Every value in this file is written bare: `KEY=value`, no quotes, no
+`export`, no backslash. systemd removes quotes and backslashes and the host
+commands would not, so a value written with them would give the service and
+the commands different settings; the service and every command refuse such a
+line, naming its number and setting (never its value).
+
+### Prove the mail
+
+Before anything depends on mail, send yourself one message. This needs only
+the settings file, not the service or the address:
+
+```bash
+.venv/bin/python -m superassistant mail-test you@example.com
+```
+
+Use your own address. It says first what it will do (the mode, the relay's
+host, port and security, the sender), then whether Resend accepted the
+message. **Accepted is not delivered**: a relay that takes a message and
+drops it looks the same as one that delivers it. Open the mailbox, and check
+the spam folder. If Resend refuses, the command says why and ends with
+status 1; a key that did not copy shows up here, not in front of a student.
+
 Then, for the first start only, change one line:
 
 ```bash
@@ -167,7 +198,9 @@ database, the lists) before it listens, and a `curl` fired the instant
 install and is not one.
 
 `{"status":"ok"}` means it runs and has just written a small file in the
-records folder and removed it again. Then read what it resolved:
+records folder and removed it again. (The unit turns gunicorn's control
+socket off: gunicorn 26 would otherwise open it at `~/.gunicorn/gunicorn.ctl`,
+where CourseBench's gunicorn, running as the same user, already has its own.) Then read what it resolved:
 
 ```bash
 sudo journalctl -u nbu-superassistant -n 20 --no-pager
@@ -225,8 +258,9 @@ public address (next section): with an https address, the sign-in cookie is
 sent over https only, so a browser on `http://127.0.0.1:8791` may not keep
 you signed in. Your account is the owner's; `/owner` is where you approve
 other staff accounts. Approve only people you know: once the address is
-public, anybody can register, and the address will be found. Cloudflare's
-certificate logs list every new subdomain, and scanners read them.
+public, anybody can register, and the address will be found. The edge
+certificate is the wildcard `*.visiometrica.com`, so the name does not appear
+in certificate logs, but its DNS record is public and names get guessed.
 
 ## The address
 
@@ -287,32 +321,29 @@ chooses another supervisor after a decline, or staff change the supervisor or
 the graduation type), the reminders, and the notice to a student whose
 supervisor declined.
 
-Prove the relay before anything depends on it. This needs only the settings
-file, not the service or the address:
-
-```bash
-cd /home/victor/apps/nbu-superassistant
-.venv/bin/python -m superassistant mail-test you@example.com
-```
-
-Use your own address. It says first what it will do (the mode, the relay's
-host, port and security, the sender), then whether Resend accepted the
-message. **Accepted is not delivered**: a relay that takes a message and
-drops it looks the same as one that delivers it. Open the mailbox, and check
-the spam folder.
+The relay is proved with `mail-test` during the first install (*Prove the
+mail*); run it again whenever mail is in doubt.
 
 **The sender's domain.** Resend sends only from a domain verified in the
-account. The key is CourseBench's, so this is CourseBench's Resend account:
-check in Resend's dashboard, under Domains, that `visiometrica.com` is
-verified. If it is not, Resend refuses the test, and the command says so.
+account. The key is CourseBench's, so this is CourseBench's Resend account.
+On 10 October 2026 `visiometrica.com` carried Resend's records (DKIM at
+`resend._domainkey`, SPF and MX at `send.`), so any address at it can send;
+Resend's dashboard, under Domains, says whether it is still verified. If it
+is not, Resend refuses the test, and the command says so.
 
 **The quota is shared.** Resend's free plan allows 100 messages a day and
 3,000 a month, per account, and this account is CourseBench's too: both apps
 spend the same 100. Every sign-in, request, reminder and notice counts.
 NBU-SuperAssistant's own limits (3 sign-in messages an hour to one address,
-10 from one visitor, 30 an hour to one supervisor, 10 notices an hour to one
-student, 300 messages an hour in all) do not keep it under Resend's 100 a
-day. A paid Resend plan is DEFERRED (`docs/reviews/milestone-2.md`).
+10 from one visitor, an IPv6 visitor counting by its /64 block, 30 an hour to
+one supervisor, 10 notices an hour to one student, 300 messages an hour in
+all) do not keep it under Resend's 100 a day. A paid Resend plan is DEFERRED
+(`docs/reviews/milestone-2.md`).
+
+The 09:00 reminders count against the same 30 an hour to one supervisor as
+new requests do. A supervisor with very many reminders due on one morning
+could therefore refuse new requests until the hour has passed; at the
+pilot's size this does not arise.
 
 When Resend refuses a message (over the quota, or for any other reason),
 nothing pretends it was sent:
@@ -356,7 +387,8 @@ sudo journalctl -u nbu-superassistant-remind -n 20 --no-pager
 `systemctl start` waits until the run ends. The journal shows how many
 reminders it sent (none, on a fresh install) and a line for each one it
 could not send. A run by hand follows the same rule as the timer's, so on a
-day the timer has already run it sends nothing more.
+day the timer has already run it sends nothing more, except the reminders
+that run could not send: those are tried again by any later run.
 
 **The rule.** Reminders count calendar days in Sofia; the time of day does
 not matter. A request is due for a reminder when today's Sofia date is at
@@ -528,8 +560,14 @@ Everything else requires signing in: a student's application and forms
 (`/owner`).
 
 The sign-in links and the answer pages carry their tokens in the address.
-That is why the service writes no access log: see the comment in
-`deploy/nbu-superassistant.service`.
+That is why the service writes no access log (see the comment in
+`deploy/nbu-superassistant.service`), and why an unexpected error is logged
+with its route (`/link/<token>`) rather than its address.
+
+Anyone can use the public pages: sign in as a student with any mailbox,
+submit an application naming any supervisor's address, and so make the
+service send that address a request and its reminders. See the pilot's limit
+at the top.
 
 ## If it will not start
 
@@ -552,7 +590,8 @@ sentence names the setting. systemd tries again every five seconds
 | `SUPERASSISTANT_SMTP_HOST` or `SUPERASSISTANT_MAIL_FROM`, with mail mode send | `smtp.resend.com`; `nbu-superassistant@visiometrica.com` |
 | `SUPERASSISTANT_MAIL_MODE` as an unknown mode | `send` |
 | `SUPERASSISTANT_OWNER_USERNAME` as naming no account | the username exactly as registered; or leave it empty, register the account (*The owner's account*), then set it |
-| `SUPERASSISTANT_REMINDER_DAYS` or `SUPERASSISTANT_REMINDER_COUNT` | at least 1 and at least 0; or take the line out for the defaults |
+| `SUPERASSISTANT_REMINDER_DAYS` or `SUPERASSISTANT_REMINDER_COUNT` | a whole number, at least 1 and at least 0; or take the line out for the defaults |
+| a line of `.env.production` and a setting, as written with quotes or a backslash | write the value bare, `KEY=value` |
 | a list file and a line | put that line right (*The lists*) |
 
 **"Failed to load environment files"**: `.env.production` is missing from

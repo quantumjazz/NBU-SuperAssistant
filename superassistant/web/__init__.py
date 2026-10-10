@@ -10,6 +10,7 @@ what it resolved (startup_line), because on the host that is read through
 journalctl.
 """
 
+import ipaddress
 import secrets
 import sys
 from functools import wraps
@@ -82,6 +83,11 @@ def create_app(settings=None):
         SESSION_COOKIE_SECURE=settings.base_url.startswith("https://"),
         MAX_CONTENT_LENGTH=2 * 1024 * 1024,
     )
+    # The unit writes no access log because sign-in links and supervisors'
+    # answer pages carry their tokens in the address; Flask's own error log
+    # would still write "Exception on <that address>" to the journal. It
+    # names the route instead ("/link/<token>"), keeping the error itself.
+    app.log_exception = _route_not_address(app)
     app.jinja_env.filters["date"] = db.local_date
     app.jinja_env.filters["datetime"] = db.local_datetime
     app.extensions["superassistant"] = {"settings": settings,
@@ -116,6 +122,14 @@ def create_app(settings=None):
     sys.stderr.write(startup_line(settings) + "\n")
     sys.stderr.flush()
     return app
+
+
+def _route_not_address(app):
+    def log_exception(exc_info):
+        rule = request.url_rule.rule if request.url_rule else "(no route)"
+        app.logger.error("Exception on %s [%s]", rule, request.method,
+                         exc_info=exc_info)
+    return log_exception
 
 
 def mail_note(settings):
@@ -196,7 +210,8 @@ def source():
     Cloudflare writes, and the first value in it is the visitor (copied from
     CourseBench's coursebench/web/app.py, _caller: a forwarding chain
     appends, and the first entry is the one nearest the visitor). Absent or
-    empty, the connection again. The setting is safe only where every
+    empty, the connection again; either way an IPv6 address counts by its
+    /64 (counted_as). The setting is safe only where every
     request comes through the tunnel; anywhere reachable directly, a caller
     could name a new source on every request.
     """
@@ -204,8 +219,27 @@ def source():
     if header:
         stated = (request.headers.get(header) or "").split(",")[0].strip()
         if stated:
-            return stated
-    return request.remote_addr or ""
+            return counted_as(stated)
+    return counted_as(request.remote_addr or "")
+
+
+def counted_as(address):
+    """The source a limit counts for an address.
+
+    An IPv6 visitor counts by its /64, the block a single machine is given
+    and can pick addresses from at will, so it meets the same limit as an
+    IPv4 visitor; an IPv4-mapped IPv6 address counts as its IPv4 address.
+    Anything else, a name or a value that is no address, as written.
+    """
+    try:
+        ip = ipaddress.ip_address(address)
+        if ip.version == 6 and ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        if ip.version == 6:
+            return str(ipaddress.ip_network(address + "/64", strict=False))
+    except ValueError:
+        pass
+    return address
 
 
 def session_student():

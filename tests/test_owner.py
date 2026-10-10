@@ -248,8 +248,20 @@ def test_the_host_command_fails_with_a_reason(client, settings, host_env,
 def test_the_host_command_runs_as_a_module(client, settings):
     env = dict(os.environ, SUPERASSISTANT_DATA_DIR=str(settings.data_dir),
                SUPERASSISTANT_OWNER_USERNAME="owner", PYTHONIOENCODING="utf-8")
+    # As `python -m superassistant`, but with the settings file pointed at
+    # one that does not exist: the command reads the clone's .env.production
+    # first, and on the host that is the pilot's (Opus 5.5's review of
+    # 0534b19, T1).
+    run_as_module = (
+        "import runpy, sys; from pathlib import Path; "
+        "import superassistant.settings as s; "
+        "s.SETTINGS_FILE = Path(sys.argv.pop(1)); "
+        "runpy.run_module('superassistant', run_name='__main__', "
+        "alter_sys=True)")
     done = subprocess.run(
-        [sys.executable, "-m", "superassistant", "owner-password", "--stdin"],
+        [sys.executable, "-c", run_as_module,
+         os.path.join(str(settings.data_dir), "no-settings-file"),
+         "owner-password", "--stdin"],
         input="от-командата-1\n".encode("utf-8"), capture_output=True,
         env=env, cwd=os.path.dirname(os.path.dirname(__file__)))
     assert done.returncode == 0, done.stderr.decode("utf-8")
