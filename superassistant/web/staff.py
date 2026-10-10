@@ -16,7 +16,6 @@ blueprint = Blueprint("staff", __name__)
 
 CORRECTABLE = ("name1", "name2", "name3", "fn", "phone", "programme", "topic",
                "average_grade") + applications.MULTI_LINE_FIELDS
-EXAM_CORRECTABLE = ("name1", "name2", "name3", "fn")
 
 
 def _row(connection, record, lists):
@@ -62,8 +61,7 @@ def _render(record, errors=None, status=200):
         requests=[(r, supervision.request_label(r, lists)) for r in requests],
         checks=applications.checks_of(connection, record["id"]),
         corrections=applications.corrections_of(connection, record["id"]),
-        correctable=(CORRECTABLE if record["grad_type"] == "thesis"
-                     else EXAM_CORRECTABLE),
+        correctable=CORRECTABLE,
         programme_label=supervision.programme_label(record, lists),
         fields=texts.FIELD_LABELS), status
 
@@ -97,15 +95,15 @@ def correct(application_id):
     from superassistant.web.student import _messages
     record = _submitted(application_id)
     field = request.form.get("field", "")
-    allowed = (CORRECTABLE if record["grad_type"] == "thesis"
-               else EXAM_CORRECTABLE)
-    if field not in allowed:
+    if field not in CORRECTABLE:
         abort(400)
     values, refusals = applications.clean({field: request.form.get("value",
                                                                    "")},
                                           [field], web.current_lists())
-    if not refusals and not values[field] and field in (
-            applications.REQUIRED_ALL + applications.REQUIRED_THESIS):
+    required = applications.REQUIRED_ALL + (
+        applications.REQUIRED_THESIS if record["grad_type"] == "thesis"
+        else ())
+    if not refusals and not values[field] and field in required:
         refusals = [applications.Refusal(field, "required")]
     if refusals:
         flash(texts.FIX_BELOW, "error")
@@ -148,4 +146,36 @@ def change_supervisor(application_id):
         return _render(record, dict(("supervisor_" + k, v) for k, v in
                                     _messages(refusals).items()), 400)
     flash(texts.STAFF_SUPERVISOR_CHANGED, "ok")
+    return redirect("/staff/application/{}".format(record["id"]))
+
+
+@blueprint.route("/staff/application/<int:application_id>/type",
+                 methods=["POST"])
+@web.staff_required
+def change_type(application_id):
+    """Correct the graduation type: state exam to thesis, or back."""
+    from superassistant.web.student import _messages
+    record = _submitted(application_id)
+    new_type = request.form.get("grad_type", "")
+    fields = ("professor", "sup_name", "sup_title", "sup_email")
+    values, refusals = applications.clean(request.form, fields,
+                                          web.current_lists())
+    if not refusals:
+        try:
+            refusals = supervision.staff_change_type(
+                web.connection(), web.settings(), web.current_lists(),
+                record["id"], new_type, values, web.session_staff()["id"])
+        except mail.MailFailed:
+            flash(texts.STAFF_SUPERVISOR_MAIL_FAILED, "error")
+            return _render(record, status=503)
+    if refusals is None:
+        flash(texts.STAFF_NOTHING_CHANGED, "ok")
+        return redirect("/staff/application/{}".format(record["id"]))
+    if refusals:
+        labels = ", ".join(texts.FIELD_LABELS.get(r.field, r.field)
+                           for r in refusals)
+        flash(texts.FIX_BELOW, "error")
+        return _render(record, {"type": texts.STAFF_TYPE_MISSING.format(
+            labels)}, 400)
+    flash(texts.STAFF_TYPE_CHANGED, "ok")
     return redirect("/staff/application/{}".format(record["id"]))

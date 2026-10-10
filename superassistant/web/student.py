@@ -19,6 +19,7 @@ TAB_FIELDS = {
         "average_grade", "professor", "sup_name", "sup_title", "sup_email"),
     2: applications.MULTI_LINE_FIELDS,
 }
+COMMON_FIELDS = ("name1", "name2", "name3", "fn")
 FIELD_TAB = dict((field, tab) for tab, fields in TAB_FIELDS.items()
                  for field in fields)
 FIELD_TAB["grad_type"] = 1
@@ -79,17 +80,25 @@ def save():
     if record["submitted_at"] is not None:
         return redirect("/application")
     tab = 2 if request.form.get("tab") == "2" else 1
-    fields = TAB_FIELDS[tab]
+    if tab == 1:
+        grad_type = request.form.get("grad_type", "")
+        grad_type = grad_type if grad_type in applications.GRAD_TYPES else None
+        # Only what the chosen type asks is checked and saved: the thesis
+        # fields of a state exam are hidden, and entries saved in them
+        # earlier are kept as they were.
+        fields = TAB_FIELDS[1] if grad_type == "thesis" else COMMON_FIELDS
+    else:
+        grad_type = record["grad_type"]
+        fields = TAB_FIELDS[2]
     values, refusals = applications.clean(request.form, fields,
                                           web.current_lists())
     if tab == 1:
-        grad_type = request.form.get("grad_type", "")
-        values["grad_type"] = (grad_type if grad_type in applications.GRAD_TYPES
-                               else None)
-        if not refusals:
+        values["grad_type"] = grad_type
+        if not refusals and grad_type == "thesis":
             values.update(supervision.supervisor_values(values))
     if refusals:
         typed = dict((f, request.form.get(f, "")) for f in fields)
+        typed["grad_type"] = grad_type
         flash(texts.FIX_BELOW, "error")
         return _render(record, tab, typed, _messages(refusals), 400)
     applications.save_draft(web.connection(), record, values)

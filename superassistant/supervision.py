@@ -20,7 +20,7 @@ import hashlib
 import hmac
 from datetime import timedelta
 
-from superassistant import applications, db, mail, texts
+from superassistant import accounts, applications, db, limits, mail, texts
 
 CHOICES = ("confirm", "decline")
 
@@ -119,6 +119,13 @@ def request_label(request, lists):
                                       request["sup_name"]) if part)
 
 
+def _throttle(connection, kind, address, in_transaction):
+    """Raise mail.MailFailed if this message would pass its finite bound."""
+    if not limits.allow_send(connection, kind, accounts.email_key(address),
+                             in_transaction):
+        raise mail.MailFailed(texts.MAIL_THROTTLED)
+
+
 # --- Making a request (always inside the caller's transaction) -------------
 
 def _replace_current(connection, application_id):
@@ -147,8 +154,10 @@ def _send_new_request(connection, settings, lists, application_id):
     token = _token(settings, request_id, stamp)
     connection.execute("UPDATE requests SET token_hash = ? WHERE id = ?",
                        (token_hash(token), request_id))
-    mail.send(settings, _request_message(settings, lists, record, token,
-                                         reminder=False))
+    message = _request_message(settings, lists, record, token,
+                               reminder=False)
+    _throttle(connection, "supervisor", message.to, in_transaction=True)
+    mail.send(settings, message)
     connection.execute(
         "UPDATE requests SET sent_at = ?, last_mailed_at = ? WHERE id = ?",
         (db.now(), db.now(), request_id))
@@ -268,7 +277,9 @@ def answer(connection, token, choice, comment):
 def tell_student_of_decline(connection, settings, lists, request):
     """The decline notice. Raises mail.MailFailed; the answer stays recorded."""
     record = applications.get(connection, request["application_id"])
-    mail.send(settings, _decline_message(settings, lists, record, request))
+    message = _decline_message(settings, lists, record, request)
+    _throttle(connection, "notice", message.to, in_transaction=False)
+    mail.send(settings, message)
 
 
 # --- Reminders -------------------------------------------------------------
@@ -309,9 +320,12 @@ def remind(connection, settings, lists):
                         or fresh["reminders_sent"] != request["reminders_sent"]):
                     continue
                 record = applications.get(connection, fresh["application_id"])
-                mail.send(settings, _request_message(
-                    settings, lists, record, token_for(settings, fresh),
-                    reminder=True))
+                message = _request_message(settings, lists, record,
+                                           token_for(settings, fresh),
+                                           reminder=True)
+                _throttle(connection, "supervisor", message.to,
+                          in_transaction=True)
+                mail.send(settings, message)
                 connection.execute(
                     "UPDATE requests SET reminders_sent = reminders_sent + 1, "
                     "last_mailed_at = ? WHERE id = ?", (db.now(), fresh["id"]))
@@ -319,3 +333,40 @@ def remind(connection, settings, lists):
         except mail.MailFailed as exc:
             failed.append((request, str(exc)))
     return sent, failed
+
+
+def staff_change_type(connection, settings, lists, application_id, new_type,
+                      values, account_id):
+    """Staff correct the graduation type the student entered (requirement 5).
+
+    The change is a correction, keeping the type it replaces with who and
+    when. To a thesis: the thesis data must be complete, and the request to
+    the supervisor (the one given in values, or the one already recorded)
+    must go before anything is committed; if the relay refuses it,
+    mail.MailFailed propagates and nothing changes. To a state exam: the
+    request standing is retired, and every answer already recorded stays with
+    its request. Returns Refusals, or None when the type was already that.
+    """
+    if new_type not in applications.GRAD_TYPES:
+        return [applications.Refusal("grad_type", "required")]
+    with db.transaction(connection):
+        record = applications.get(connection, application_id)
+        if record["submitted_at"] is None:
+            raise PermissionError("not submitted")
+        if record["grad_type"] == new_type:
+            return None
+        changes = {"grad_type": new_type}
+        if new_type == "thesis":
+            if values.get("professor") or values.get("sup_name") \
+                    or values.get("sup_email") or values.get("sup_title"):
+                changes.update(supervisor_values(values))
+            prospective = dict(record)
+            prospective.update(changes)
+            missing = applications.missing_for_submission(prospective)
+            if missing:
+                return missing
+        applications.correct(connection, record, changes, account_id)
+        _replace_current(connection, application_id)
+        if new_type == "thesis":
+            _send_new_request(connection, settings, lists, application_id)
+    return []

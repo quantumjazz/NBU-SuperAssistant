@@ -309,6 +309,7 @@ def build_report(path):
     (table,) = document.tables
     if [c.text for c in table.rows[0].cells] != HEADER:
         raise BuildError("the report's columns have changed")
+    header_to_12pt(table)
     rows = table._tbl.findall(qn("w:tr"))
     model = rows[1]
     model_run = model.find(".//" + qn("w:r"))
@@ -326,6 +327,21 @@ def build_report(path):
     for row in (opening, data, closing):
         table._tbl.append(row)
     return document
+
+
+def header_to_12pt(table):
+    """The header row in the adopted layout's size: Times New Roman 12 pt
+    (docs/domain.md). The samples set it at 10 pt."""
+    for cell in table.rows[0].cells:
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run.font.size = Pt(12)
+            marks = paragraph._p.find(qn("w:pPr"))
+            if marks is not None and marks.find(qn("w:rPr")) is not None:
+                for name in ("w:sz", "w:szCs"):
+                    size = marks.find(qn("w:rPr")).find(qn(name))
+                    if size is not None:
+                        size.set(qn("w:val"), "24")
 
 
 # --- Saving, with neutral metadata ---------------------------------------------

@@ -28,20 +28,59 @@ def _holdable(ch, multi):
 def test_stored_as_typed_trimmed_fn_in_capitals_or_refused(field, value):
     stored = applications.normalise(field, value)
     multi = field in applications.MULTI_LINE_FIELDS
-    expected = value.replace("\r\n", "\n").replace("\r", "\n") if multi \
+    typed = value.replace("\r\n", "\n").replace("\r", "\n") if multi \
         else value
-    expected = expected.strip()
+    expected = typed.strip()
     if field == "fn":
         expected = expected.upper()
     assert stored == expected
-    refusal = applications.check_entry(field, stored)
-    bad = [ch for ch in stored if not _holdable(ch, multi)]
+    # Refused characters are looked for in what was typed, ends included.
+    refusal = applications.check_entry(field, value)
+    bad = [ch for ch in typed if not _holdable(ch, multi)]
     if bad:
         assert refusal is not None and refusal.reason == "control"
         assert set(refusal.characters) == set(bad)
     elif refusal is not None:
         assert refusal.reason == "mixed"
         assert field in applications.SCRIPT_CHECKED_FIELDS
+
+
+controls = st.characters(whitelist_categories=("Cc",)).filter(
+    lambda ch: ch != "\n")
+
+
+@given(field=st.sampled_from(applications.ONE_LINE_FIELDS
+                             + applications.MULTI_LINE_FIELDS),
+       before=st.lists(controls, max_size=2), after=st.lists(controls,
+                                                             max_size=2),
+       middle=st.text(alphabet="Иван Петров", min_size=1, max_size=10))
+def test_a_control_at_either_end_is_refused_not_trimmed(field, before, after,
+                                                        middle):
+    if not before and not after:
+        return
+    value = "".join(before) + middle + "".join(after)
+    expected = set(before + after)
+    if field in applications.MULTI_LINE_FIELDS:
+        expected.discard("\r")         # a line break there, kept as \n
+    values, refusals = applications.clean({field: value}, [field])
+    if not expected:
+        assert refusals == []
+        return
+    assert values == {}
+    (refusal,) = refusals
+    assert refusal.reason == "control"
+    assert set(refusal.characters) == expected
+
+
+def test_the_refused_controls_are_shown_by_their_codes(client):
+    from tests.test_application_flow import as_student, save
+    as_student(client, "codes@example.org")
+    response = save(client, 1, {"name1": "\x0bИван\x0c", "name2": "Иванов",
+                                "name3": "Петров", "fn": "F1",
+                                "grad_type": "exam"}, "submit")
+    page = response.get_data(as_text=True)
+    assert response.status_code == 400
+    assert "U+000B" in page and "U+000C" in page
 
 
 word = st.text(alphabet=LATIN + CYRILLIC, min_size=1, max_size=12)

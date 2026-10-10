@@ -64,7 +64,11 @@
   <h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2>
   <ul>
   {% for c in corrections %}
+    {% if c.field == "grad_type" %}
+    <li>{{ t.STAFF_CORRECTION_LINE.format(fields.grad_type, t.STAFF_TYPE.get(c.old_value, c.old_value), t.STAFF_TYPE.get(c.new_value, c.new_value), c.username, c.at|datetime) }}</li>
+    {% else %}
     <li>{{ t.STAFF_CORRECTION_LINE.format(fields.get(c.field, c.field), c.old_value, c.new_value, c.username, c.at|datetime) }}</li>
+    {% endif %}
   {% endfor %}
   </ul>
   <form method="post" action="/staff/application/{{ r.id }}/correct">
@@ -80,6 +84,34 @@
       <p class="hint">{{ t.STAFF_CORRECT_PROGRAMME_HINT }} {% for code, p in lists.programmes.items() %}{{ code }} ({{ p.degree }} {{ p.name }}, {{ p.form }}){% if not loop.last %}; {% endif %}{% endfor %}</p>
       {% if errors.correction %}<p class="error">{{ errors.correction }}</p>{% endif %}
       <button type="submit">{{ t.STAFF_CORRECT_SAVE }}</button>
+    </fieldset>
+  </form>
+  <form method="post" action="/staff/application/{{ r.id }}/type" id="type-form">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <fieldset>
+      <legend>{{ t.STAFF_TYPE_FORM }}</legend>
+      <p class="hint">{{ t.STAFF_TYPE_HINT }}</p>
+      <label class="choice"><input type="radio" name="grad_type" value="thesis" {% if r.grad_type == "thesis" %}checked{% endif %}> {{ t.GRAD_THESIS }}</label>
+      <label class="choice"><input type="radio" name="grad_type" value="exam" {% if r.grad_type == "exam" %}checked{% endif %}> {{ t.GRAD_EXAM }}</label>
+      {% if r.grad_type != "thesis" %}
+        <label for="type_professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
+        <select id="type_professor" name="professor">
+          <option value="">{{ t.SUPERVISOR_NONE }}</option>
+          {% for code, p in lists.professors.items() %}<option value="{{ code }}" {% if r.professor == code %}selected{% endif %}>{{ p.title }} {{ p.name }}</option>{% endfor %}
+        </select>
+        <p class="hint">{{ t.SUPERVISOR_OUTSIDE }}</p>
+        <label for="type_sup_title">{{ fields.sup_title }}</label>
+        <select id="type_sup_title" name="sup_title">
+          <option value="">{{ t.SUPERVISOR_NONE }}</option>
+          {% for title in lists.titles %}<option value="{{ title }}">{{ title }}</option>{% endfor %}
+        </select>
+        <label for="type_sup_name">{{ fields.sup_name }}</label>
+        <input type="text" id="type_sup_name" name="sup_name">
+        <label for="type_sup_email">{{ fields.sup_email }}</label>
+        <input type="email" id="type_sup_email" name="sup_email">
+      {% endif %}
+      {% if errors.type %}<p class="error" id="type-error">{{ errors.type }}</p>{% endif %}
+      <button type="submit" id="change-type">{{ t.STAFF_TYPE_SAVE }}</button>
     </fieldset>
   </form>
   {% if r.grad_type == "thesis" %}

@@ -110,7 +110,12 @@ def write_starter(lists_dir):
 
 
 def _rows(lists_dir, filename):
-    """(line number, cells) for each non-empty row after the header."""
+    """(physical line number, cells) for each non-empty row after the header.
+
+    The line is the file's own line where the row starts, so a quoted cell
+    spanning lines does not shift the lines reported after it.
+    """
+    from superassistant.applications import forbidden_characters
     path = lists_dir / filename
     try:
         text = path.read_text(encoding="utf-8-sig")
@@ -118,21 +123,36 @@ def _rows(lists_dir, filename):
         raise ListError(filename, 0, "the file is missing")
     except (OSError, UnicodeDecodeError) as exc:
         raise ListError(filename, 0, "the file cannot be read: " + str(exc))
+    # A character no Word document can hold would silently vanish from every
+    # document that prints the entry: refuse it, by line and code.
+    for number, line in enumerate(text.split("\n"), start=1):
+        bad = forbidden_characters(line[:-1] if line.endswith("\r") else line)
+        if bad:
+            raise ListError(filename, number, "the character " + ", ".join(
+                "U+{:04X}".format(ord(ch)) for ch in bad)
+                + " cannot be printed in a document")
+    reader = csv.reader(io.StringIO(text))
+    rows, previous = [], 0
     try:
-        rows = list(csv.reader(io.StringIO(text)))
+        for row in reader:
+            rows.append((previous + 1, row))
+            previous = reader.line_num
     except csv.Error as exc:
-        raise ListError(filename, 0, "the file cannot be read: " + str(exc))
+        raise ListError(filename, previous + 1,
+                        "the file cannot be read: " + str(exc))
     if not rows:
         raise ListError(filename, 1, "the header row is missing")
-    header = [cell.strip() for cell in rows[0]]
+    header = [cell.strip() for cell in rows[0][1]]
     if header != HEADERS[filename]:
-        raise ListError(filename, 1, "the header must be: "
+        raise ListError(filename, rows[0][0], "the header must be: "
                         + ",".join(HEADERS[filename]))
     out = []
-    for number, row in enumerate(rows[1:], start=2):
+    for number, row in rows[1:]:
         cells = [cell.strip() for cell in row]
         if not any(cells):
             continue
+        if any("\n" in cell or "\r" in cell for cell in cells):
+            raise ListError(filename, number, "a cell holds a line break")
         if len(cells) != len(HEADERS[filename]):
             raise ListError(filename, number, "expected {} columns, found {}"
                             .format(len(HEADERS[filename]), len(cells)))

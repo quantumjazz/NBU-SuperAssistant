@@ -97,28 +97,42 @@ def mixed_letters(text):
     return "".join(found)
 
 
-def normalise(field, value):
-    """The value as it will be stored: line breaks as \\n, ends trimmed."""
+def _line_breaks(field, value):
     value = value if isinstance(value, str) else ""
     if field in MULTI_LINE_FIELDS:
         value = value.replace("\r\n", "\n").replace("\r", "\n")
-    value = value.strip()
+    return value
+
+
+def normalise(field, value):
+    """The value as it will be stored: line breaks as \\n, ends trimmed."""
+    value = _line_breaks(field, value).strip()
     if field == "fn":
         value = value.upper()
     return value
 
 
-def check_entry(field, value):
-    """The refusal for one already normalised entry, or None."""
-    multi = field in MULTI_LINE_FIELDS
+def forbidden_characters(text, multi_line=False):
+    """The characters a Word file cannot hold, in order, each once."""
     bad = []
-    for ch in value:
-        if _not_holdable(ch, multi) and ch not in bad:
+    for ch in text:
+        if _not_holdable(ch, multi_line) and ch not in bad:
             bad.append(ch)
+    return "".join(bad)
+
+
+def check_entry(field, value):
+    """The refusal for one entry, or None.
+
+    Control characters are looked for in the value as typed, before the ends
+    are trimmed: trimming must never be what makes a refused character pass.
+    """
+    value = _line_breaks(field, value)
+    bad = forbidden_characters(value, field in MULTI_LINE_FIELDS)
     if bad:
-        return Refusal(field, "control", "".join(bad))
+        return Refusal(field, "control", bad)
     if field in SCRIPT_CHECKED_FIELDS:
-        mixed = mixed_letters(value)
+        mixed = mixed_letters(normalise(field, value))
         if mixed:
             return Refusal(field, "mixed", mixed)
     return None
@@ -133,8 +147,8 @@ def clean(form, fields, lists=None):
     values, refusals = {}, []
     for field in fields:
         raw = form.get(field, "")
+        refusal = check_entry(field, raw)
         value = normalise(field, raw)
-        refusal = check_entry(field, value)
         if refusal is None and lists is not None and value:
             if field == "programme" and value not in lists.programmes:
                 refusal = Refusal(field, "choice")

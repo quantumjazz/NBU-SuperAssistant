@@ -37,7 +37,11 @@ def prepare(settings):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.reports_dir.mkdir(parents=True, exist_ok=True)
     db.migrate(settings.db_path)
-    lists.write_starter(settings.lists_dir)
+    # The starting lists are written once, on the first installation. A list
+    # missing later is an error to report, never one to quietly replace: the
+    # owner may have changed every entry since.
+    if not settings.lists_dir.exists():
+        lists.write_starter(settings.lists_dir)
     connection = db.connect(settings.db_path)
     try:
         try:
@@ -124,9 +128,14 @@ def csrf_token():
 
 
 def source():
-    """Who is asking, for rate limits: the address the request came from."""
-    return (request.headers.get("CF-Connecting-IP")
-            or request.remote_addr or "")
+    """Who is asking, for rate limits: the connection's own address.
+
+    Never a forwarded header: any caller can set CF-Connecting-IP to a new
+    value on every request and so never meet the per-source limit. Trusting
+    a forwarded address only from a configured proxy (Cloudflare's tunnel
+    on the host) comes with the deployment.
+    """
+    return request.remote_addr or ""
 
 
 def session_student():

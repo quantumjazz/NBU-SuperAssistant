@@ -219,3 +219,42 @@ def test_staff_table_one_application_and_a_check(live_server, open_page):
     desk.goto(live_server.url + "/staff")
     expect(desk.locator("#applications tbody tr").first).not_to_contain_text(
         texts.STAFF_WAITING_CHECK)
+
+
+def test_a_refused_thesis_entry_keeps_the_thesis_choice_and_shows_its_error(
+        live_server, open_page):
+    """Codex M1-C1: a refusal redisplayed the page with no graduation type
+    chosen, the error hidden inside the thesis fields."""
+    page = open_page(PHONE)
+    sign_in_by_link(page, live_server, "refused-topic@example.org")
+    fill_thesis_tab_1(page, STUDENT[:4] + ("Тeма с латинско e",))
+    page.locator("#next-button").click()
+    expect(page.locator("input[name=grad_type][value=thesis]")).to_be_checked()
+    expect(page.locator("#thesis-fields")).to_be_visible()
+    expect(page.locator("#topic-error")).to_be_visible()
+    expect(page.locator("#topic-error")).to_contain_text("e")
+    expect(page.locator("#tab2-link")).to_be_visible()
+
+
+def test_switching_to_a_state_exam_ignores_the_hidden_thesis_fields(
+        live_server, open_page):
+    """Codex M1-C2: an invalid hidden thesis entry blocked a state exam; and
+    thesis entries saved earlier are kept, not deleted."""
+    page = open_page(PHONE)
+    sign_in_by_link(page, live_server, "switch@example.org")
+    fill_thesis_tab_1(page, STUDENT)
+    page.locator("button[value=save]").click()
+    expect(page.locator(".flash.ok")).to_be_visible()
+    page.fill("#topic", "Тeма с латинско e")          # invalid, then hidden
+    page.check("input[name=grad_type][value=exam]")
+    expect(page.locator("#thesis-fields")).to_be_hidden()
+    page.locator("#submit-exam").click()
+    expect(page.locator("#status")).to_contain_text("Подадено на")
+    from superassistant import applications, db
+    connection = db.connect(live_server.settings.db_path)
+    try:
+        record = applications.by_email_key(connection, "switch@example.org")
+    finally:
+        connection.close()
+    assert record["grad_type"] == "exam" and record["submitted_at"]
+    assert record["topic"] == STUDENT[4]              # kept as saved
