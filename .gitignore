@@ -12,3 +12,7 @@ data/
 test-output/
 # Delegates' isolated worktrees.
 .claude/
+# Settings files hold secrets (the host's holds the Resend key): never
+# committed. .env.production.example is the template (docs/deployment.md).
+.env.production
+.env
