@@ -40,7 +40,7 @@ Ask only when ambiguity changes visible behaviour, makes implementation dishones
   - Repository: `NBU-SuperAssistant`.
   - Python package: `superassistant`.
   - Settings prefix: `SUPERASSISTANT_`.
-  - Host service: `superassistant`.
+  - Host service: `nbu-superassistant`.
 
   Do not rename these without the owner's approval.
 - **Python.** 3.9 on the owner's Mac and 3.12 on the host, and the code runs on both. That rules out `match` statements, `X | Y` unions outside annotations, and anything else newer than 3.9.
