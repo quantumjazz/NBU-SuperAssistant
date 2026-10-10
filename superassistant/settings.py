@@ -45,6 +45,13 @@ _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # str.strip(), which also takes form feeds, NEL and no-break spaces.
 _BLANKS = " \t\r"
 
+# Where systemd's EnvironmentFile ends a line: at a line feed and at a
+# carriage return alike, so "KEY=a\rb" gives KEY the value "a", and
+# "D=x\ry=z" two settings. Checked on the host's systemd 255 with a
+# transient unit on 11 October 2026 (Codex's M2-C1); a form feed, NEL or
+# line separator ends no line.
+_LINE_ENDS = re.compile("\r\n|\r|\n")
+
 
 class SettingsFileError(Exception):
     """The settings file holds a line systemd would read differently."""
@@ -76,11 +83,11 @@ def load_settings_file(path=None, environ=None):
     path = Path(SETTINGS_FILE if path is None else path)
     environ = os.environ if environ is None else environ
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_bytes().decode("utf-8")
     except FileNotFoundError:
         return []
     values = {}
-    for number, line in enumerate(text.split("\n"), start=1):
+    for number, line in enumerate(_LINE_ENDS.split(text), start=1):
         line = line.strip(_BLANKS)
         if not line or line.startswith("#") or "=" not in line:
             continue

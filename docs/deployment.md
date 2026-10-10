@@ -529,18 +529,62 @@ row. The `pip install` line is how a new dependency arrives.
 `/home/victor/nbu-superassistant-data` is the only thing that matters. The
 clone is disposable: it can be deleted and cloned again.
 
+Two programs write the records: the service, and the reminder run, which the
+timer starts at 09:00, or later to catch up a 09:00 it missed (at the next
+boot, or when the timer is started again). A backup and a restore therefore
+stop both. First the timer, so it starts no new run. Then they wait for a run
+already under way to end, so no reminder is cut off between its mail and its
+record. Then the service.
+
+### Taking a backup
+
 ```bash
+sudo systemctl stop nbu-superassistant-remind.timer
+while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done
 sudo systemctl stop nbu-superassistant
-tar czf ~/nbu-superassistant-backup-$(date +%F).tgz -C /home/victor nbu-superassistant-data
-chmod 600 ~/nbu-superassistant-backup-$(date +%F).tgz
+backup=/home/victor/nbu-superassistant-backup-$(date +%Y%m%d-%H%M%S).tgz
+(umask 077; set -o noclobber; tar czf - -C /home/victor nbu-superassistant-data > "$backup") && ls -l "$backup"
 sudo systemctl start nbu-superassistant
+sudo systemctl start nbu-superassistant-remind.timer
 ```
 
-The backup holds everything people entered and the session key, so keep it
-as private as the folder. Do not take it at 09:00, when the reminder run
-writes to the same records.
+Every backup gets a name of its own, to the second, and `noclobber` refuses
+to write over a file that already exists, so a backup never replaces an
+earlier one. `umask 077` makes the archive yours alone from the moment it
+exists: it holds everything people entered and the session key. If 09:00
+passed while the timer was stopped, starting it again sends that morning's
+reminders at once.
 
-To restore: stop the service, replace the folder (mode 700), start it again.
+Keep a copy off the laptop as well; a backup on the same disk goes with the
+disk. On the Mac:
+
+```bash
+scp 'victor@192.168.1.102:/home/victor/nbu-superassistant-backup-*.tgz' .
+```
+
+### Restoring a backup
+
+A restore keeps the current records under a new name, so a restore can
+itself be undone. Write the name of the backup to restore in the first line:
+
+```bash
+backup=/home/victor/nbu-superassistant-backup-YYYYMMDD-HHMMSS.tgz
+sudo systemctl stop nbu-superassistant-remind.timer
+while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done
+sudo systemctl stop nbu-superassistant
+kept=/home/victor/nbu-superassistant-data.before-restore-$(date +%Y%m%d-%H%M%S)
+test -f "$backup" && test ! -e "$kept" && mv /home/victor/nbu-superassistant-data "$kept" && tar xzf "$backup" -C /home/victor && chmod 700 /home/victor/nbu-superassistant-data && ls -ld "$kept" /home/victor/nbu-superassistant-data && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
+curl -s http://127.0.0.1:8791/healthz
+```
+
+The long line stops at the first step that fails, and then the service stays
+stopped, because started without its records folder it would make a new,
+empty installation in its place. If the backup's name was wrong, nothing has
+moved: correct the first line and run the rest again. If the unpacking
+failed, the current records are in the kept folder: put them back with
+`mv "$kept" /home/victor/nbu-superassistant-data` in the same window, then
+start the service and the timer. Delete the kept folder only once the
+restored records are confirmed.
 
 ## What is public without signing in
 

@@ -312,6 +312,29 @@ def test_only_a_newline_ends_a_line_and_only_blanks_are_trimmed(tmp_path):
                        "SUPERASSISTANT_SMTP_HOST": "smtp.example.org"}
 
 
+def test_a_carriage_return_ends_a_line_as_systemd_reads_it(tmp_path):
+    """Codex's M2-C1 (11 October 2026) asked to keep a carriage return
+    inside a value. The host's systemd 255, given this very file through a
+    transient unit's EnvironmentFile=, gave SUPERASSISTANT_SMTP_PASSWORD
+    the value "re_FAKE_before", D the value "x" and y the value "z", and
+    left C unset: a carriage return ends a line there, as a line feed does.
+    The reader must give the same, or the host commands would test other
+    settings than the service runs with."""
+    path = tmp_path / ".env.production"
+    path.write_bytes(b"SUPERASSISTANT_SMTP_PASSWORD=re_FAKE_before\rafter\n"
+                     b"SUPERASSISTANT_A=one\r\n"
+                     b"SUPERASSISTANT_B=  two words  \n"
+                     b";SUPERASSISTANT_C=semicolon\n"
+                     b"SUPERASSISTANT_D=x\ry=z\n")
+    environ = {}
+    load_settings_file(path, environ)
+    assert environ == {"SUPERASSISTANT_SMTP_PASSWORD": "re_FAKE_before",
+                       "SUPERASSISTANT_A": "one",
+                       "SUPERASSISTANT_B": "two words",
+                       "SUPERASSISTANT_D": "x",
+                       "y": "z"}
+
+
 # Taken when this module is imported, before any test repoints it.
 REAL_SETTINGS_FILE = settings_module.SETTINGS_FILE
 
