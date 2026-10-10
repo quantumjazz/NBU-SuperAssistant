@@ -99,12 +99,12 @@
   - The per-source limit was keyed by Cloudflare's visitor address, not 127.0.0.1.
   - The journal holds no error and no token.
   - If she does not answer, the reminders go on 13 and 16 October at 09:00.
-- **Found:** rendered through Word, Приложение 2 put the supervisor's slot at the left edge of the next line. This is a milestone-1 template defect: milestone 1 rendered the form only with Quick Look.
+- **Found:** rendered through Word, Приложение 2 put the supervisor's slot at the left edge of the next line. This is a milestone-1 template defect.
 - **Fixed in `e3b51b9`:**
   - The year is replaced by dots of equal width.
   - A regression test pins the line's width.
   - Checked by eye through Word against the sample.
   - Python 3.9.6 and 3.12.14: 212 passed and browser 7 passed.
-  - Pushed. The laptop pulled it; it reads templates for each document, so no restart was needed.
+  - Pushed. The laptop pulled it.
 - **DEFERRED until real students (8.7):** the sign-in limit of 10 an hour per visitor counts one public address, so students on one campus network would share it.
 - **Outstanding:** Codex's review, now of `e3b51b9`; then the supervisor's answer and the report.
