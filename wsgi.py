@@ -1,5 +1,24 @@
-"""The host's entry point: gunicorn wsgi:app (listening on 127.0.0.1:8791)."""
+"""The host's entry point: gunicorn wsgi:app (listening on 127.0.0.1:8791).
 
-from superassistant.web import create_app
+The settings file .env.production in the clone is read first, never
+overriding a variable already set (systemd's EnvironmentFile has usually set
+them all). A start the settings or the records refuse prints one line,
+"NBU-SuperAssistant cannot start: <reason>", and exits with status 3, which
+gunicorn reads as a worker that cannot boot, so it stops instead of starting
+the worker again and again.
+"""
 
-app = create_app()
+import sys
+
+from superassistant.settings import load_settings_file
+
+load_settings_file()
+
+from superassistant.web import StartupError, create_app  # noqa: E402
+
+try:
+    app = create_app()
+except StartupError as exc:
+    sys.stderr.write("NBU-SuperAssistant cannot start: " + str(exc) + "\n")
+    sys.stderr.flush()
+    sys.exit(3)

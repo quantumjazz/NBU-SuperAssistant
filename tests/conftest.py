@@ -4,19 +4,52 @@ helpers that write records straight into the database.
 
 Nobody here is real: the professors, students and staff are invented
 (CLAUDE.md "Data in the repository").
+
+Every test runs isolated from the machine it runs on (isolated_settings):
+no SUPERASSISTANT_* variable from the shell, no settings file from the clone,
+and no real relay, so neither a developer's nor the host's own settings can
+decide a test or make it send a message.
 """
 
 import email
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from superassistant import accounts, db, lists, mail
+from superassistant import settings as settings_module
 from superassistant.settings import Settings
 from superassistant.web import create_app
 
 OWNER_EMAIL = "owner@example.org"
+
+
+def _never_send(settings, envelope):
+    raise mail.MailFailed("tests never use the real relay; use the outbox "
+                          "fixture")
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(monkeypatch, tmp_path_factory):
+    """Every test: no SUPERASSISTANT_* variable from the shell, the settings
+    file pointed at one that does not exist, and a relay that refuses unless
+    the test installs the fake one (outbox). Afterwards any SUPERASSISTANT_*
+    variable a test's own settings file left behind is removed."""
+    for name in list(os.environ):
+        if name.startswith(settings_module.PREFIX):
+            monkeypatch.delenv(name)
+    monkeypatch.setattr(settings_module, "SETTINGS_FILE",
+                        tmp_path_factory.getbasetemp() / "no-settings-file"
+                        / ".env.production")
+    mail.set_relay(_never_send)
+    yield
+    mail.set_relay(None)
+    for name in list(os.environ):
+        if name.startswith(settings_module.PREFIX):
+            del os.environ[name]
+
 
 INVENTED_PROFESSORS = [
     ["ivanov", "доц. д-р", "Петър Иванов", "p.ivanov@example.org"],
@@ -100,7 +133,14 @@ class Sent(object):
         self.envelope = envelope
         self.envelope_to = envelope["To"]
         self.subject = envelope["Subject"]
-        parsed = email.message_from_bytes(envelope.as_bytes())
+        # Serialized as smtplib's send_message serializes it: with the utf8
+        # policy (SMTPUTF8) when an address is not ASCII, as a student's
+        # typed address in mode "send" can be; the default policy cannot
+        # fold such an address and raises.
+        addresses = str(envelope["From"]) + str(envelope["To"])
+        international = any(ord(ch) > 127 for ch in addresses)
+        policy = envelope.policy.clone(utf8=True) if international else None
+        parsed = email.message_from_bytes(envelope.as_bytes(policy=policy))
         self.text = ""
         self.html = ""
         for part in parsed.walk():

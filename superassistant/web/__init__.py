@@ -3,15 +3,20 @@
 create_app refuses to build an application the records or the lists would
 make wrong (NOW.md, requirements 5 and 6): unknown settings, a list that
 cannot be read or no longer holds an entry an application uses, or an owner
-setting that names no account. app.py prints the reason and exits.
+setting that names no account; and, for a hosted installation, settings that
+would expose it or lose mail (Settings.problems). app.py and wsgi.py print the
+reason and exit. A start that succeeds says on one line of standard error
+what it resolved (startup_line), because on the host that is read through
+journalctl.
 """
 
 import secrets
+import sys
 from functools import wraps
 
 from flask import Flask, abort, g, redirect, request, session
 
-from superassistant import accounts, db, lists, texts
+from superassistant import accounts, db, lists, mail, texts
 from superassistant.settings import from_env
 
 
@@ -98,18 +103,62 @@ def create_app(settings=None):
 
     @app.context_processor
     def _globals():
-        mode = settings.effective_mail_mode()
-        mail_note = (texts.MAIL_DEV_CONSOLE if mode == "console" else
-                     texts.MAIL_DEV_OWNER.format(settings.owner_email))
-        return {"t": texts, "csrf_token": csrf_token, "mail_note": mail_note,
+        return {"t": texts, "csrf_token": csrf_token,
+                "mail_note": mail_note(settings),
                 "student": session_student(), "staff": session_staff(),
                 "is_owner": is_owner(session_staff())}
 
-    from superassistant.web import (auth, documents, owner, staff, student,
-                                    supervisor)
-    for module in (auth, student, supervisor, staff, owner, documents):
+    from superassistant.web import (auth, documents, health, owner, staff,
+                                    student, supervisor)
+    for module in (auth, student, supervisor, staff, owner, documents,
+                   health):
         app.register_blueprint(module.blueprint)
+    sys.stderr.write(startup_line(settings) + "\n")
+    sys.stderr.flush()
     return app
+
+
+def mail_note(settings):
+    """The line every page shows in a development mail mode, or ""."""
+    mode = settings.effective_mail_mode()
+    if mode == "console":
+        return texts.MAIL_DEV_CONSOLE
+    if mode == "owner":
+        return texts.MAIL_DEV_OWNER.format(settings.owner_email)
+    return ""
+
+
+def startup_line(settings):
+    """What this start resolved, as one line for the log. Never a secret.
+
+    The records folder, the address, the mail mode (with the relay and the
+    sender when mail leaves) and where a visitor's address comes from. As
+    CourseBench's hosting.describe: when a deploy behaves oddly, the first
+    question is what the process resolved, not what someone believes is in
+    the settings file. No password, key or username is among it.
+    """
+    mode = settings.effective_mail_mode()
+    if mode == "send":
+        how = ("send, to each intended recipient, through "
+               + mail.relay_description(settings) + " from "
+               + settings.mail_from)
+    elif mode == "owner":
+        how = ("owner, every message to " + settings.owner_email
+               + ", through " + mail.relay_description(settings) + " from "
+               + (settings.mail_from or "(SUPERASSISTANT_MAIL_FROM not set)"))
+    else:
+        how = ("console, printed and never sent"
+               + ("" if settings.mail_mode else " (SUPERASSISTANT_MAIL_MODE "
+                  "not set)"))
+    if settings.client_ip_header:
+        visitor = ("the " + settings.client_ip_header + " header, else the "
+                   "connection")
+    else:
+        visitor = "the connection"
+    return ("NBU-SuperAssistant started: records "
+            + str(settings.data_dir.resolve())
+            + "; address " + settings.base_url + "; mail " + how
+            + "; visitor address from " + visitor + ".")
 
 
 # --- What every page needs -------------------------------------------------
@@ -137,13 +186,25 @@ def csrf_token():
 
 
 def source():
-    """Who is asking, for rate limits: the connection's own address.
+    """Who is asking, for rate limits.
 
-    Never a forwarded header: any caller can set CF-Connecting-IP to a new
-    value on every request and so never meet the per-source limit. Trusting
-    a forwarded address only from a configured proxy (Cloudflare's tunnel
-    on the host) comes with the deployment.
+    Unless SUPERASSISTANT_CLIENT_IP_HEADER names a header, the connection's
+    own address, and never a forwarded header: any caller can set
+    CF-Connecting-IP to a new value on every request and so never meet the
+    per-source limit. On the host the tunnel connects from 127.0.0.1, so
+    every visitor would share one source; there the setting names the header
+    Cloudflare writes, and the first value in it is the visitor (copied from
+    CourseBench's coursebench/web/app.py, _caller: a forwarding chain
+    appends, and the first entry is the one nearest the visitor). Absent or
+    empty, the connection again. The setting is safe only where every
+    request comes through the tunnel; anywhere reachable directly, a caller
+    could name a new source on every request.
     """
+    header = settings().client_ip_header
+    if header:
+        stated = (request.headers.get(header) or "").split(",")[0].strip()
+        if stated:
+            return stated
     return request.remote_addr or ""
 
 

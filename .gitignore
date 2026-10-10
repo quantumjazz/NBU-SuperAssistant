@@ -12,3 +12,5 @@ data/
 test-output/
 # Delegates' isolated worktrees.
 .claude/
+# The host's settings file holds the relay password and the session key.
+.env.production

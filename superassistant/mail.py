@@ -4,15 +4,18 @@ The relay code is copied from CourseBench (`coursebench/mail.py`): SMTP with
 the standard library, a configured sender, and a failure that is raised and
 never swallowed, so the person waiting is always told.
 
-What is new here is the mail mode (CLAUDE.md "Mail"; NOW.md proof 4):
+What is new here is the mail mode (CLAUDE.md "Mail"):
 
+  send     every message goes to its intended recipient through the relay,
+           unchanged (the hosted pilot);
   owner    every message goes to SUPERASSISTANT_OWNER_EMAIL instead, with the
            intended recipient written at its top;
   console  every message is printed, never sent;
   unset    the same as console.
 
-No mode in this milestone sends to the intended recipient: that comes with the
-deployment. Tests replace the relay with a fake (set_relay) and never send.
+Only "send" reaches the intended recipient; "owner" and "console" are the
+development modes. Tests replace the relay with a fake (set_relay) and never
+send.
 """
 
 import smtplib
@@ -91,6 +94,14 @@ def relay_problem(settings):
     return ""
 
 
+def relay_description(settings):
+    """The relay as host:port (security), for people to read. Never the
+    username or the password."""
+    return "{}:{} ({})".format(
+        settings.smtp_host or "(SUPERASSISTANT_SMTP_HOST not set)",
+        _port(settings), _security(settings))
+
+
 def smtp_relay(settings, envelope):
     """Hand one EmailMessage to the configured relay. Raises on failure."""
     stopper = relay_problem(settings)
@@ -157,15 +168,20 @@ def send(settings, message, out=None):
         ]))
         stream.flush()
         return
-    # mode == "owner": to the owner, the intended recipient written on top.
-    note = texts.MAIL_INTENDED_FOR.format(message.to)
-    text = note + "\n\n" + message.text
-    html = None
-    if message.html:
-        html = "<p><strong>" + texts.escape(note) + "</strong></p>" \
-            + message.html
-    envelope = _envelope(settings, settings.owner_email, message.subject,
-                         text, html)
+    if mode == "send":
+        # To the intended recipient, exactly as written.
+        envelope = _envelope(settings, message.to, message.subject,
+                             message.text, message.html)
+    else:
+        # mode == "owner": to the owner, the intended recipient on top.
+        note = texts.MAIL_INTENDED_FOR.format(message.to)
+        text = note + "\n\n" + message.text
+        html = None
+        if message.html:
+            html = "<p><strong>" + texts.escape(note) + "</strong></p>" \
+                + message.html
+        envelope = _envelope(settings, settings.owner_email, message.subject,
+                             text, html)
     try:
         _relay(settings, envelope)
     except MailFailed:

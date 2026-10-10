@@ -2,13 +2,17 @@
 proof 1's list bullet, proof 4's mail modes)."""
 
 import io
+import string
 
 import pytest
+from hypothesis import HealthCheck, assume, given, settings as hsettings
+from hypothesis import strategies as st
 
 from superassistant import lists, mail
 from superassistant.settings import Settings
 from superassistant.web import StartupError, create_app
-from tests.conftest import make_account, make_settings, prepare_data_dir
+from tests.conftest import (OWNER_EMAIL, make_account, make_settings,
+                            prepare_data_dir)
 
 
 def test_starts_from_an_empty_directory(tmp_path):
@@ -92,9 +96,41 @@ def test_console_and_unset_modes_print_and_send_nothing(tmp_path, outbox,
     assert "Текст" in out.getvalue()
 
 
-def test_no_mode_sends_to_the_intended_recipient(tmp_path):
-    assert Settings(tmp_path, mail_mode="send").problem()
-    assert Settings(tmp_path, mail_mode="owner").problem()   # no owner email
+# Milestone 2 changed this test on purpose. Milestone 1's version asserted
+# that mode "send" was refused, because no mode then sent to the intended
+# recipient. Milestone 2 adds "send" (tests/test_hosting.py proves it); what
+# remains true, and is tested here over generated recipients, is that the
+# development modes (unset, console, owner) never send to the intended
+# recipient, even with a relay fully configured, and that "send" still starts
+# only with a relay to send through.
+@hsettings(max_examples=40, deadline=None,
+           suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(local=st.text(alphabet=string.ascii_lowercase + string.digits
+                     + "._-+абвгдежзийклмнопрстуфхцчшщъьюя",
+                     min_size=1, max_size=30),
+       domain=st.sampled_from(["example.org", "example.bg", "пример.бг"]),
+       mode=st.sampled_from(["", "console", "owner"]))
+def test_no_development_mode_sends_to_the_intended_recipient(
+        tmp_path, outbox, local, domain, mode):
+    recipient = local + "@" + domain
+    assume(mail.valid_address(recipient) and recipient != OWNER_EMAIL)
+    outbox.clear()
+    settings = make_settings(tmp_path, mail_mode=mode,
+                             smtp_host="smtp.example.org",
+                             mail_from="pilot@example.org")
+    out = io.StringIO()
+    mail.send(settings, mail.Message(recipient, "Тема", "Текст"), out=out)
+    assert all(m.envelope_to != recipient for m in outbox.messages)
+    if mode == "owner":
+        (sent,) = outbox.messages
+        assert sent.envelope_to == OWNER_EMAIL and sent.intended == recipient
+    else:
+        assert outbox.messages == [] and recipient in out.getvalue()
+
+
+def test_send_and_owner_modes_start_only_with_what_they_need(tmp_path):
+    assert Settings(tmp_path, mail_mode="send").problem()     # no relay
+    assert Settings(tmp_path, mail_mode="owner").problem()    # no owner email
 
 
 def test_a_refused_message_raises(settings, outbox):
