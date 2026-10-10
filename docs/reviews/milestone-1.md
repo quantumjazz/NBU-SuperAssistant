@@ -44,3 +44,10 @@
 - **Disposition:** all four fixed in `159925f` by Opus 5.5 (`claude-opus-5-5`). An independent read-only check of `159925f` (two delegated agents, one round) confirmed them and found three gaps inside the same points, fixed in `cc688ff`: an upgraded schema-1 installation recreating missing lists; a filled-in invalid address called missing; a retained title alone hidden. Each fix has a regression shown to fail on the commit before it.
 - **Checks on `cc688ff`** (Opus 5.5): Python 3.9.6 and 3.12.14, 123 passed and browser 7 passed each. Reports with 1, 3 and 12 invented students exported to PDF by Microsoft Word: the signature block is whole on the last page.
 - **Outstanding:** Codex's review of these fixes; the owner's inspection.
+
+## 2026-10-10 — Final code approved: `cc688ff`; ready for owner acceptance
+
+- **Approvals of the final code `cc688ff67d0c71f3fadff087629df85319539cb3`:** Codex APPROVED, relayed by the owner: "Codex approves milestone 1 code at `cc688ff67d0c71f3fadff087629df85319539cb3`." Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit. Plan: `NOW.md` `65d0ad16…`, Opus 5.5 APPROVED; Fable's approval waived by the owner (entry of 10 October above).
+- **Checks on `cc688ff`:** Codex, Python 3.9 and 3.12, 123 passed and browser 7 passed each, no skips; reports with 1, 3 and 12 invented students checked by content and by eye. Opus 5.5, the same counts.
+- **DEFERRED** (Codex, non-blocking): a typed supervisor address entered with name and title empty gets the generic missing-supervisor message; the migration race between simultaneous starts, to the deployment.
+- **Phase:** READY FOR OWNER ACCEPTANCE. Outstanding: the owner's inspection, `NOW.md` Completion 1–5, on the Mac with mail mode "owner".
