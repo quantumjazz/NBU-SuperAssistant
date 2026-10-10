@@ -41,6 +41,8 @@ def _messages(refusals):
         elif refusal.reason == "mixed":
             out[refusal.field] = texts.REFUSED_MIXED.format(
                 " ".join(refusal.characters))
+        elif refusal.reason == "address":
+            out[refusal.field] = texts.MAIL_BAD_ADDRESS
         elif refusal.reason == "choice":
             out[refusal.field] = texts.REFUSED_CHOICE
         else:

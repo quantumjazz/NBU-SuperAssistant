@@ -17,7 +17,7 @@ blueprint = Blueprint("staff", __name__)
 # Thesis entries a state-exam application may still hold, from before staff
 # corrected its type or from the student's draft: shown, never dropped.
 RETAINED = ("phone", "programme", "topic", "average_grade", "professor",
-            "sup_name", "sup_email") + applications.MULTI_LINE_FIELDS
+            "sup_name", "sup_title", "sup_email") + applications.MULTI_LINE_FIELDS
 
 CORRECTABLE = ("name1", "name2", "name3", "fn", "phone", "programme", "topic",
                "average_grade") + applications.MULTI_LINE_FIELDS

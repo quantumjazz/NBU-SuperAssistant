@@ -493,3 +493,107 @@ def test_the_signature_block_is_kept_together_in_a_filled_report(settings):
     header = document.tables[0].rows[0]
     assert {r.font.size.pt for c in header.cells for p in c.paragraphs
             for r in p.runs} == {12.0}
+
+
+# --- Found by Opus 5.5's own check of 159925f --------------------------------
+
+def schema_1_installation(data_dir):
+    """A data directory as an installation before schema 2 left it."""
+    import sqlite3
+    data_dir.mkdir(parents=True)
+    connection = sqlite3.connect(str(data_dir / "superassistant.sqlite3"))
+    connection.executescript(db.MIGRATIONS[0] + ";PRAGMA user_version = 1;")
+    connection.close()
+    lists.write_starter(data_dir / "lists")
+
+
+@pytest.mark.parametrize("remove", ["folder", lists.PROFESSORS])
+def test_an_upgraded_installation_with_lists_missing_stops_the_start(
+        tmp_path, remove):
+    import shutil
+    data_dir = tmp_path / "data"
+    schema_1_installation(data_dir)
+    if remove == "folder":
+        shutil.rmtree(str(data_dir / "lists"))
+    else:
+        (data_dir / "lists" / remove).unlink()
+    with pytest.raises(StartupError) as raised:
+        create_app(make_settings(data_dir))
+    assert "missing" in str(raised.value)
+    if remove == "folder":
+        assert not (data_dir / "lists").exists()
+    else:
+        assert not (data_dir / "lists" / remove).exists()
+
+
+def test_an_upgraded_installation_is_recorded_as_installed(tmp_path):
+    data_dir = tmp_path / "data"
+    schema_1_installation(data_dir)
+    settings = make_settings(data_dir)
+    create_app(settings)
+    connection = connect(settings)
+    assert [r[0] for r in connection.execute("SELECT key FROM installation")] \
+        == ["lists"]
+    connection.close()
+
+
+def test_a_failed_first_start_leaves_no_partial_list(tmp_path, monkeypatch):
+    import os
+    data_dir = tmp_path / "data"
+    settings = make_settings(data_dir)
+    real_replace = os.replace
+    calls = []
+
+    def failing(src, dst):
+        calls.append(dst)
+        if len(calls) == 2:
+            raise OSError(28, "No space left on device")
+        real_replace(src, dst)
+    monkeypatch.setattr(lists.os, "replace", failing)
+    with pytest.raises(OSError):
+        create_app(settings)
+    monkeypatch.setattr(lists.os, "replace", real_replace)
+    create_app(settings)                        # the retry completes the lists
+    loaded = lists.load(settings.lists_dir)
+    assert "АУ-РО" in loaded.programmes and loaded.titles
+
+
+TYPED_BAD_ADDRESS = {"professor": "", "sup_title": "проф. д-р",
+                     "sup_name": "Анна Стефанова", "sup_email": "anna@example"}
+
+
+def test_a_typed_address_that_is_not_one_is_wrong_not_missing(
+        client, new_client, settings, outbox, staff):
+    from superassistant import texts
+    as_student(client, "badaddress@example.org")
+    response = submit_thesis(client, TYPED_BAD_ADDRESS)
+    page = response.get_data(as_text=True)
+    assert response.status_code == 400
+    assert texts.MAIL_BAD_ADDRESS in page
+    assert texts.REFUSED_REQUIRED not in page.split('id="sup_email-error"')[
+        1][:200]
+    submit_exam(new_client(), "badtype@example.org")
+    record = record_for(settings, "badtype@example.org")
+    viewer = as_staff(new_client(), staff)
+    base = "/staff/application/{}".format(record["id"])
+    for field, value in thesis_data().items():
+        viewer.post(base + "/correct", data={"field": field, "value": value})
+    data = {"grad_type": "thesis"}
+    data.update(TYPED_BAD_ADDRESS)
+    page = viewer.post(base + "/type", data=data).get_data(as_text=True)
+    assert texts.MAIL_BAD_ADDRESS in page and "За теза липсват" not in page
+
+
+def test_a_retained_title_alone_is_shown(client, new_client, settings, staff):
+    as_student(client, "titleonly@example.org")
+    save(client, 1, {"name1": "Мила", "name2": "Петрова", "name3": "Нейкова",
+                     "fn": "F700001", "grad_type": "thesis",
+                     "sup_title": "проф. д-р"})
+    save(client, 1, {"name1": "Мила", "name2": "Петрова", "name3": "Нейкова",
+                     "fn": "F700001", "grad_type": "exam"}, "submit")
+    record = record_for(settings, "titleonly@example.org")
+    assert record["sup_title"] == "проф. д-р"
+    page = as_staff(new_client(), staff).get(
+        "/staff/application/{}".format(record["id"])).get_data(as_text=True)
+    assert "Запазени данни за теза" in page
+    assert "проф. д-р" in page.split('id="thesis-fields"')[1].split("</dl>")[0]

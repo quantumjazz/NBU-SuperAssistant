@@ -168,10 +168,20 @@ def missing_for_submission(record):
     missing = [f for f in REQUIRED_ALL if not record[f]]
     if record["grad_type"] not in GRAD_TYPES:
         missing.append("grad_type")
+    refusals = [Refusal(field, "required") for field in missing]
     if record["grad_type"] == "thesis":
-        missing.extend(f for f in REQUIRED_THESIS if not record[f])
-        missing.extend(supervisor_missing(record))
-    return [Refusal(field, "required") for field in missing]
+        refusals.extend(Refusal(f, "required") for f in REQUIRED_THESIS
+                        if not record[f])
+        refusals.extend(supervisor_refusals(record))
+    return refusals
+
+
+def supervisor_refusals(record):
+    """supervisor_missing as Refusals: an empty field is 'required'; an
+    address typed but not an address is 'address', wrong rather than missing."""
+    return [Refusal(field, "address" if field == "sup_email"
+                    and record["sup_email"] else "required")
+            for field in supervisor_missing(record)]
 
 
 def supervisor_missing(record):

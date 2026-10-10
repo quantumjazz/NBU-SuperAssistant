@@ -237,8 +237,13 @@ def migrate(path):
         for number, script in enumerate(MIGRATIONS, start=1):
             if number <= version:
                 continue
-            connection.executescript("BEGIN IMMEDIATE;" + script
-                                     + ";PRAGMA user_version = "
+            # A file already at schema 1 was made by a start that wrote the
+            # starting lists: it is an installation, never a first start, so
+            # lists missing from it must stop the start, not be recreated.
+            known = ("INSERT INTO installation (key, value) VALUES ('lists', '"
+                     + now() + "');") if number == 2 and version >= 1 else ""
+            connection.executescript("BEGIN IMMEDIATE;" + script + ";"
+                                     + known + "PRAGMA user_version = "
                                      + str(number) + ";COMMIT;")
     finally:
         connection.close()

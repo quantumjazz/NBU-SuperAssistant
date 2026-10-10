@@ -208,10 +208,9 @@ def choose_again(connection, settings, lists, application_id, values):
                 or current is None or current["answer"] != "decline"):
             raise PermissionError("no decline")
         chosen = supervisor_values(values)
-        missing = applications.supervisor_missing(chosen)
-        if missing:
-            return [applications.Refusal(field, "required")
-                    for field in missing]
+        refusals = applications.supervisor_refusals(chosen)
+        if refusals:
+            return refusals
         connection.execute(
             "UPDATE applications SET professor = ?, sup_name = ?, "
             "sup_title = ?, sup_email = ?, updated_at = ? WHERE id = ?",
@@ -236,10 +235,9 @@ def staff_change(connection, settings, lists, application_id, values,
         if record["submitted_at"] is None or record["grad_type"] != "thesis":
             raise PermissionError("not a submitted thesis")
         chosen = supervisor_values(values)
-        missing = applications.supervisor_missing(chosen)
-        if missing:
-            return [applications.Refusal(field, "required")
-                    for field in missing]
+        refusals = applications.supervisor_refusals(chosen)
+        if refusals:
+            return refusals
         changed = applications.correct(connection, record, chosen, account_id)
         if not changed:
             return []

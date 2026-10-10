@@ -12,6 +12,7 @@ list must never reach an email or a document.
 
 import csv
 import io
+import os
 
 TITLES = "titles.csv"
 FACULTIES = "faculties.csv"
@@ -106,7 +107,11 @@ def write_starter(lists_dir):
         writer.writerow(HEADERS[filename])
         for row in rows:
             writer.writerow(row)
-        path.write_text(buffer.getvalue(), encoding="utf-8")
+        # Whole or not at all: a start that fails half-way must not leave a
+        # truncated list that every later start then refuses.
+        partial = path.with_name(filename + ".tmp")
+        partial.write_text(buffer.getvalue(), encoding="utf-8")
+        os.replace(str(partial), str(path))
 
 
 def _rows(lists_dir, filename):

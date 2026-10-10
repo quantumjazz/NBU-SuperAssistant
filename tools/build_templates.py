@@ -337,6 +337,9 @@ def header_to_12pt(table):
         for paragraph in cell.paragraphs:
             for run in paragraph.runs:
                 run.font.size = Pt(12)
+                complex_size = run._r.get_or_add_rPr().find(qn("w:szCs"))
+                if complex_size is not None:
+                    complex_size.set(qn("w:val"), "24")
             marks = paragraph._p.find(qn("w:pPr"))
             if marks is not None and marks.find(qn("w:rPr")) is not None:
                 for name in ("w:sz", "w:szCs"):
