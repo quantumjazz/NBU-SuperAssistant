@@ -148,3 +148,17 @@
   - the other app's folder was untouched.
 - **Residual:** a tar stream cut at a member boundary inside a valid gzip unpacks with status 0. The `.partial` naming keeps the doc's own backups from ever being such a file.
 - **Outstanding:** Codex's review of `9d34f5b`.
+
+## 2026-10-11 — Codex's re-review of `9d34f5b`; the undo quiesces, `aaf8fd2`
+
+- **Review** (Codex, relayed by the owner): CHANGES REQUESTED at `9d34f5b`, M2-C3 only.
+  - Verified: the staging, a retry after a failure, the refusal of a wrong archive, the folder checks and the `.partial` backups.
+  - Open: after a successful restore, the undo moved both records folders while the service, the timer and a reminder run could still write.
+- **Fixed in `aaf8fd2`** (`docs/deployment.md` only): after the `$kept` checks, the undo stops the timer, waits while a reminder run is under way, and stops the service before its first move. It restarts both only once the records are back. An absent `$kept` still does and stops nothing.
+- **Verified on the laptop** with the doc's own blocks, invented records, real `tar` and `mv`, and stateful stubs for `sudo` and `systemctl`:
+  - a restore, then a reminder run active for three polls, then the undo: both moves came at web, timer and reminder all inactive;
+  - A came back, and B stayed whole in `failed-restore-…` (mode 700);
+  - the undo repeated, and run in a new window, stopped and moved nothing;
+  - 0 moves with a writer possibly running.
+  - The 71-case harness gave the same outcome in every case.
+- **Outstanding:** Codex's review of `aaf8fd2`.
