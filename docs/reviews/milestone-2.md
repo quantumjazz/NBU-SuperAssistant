@@ -199,3 +199,19 @@
   - the owner's student list and faculty list (future tasks);
   - roles the owner assigns.
 - **Status:** COMPLETE.
+
+## 2026-10-11 — Interface restyle, an owner-authorized task: code `c89c2d6` for Codex
+
+- **Authorization** (the owner, quoted in the owner's brief to Opus 5.5): the interface was "cold, uninviting and rather crude". The owner chose Fable's preview "B with the system font, write the brief for Opus 5.5", and removed the global slide rule against cards and chips: "this comes from CourseBench and it's wrong". A task, not a milestone: no `NOW.md`.
+- **Code:** `5129c3d` is Fable's `mockup.patch` (SHA-256 `133786b5…`) plus Opus 5.5's fixes. They follow from checking 66 invented-people states in Chromium and the Mac's WebKit:
+  - the status sentences are true in every state;
+  - Safari selects and iPhone focus zoom;
+  - contrast, focus and number agreement;
+  - long text wraps;
+  - a `?v=` hash on the stylesheet link, because Cloudflare gives browsers `max-age=14400`.
+  `c89c2d6` adds four follow-ups from two read-only verifiers (no blocker). No route, record, email or Word template changed.
+- **Wording not yet seen by the owner:** STATUS_NEXT "awaited", DRAFT_LEAD and the count chips' plurals.
+- **Checks:** 214 passed and 7 browser passed on Python 3.12.14 and 3.9.6. The new test fails on the mock-up's `?v=preview2`.
+- **Not checked:** Safari's own window and the iOS Simulator. No screen-recording permission; Xcode's licence unaccepted.
+- **Outstanding:** Codex's review; the push and the documented update; every live page opened; the owner's acceptance on a phone and in Safari.
+- **DEFERRED** (these predate the restyle): the answer page's title and heading in some states; the choose-again mail-failure message; "одобрена".
