@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% macro field(name, kind="text", hint="") -%}
+  <div class="f">
   <label for="{{ name }}">{{ fields[name] }}</label>
   {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
   {% if kind == "textarea" %}
@@ -8,8 +9,10 @@
     <input type="{{ kind }}" id="{{ name }}" name="{{ name }}" value="{{ values[name] or "" }}">
   {% endif %}
   {% if errors[name] %}<p class="error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}
+  </div>
 {%- endmacro %}
 {% macro supervisor_fields(v) -%}
+  <div class="f">
   <label for="professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
   <select id="professor" name="professor">
     <option value="">{{ t.SUPERVISOR_NONE }}</option>
@@ -18,64 +21,80 @@
     {% endfor %}
   </select>
   {% if errors.professor %}<p class="error" id="professor-error">{{ errors.professor }}</p>{% endif %}
-  <fieldset class="outside">
+  </div>
+  <fieldset class="outside subsection">
     <legend>{{ t.SUPERVISOR_OUTSIDE }}</legend>
     <p class="hint">{{ t.SUPERVISOR_OUTSIDE_HINT }}</p>
-    <label for="sup_title">{{ fields.sup_title }}</label>
-    <select id="sup_title" name="sup_title">
-      <option value="">{{ t.SUPERVISOR_NONE }}</option>
-      {% for title in lists.titles %}
-        <option value="{{ title }}" {% if v.sup_title == title %}selected{% endif %}>{{ title }}</option>
-      {% endfor %}
-    </select>
-    {% if errors.sup_title %}<p class="error" id="sup_title-error">{{ errors.sup_title }}</p>{% endif %}
-    <label for="sup_name">{{ fields.sup_name }}</label>
-    <input type="text" id="sup_name" name="sup_name" value="{{ v.sup_name or "" }}">
-    {% if errors.sup_name %}<p class="error" id="sup_name-error">{{ errors.sup_name }}</p>{% endif %}
-    <label for="sup_email">{{ fields.sup_email }}</label>
-    <input type="email" id="sup_email" name="sup_email" value="{{ v.sup_email or "" }}">
-    {% if errors.sup_email %}<p class="error" id="sup_email-error">{{ errors.sup_email }}</p>{% endif %}
+    <div class="row two">
+      <div class="f">
+        <label for="sup_title">{{ fields.sup_title }}</label>
+        <select id="sup_title" name="sup_title">
+          <option value="">{{ t.SUPERVISOR_NONE }}</option>
+          {% for title in lists.titles %}
+            <option value="{{ title }}" {% if v.sup_title == title %}selected{% endif %}>{{ title }}</option>
+          {% endfor %}
+        </select>
+        {% if errors.sup_title %}<p class="error" id="sup_title-error">{{ errors.sup_title }}</p>{% endif %}
+      </div>
+      <div class="f">
+        <label for="sup_name">{{ fields.sup_name }}</label>
+        <input type="text" id="sup_name" name="sup_name" value="{{ v.sup_name or "" }}">
+        {% if errors.sup_name %}<p class="error" id="sup_name-error">{{ errors.sup_name }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="f">
+      <label for="sup_email">{{ fields.sup_email }}</label>
+      <input type="email" id="sup_email" name="sup_email" value="{{ v.sup_email or "" }}">
+      {% if errors.sup_email %}<p class="error" id="sup_email-error">{{ errors.sup_email }}</p>{% endif %}
+    </div>
   </fieldset>
 {%- endmacro %}
 {% block title %}{{ t.NAV_APPLICATION_TITLE }}{% endblock %}
 {% block content %}
-<h1>{{ t.NAV_APPLICATION_TITLE }}</h1>
+<div class="page-head">
+  <h1>{{ t.NAV_APPLICATION_TITLE }}</h1>
+  {% if not submitted %}<p class="lead">{{ t.DRAFT_LEAD }}</p>{% endif %}
+</div>
 
 {% if submitted %}
-  <section id="status">
-    <h2>{{ t.STATUS_TITLE }}</h2>
-    <p>{{ t.STATUS_SUBMITTED.format(record.submitted_at|date) }}</p>
-    {% if standing.thesis %}
-      {% if standing.answer == "awaited" %}<p>{{ t.STATUS_AWAITED }}</p>
-      {% elif standing.answer == "confirm" %}<p>{{ t.STATUS_CONFIRMED }}</p>
-      {% elif standing.answer == "decline" %}<p>{{ t.STATUS_DECLINED }}</p>{% endif %}
-    {% endif %}
-    {% if standing.check == "passed" %}<p>{{ t.STATUS_CHECK_PASSED }}</p>
-    {% elif standing.check == "not_passed" %}<p>{{ t.STATUS_CHECK_NOT_PASSED }}</p>
-    {% else %}<p>{{ t.STATUS_NO_CHECK }}</p>{% endif %}
-  </section>
+  {% set state = standing.answer if standing.thesis else None %}
+  <section id="status" class="card"><div class="card-h"><h2>{{ t.STATUS_TITLE }}</h2></div><div class="card-b">
+    <div class="status">
+      <span class="chip {{ 'wait' if state == 'awaited' else 'ok' if state == 'confirm' else 'no' if state == 'decline' else 'info' }}">{{ t.STATUS_CHIP[state] }}</span>
+      <div>
+        <p>{{ t.STATUS_SUBMITTED.format(record.submitted_at|date) }}</p>
+        {% if standing.thesis %}
+          {% if standing.answer == "awaited" %}<p>{{ t.STATUS_AWAITED }}</p>
+          {% elif standing.answer == "confirm" %}<p>{{ t.STATUS_CONFIRMED }}</p>
+          {% elif standing.answer == "decline" %}<p>{{ t.STATUS_DECLINED }}</p>{% endif %}
+        {% endif %}
+        {% if standing.check == "passed" %}<p>{{ t.STATUS_CHECK_PASSED }}</p>
+        {% elif standing.check == "not_passed" %}<p>{{ t.STATUS_CHECK_NOT_PASSED }}</p>
+        {% else %}<p>{{ t.STATUS_NO_CHECK }}</p>{% endif %}
+        {# After a confirmation, the next step is the check; once a check is recorded, its own sentence above says what follows. #}
+        {% if state in t.STATUS_NEXT and not (state == "confirm" and standing.check) %}<p class="next">{{ t.STATUS_NEXT[state] }}</p>{% endif %}
+      </div>
+    </div>
+  </div></section>
 
   {% if standing.thesis and standing.answer == "decline" %}
-  <section id="choose-again">
-    <h2>{{ t.CHOOSE_AGAIN_TITLE }}</h2>
+  <section id="choose-again" class="card"><div class="card-h"><h2>{{ t.CHOOSE_AGAIN_TITLE }}</h2></div><div class="card-b">
     <form method="post" action="/application/supervisor">
       <input type="hidden" name="csrf" value="{{ csrf_token() }}">
       {{ supervisor_fields(again or {}) }}
-      <button type="submit">{{ t.CHOOSE_AGAIN }}</button>
+      <div class="actions"><button type="submit">{{ t.CHOOSE_AGAIN }}</button></div>
     </form>
-  </section>
+  </div></section>
   {% endif %}
 
-  <section id="forms">
-    <h2>{{ t.FORMS_TITLE }}</h2>
-    <ul>
-      <li><a href="/application/forms/zaiavlenie.docx">Заявление-декларация (.docx)</a></li>
-      {% if standing.thesis %}<li><a href="/application/forms/prilozhenie2.docx">Приложение 2 (.docx)</a></li>{% endif %}
+  <section id="forms" class="card"><div class="card-h"><h2>{{ t.FORMS_TITLE }}</h2></div><div class="card-b">
+    <ul class="downloads" role="list">
+      <li><a class="btn secondary" href="/application/forms/zaiavlenie.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Заявление-декларация (.docx)</a></li>
+      {% if standing.thesis %}<li><a class="btn secondary" href="/application/forms/prilozhenie2.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Приложение 2 (.docx)</a></li>{% endif %}
     </ul>
-  </section>
+  </div></section>
 
-  <section id="entered">
-    <h2>{{ t.ENTERED_TITLE }}</h2>
+  <section id="entered" class="card"><div class="card-h"><h2>{{ t.ENTERED_TITLE }}</h2></div><div class="card-b">
     <dl class="fields">
       <dt>{{ t.FIELD_LABELS.grad_type }}</dt><dd>{{ t.GRAD_THESIS if standing.thesis else t.GRAD_EXAM }}</dd>
       {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ record[name] }}</dd>{% endfor %}
@@ -91,13 +110,13 @@
         {% endfor %}
       {% endif %}
     </dl>
-  </section>
+  </div></section>
 
 {% else %}
   {% set thesis = values.grad_type == "thesis" %}
-  <nav class="tabs" id="tabs">
-    <a href="/application?tab=1" class="{{ 'current' if tab == 1 }}">{{ t.TAB_1 }}</a>
-    <a href="/application?tab=2" id="tab2-link" class="{{ 'current' if tab == 2 }}" {% if not thesis %}hidden{% endif %}>{{ t.TAB_2 }}</a>
+  <nav class="steps" id="tabs">
+    <a href="/application?tab=1" class="{{ 'current' if tab == 1 }}" {% if tab == 1 %}aria-current="step"{% endif %}><span class="step-n">1</span><span>{{ t.STEP_1 }}</span></a>
+    <a href="/application?tab=2" id="tab2-link" class="{{ 'current' if tab == 2 }}" {% if tab == 2 %}aria-current="step"{% endif %} {% if not thesis %}hidden{% endif %}><span class="step-n">2</span><span>{{ t.STEP_2 }}</span></a>
   </nav>
 
   <form method="post" action="/application" id="application-form" novalidate>
@@ -105,49 +124,69 @@
     <input type="hidden" name="tab" value="{{ tab }}">
 
   {% if tab == 1 %}
-    <p class="advice" id="advice">{{ t.ADVICE }}</p>
-    <p class="hint">{{ t.EMAIL_LINE.format(record.email) }}</p>
-    {{ field("name1") }}
-    {{ field("name2") }}
-    {{ field("name3") }}
-    {{ field("fn") }}
+    <div class="callout"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg><p id="advice" style="margin:0">{{ t.ADVICE }}</p></div>
 
-    <fieldset>
-      <legend>{{ t.GRAD_TYPE }}</legend>
-      <label class="choice"><input type="radio" name="grad_type" value="thesis" {% if thesis %}checked{% endif %}> {{ t.GRAD_THESIS }}</label>
-      <label class="choice"><input type="radio" name="grad_type" value="exam" {% if values.grad_type == "exam" %}checked{% endif %}> {{ t.GRAD_EXAM }}</label>
-      {% if errors.grad_type %}<p class="error" id="grad_type-error">{{ errors.grad_type }}</p>{% endif %}
-      <p class="hint">{{ t.EXAM_ONLY_NAMES }}</p>
-    </fieldset>
+    <div class="card"><div class="card-h"><div><h2>{{ t.SECTION_PERSON }}</h2><p>{{ t.EMAIL_LINE.format(record.email) }}</p></div></div><div class="card-b">
+      <div class="row three">
+        {{ field("name1") }}
+        {{ field("name2") }}
+        {{ field("name3") }}
+      </div>
+      <div class="row two">
+        {{ field("fn") }}
+      </div>
+    </div></div>
 
-    <div class="thesis-only" id="thesis-fields" {% if not thesis %}hidden{% endif %}>
-      <h2>{{ t.THESIS_ONLY }}</h2>
-      {{ field("phone", "tel") }}
-      <label for="programme">{{ fields.programme }}</label>
-      <select id="programme" name="programme">
-        <option value="">{{ t.PROGRAMME_NONE }}</option>
-        {% for code, p in lists.programmes.items() %}
-          <option value="{{ code }}" {% if values.programme == code %}selected{% endif %}>{{ p.degree }} „{{ p.name }}“, {{ p.form }}</option>
-        {% endfor %}
-      </select>
-      {% if errors.programme %}<p class="error" id="programme-error">{{ errors.programme }}</p>{% endif %}
-      {{ field("topic") }}
-      {{ field("average_grade") }}
-      {{ supervisor_fields(values) }}
+    <div class="card"><div class="card-h"><h2 id="grad-type-title">{{ t.GRAD_TYPE }}</h2></div><div class="card-b">
+      <fieldset aria-labelledby="grad-type-title">
+        <div class="choices two">
+          <label class="choice"><input type="radio" name="grad_type" value="thesis" {% if thesis %}checked{% endif %}> {{ t.GRAD_THESIS }}</label>
+          <label class="choice"><input type="radio" name="grad_type" value="exam" {% if values.grad_type == "exam" %}checked{% endif %}> {{ t.GRAD_EXAM }}</label>
+        </div>
+        {% if errors.grad_type %}<p class="error" id="grad_type-error">{{ errors.grad_type }}</p>{% endif %}
+        <p class="hint" style="margin: 10px 0 0">{{ t.EXAM_ONLY_NAMES }}</p>
+      </fieldset>
+    </div></div>
+
+    <div class="thesis-only card-stack" id="thesis-fields" {% if not thesis %}hidden{% endif %}>
+      <div class="card"><div class="card-h"><div><h2>{{ t.SECTION_THESIS }}</h2><p>{{ t.THESIS_ONLY }}</p></div></div><div class="card-b">
+        <div class="f">
+          <label for="programme">{{ fields.programme }}</label>
+          <select id="programme" name="programme">
+            <option value="">{{ t.PROGRAMME_NONE }}</option>
+            {% for code, p in lists.programmes.items() %}
+              <option value="{{ code }}" {% if values.programme == code %}selected{% endif %}>{{ p.degree }} „{{ p.name }}“, {{ p.form }}</option>
+            {% endfor %}
+          </select>
+          {% if errors.programme %}<p class="error" id="programme-error">{{ errors.programme }}</p>{% endif %}
+        </div>
+        {{ field("topic") }}
+        <div class="row two">
+          {{ field("phone", "tel") }}
+          {{ field("average_grade") }}
+        </div>
+      </div></div>
+      <div class="card"><div class="card-h"><h2>{{ t.SECTION_SUPERVISOR }}</h2></div><div class="card-b">
+        {{ supervisor_fields(values) }}
+      </div></div>
     </div>
 
-    <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
-    <button type="submit" name="action" value="next" id="next-button" {% if not thesis %}hidden{% endif %}>{{ t.NEXT_TAB }}</button>
-    <button type="submit" name="action" value="submit" id="submit-exam" {% if thesis %}hidden{% endif %}>{{ t.SUBMIT }}</button>
+    <div class="actions end">
+      <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
+      <button type="submit" name="action" value="next" id="next-button" {% if not thesis %}hidden{% endif %}>{{ t.NEXT_TAB }}</button>
+      <button type="submit" name="action" value="submit" id="submit-exam" {% if thesis %}hidden{% endif %}>{{ t.SUBMIT }}</button>
+    </div>
   {% else %}
-    <p>{{ t.STUDENT_LINE.format((values.name1 ~ " " ~ values.name2 ~ " " ~ values.name3)|trim, values.fn) }}</p>
-    <p>{{ t.TOPIC_LINE.format(values.topic) }}</p>
-    {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
-      {{ field(name, "textarea", t.FIELD_HINTS[name]) }}
-    {% endfor %}
-    <p class="hint">{{ t.SUBMIT_CONFIRM_HINT }}</p>
-    <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
-    <button type="submit" name="action" value="submit" id="submit-thesis">{{ t.SUBMIT }}</button>
+    <div class="card"><div class="card-h"><div><h2>{{ t.STEP_2 }}</h2><p>{{ (values.name1 ~ " " ~ values.name2 ~ " " ~ values.name3)|trim }} ({{ values.fn }}). {{ t.TOPIC_LINE.format(values.topic) }}</p></div></div><div class="card-b">
+      {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
+        {{ field(name, "textarea", t.FIELD_HINTS[name]) }}
+      {% endfor %}
+      <p class="hint">{{ t.SUBMIT_CONFIRM_HINT }}</p>
+    </div></div>
+    <div class="actions end">
+      <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
+      <button type="submit" name="action" value="submit" id="submit-thesis"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>{{ t.SUBMIT }}</button>
+    </div>
   {% endif %}
   </form>
 

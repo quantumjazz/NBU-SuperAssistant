@@ -862,3 +862,36 @@ def test_an_error_on_a_token_page_logs_its_route_not_its_token(
     assert "SECRET-TOKEN" not in logged
     assert "database is locked" in logged        # the error itself is kept
     assert "<token>" in logged                    # and the route it was on
+
+
+# --- The stylesheet's address follows its content ------------------------------
+
+def test_the_stylesheet_address_carries_a_hash_of_the_file_served(tmp_path,
+                                                                   outbox):
+    """The interface restyle (11 October 2026): Cloudflare hands browsers the
+    stylesheet with cache-control: max-age=14400, so after a deploy a browser
+    would show the new pages with the old stylesheet for up to four hours,
+    unless a stylesheet with other content has another address."""
+    import hashlib
+    import re
+    client = create_app(make_settings(tmp_path / "data")).test_client()
+    for page in ("/", "/staff/sign-in"):
+        html = client.get(page).get_data(as_text=True)
+        href = re.search(r'<link rel="stylesheet" href="([^"]+)"',
+                         html).group(1)
+        path, _, query = href.partition("?")
+        assert path == "/static/style.css"
+        served = client.get(href)
+        assert served.status_code == 200
+        assert query == "v=" + hashlib.sha256(served.data).hexdigest()[:12]
+        served.close()
+
+    class Copy(object):
+        static_folder = str(tmp_path / "static")
+
+    os.mkdir(Copy.static_folder)
+    stylesheet = Path(Copy.static_folder) / "style.css"
+    stylesheet.write_bytes(b"body { color: #222; }\n")
+    before = web.style_version(Copy)
+    stylesheet.write_bytes(b"body { color: #1f2933; }\n")
+    assert web.style_version(Copy) != before

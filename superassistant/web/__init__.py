@@ -10,7 +10,9 @@ what it resolved (startup_line), because on the host that is read through
 journalctl.
 """
 
+import hashlib
 import ipaddress
+import os
 import secrets
 import sys
 from functools import wraps
@@ -92,6 +94,7 @@ def create_app(settings=None):
     app.jinja_env.filters["datetime"] = db.local_datetime
     app.extensions["superassistant"] = {"settings": settings,
                                         "lists": loaded}
+    version = style_version(app)
 
     @app.before_request
     def _guard_posts():
@@ -112,7 +115,8 @@ def create_app(settings=None):
         return {"t": texts, "csrf_token": csrf_token,
                 "mail_note": mail_note(settings),
                 "student": session_student(), "staff": session_staff(),
-                "is_owner": is_owner(session_staff())}
+                "is_owner": is_owner(session_staff()),
+                "style_version": version}
 
     from superassistant.web import (auth, documents, health, owner, staff,
                                     student, supervisor)
@@ -130,6 +134,19 @@ def _route_not_address(app):
         app.logger.error("Exception on %s [%s]", rule, request.method,
                          exc_info=exc_info)
     return log_exception
+
+
+def style_version(app):
+    """A short hash of the stylesheet, for the ?v= on every page's link.
+
+    Cloudflare tells browsers to keep /static/style.css for four hours
+    (cache-control: max-age=14400 at the edge, although Flask sends
+    no-cache), so after a deploy a browser could show the new pages with the
+    old stylesheet. A stylesheet with other content gets another address.
+    Read at start: the documented update restarts the service.
+    """
+    with open(os.path.join(app.static_folder, "style.css"), "rb") as handle:
+        return hashlib.sha256(handle.read()).hexdigest()[:12]
 
 
 def mail_note(settings):

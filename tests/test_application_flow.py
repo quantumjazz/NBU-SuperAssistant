@@ -339,8 +339,10 @@ def test_the_table_lists_submitted_applications_and_marks_the_waiting(
     for column in ("Студент", "F№", "Програма", "Вид", "Тема",
                    "Научен ръководител", "Отговор", "Проверка"):
         assert column in page
-    assert 'class="waiting"' in page
-    assert "чака научния ръководител" in page and "чака проверка" in page
+    # In the rows: the counts above the table name the same states.
+    table = page.split('id="applications"', 1)[1]
+    assert 'class="waiting"' in table
+    assert "чака научния ръководител" in table and "чака проверка" in table
 
 
 def test_staff_see_every_field_and_the_answer_with_its_comment_and_time(

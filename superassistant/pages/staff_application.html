@@ -1,18 +1,30 @@
 {% extends "base.html" %}
 {% set r = record %}
+{% set s = row.standing %}
 {% block title %}{{ t.STAFF_APPLICATION_TITLE.format(row.name) }}{% endblock %}
 {% block content %}
-<p><a href="/staff">{{ t.BACK }}</a></p>
-<h1>{{ t.STAFF_APPLICATION_TITLE.format(row.name or r.email) }}</h1>
+<a class="back" href="/staff"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_STAFF }}</a>
+<div class="page-head">
+  <h1>{{ row.name or r.email }}</h1>
+  <p class="lead">{{ r.fn }}{% if row.programme %}, {{ row.programme }}{% endif %}, {{ t.STAFF_SUBMITTED_AT|lower }} {{ r.submitted_at|datetime }}.</p>
+  <div class="meta">
+    <span class="chip info plain">{{ t.STAFF_TYPE.get(r.grad_type, "") }}</span>
+    {% if r.grad_type == "thesis" %}<span class="chip {{ 'wait' if s.answer == 'awaited' else 'ok' if s.answer == 'confirm' else 'no' if s.answer == 'decline' else '' }}">{{ t.STAFF_ANSWER[s.answer] }}</span>{% endif %}
+    <span class="chip {{ 'ok' if s.check == 'passed' else 'no' if s.check == 'not_passed' else '' }}">{{ t.STAFF_CHECK_CHIP[s.check] }}</span>
+    {% if s.waiting_for_report %}<span class="chip wait">{{ t.STAFF_WAITING_REPORT }}</span>{% endif %}
+  </div>
+</div>
 
+<div class="card"><div class="card-h"><h2>{{ t.ENTERED_TITLE }}</h2></div><div class="card-b">
 <dl class="fields" id="fields">
   <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at|datetime }}</dd>
   <dt>{{ t.STAFF_STUDENT_EMAIL }}</dt><dd>{{ r.email }}</dd>
   <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
   {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
 </dl>
+</div></div>
 {% if r.grad_type == "thesis" or retained %}
-{% if r.grad_type != "thesis" %}<h2 id="retained">{{ t.STAFF_RETAINED_THESIS }}</h2>{% endif %}
+<div class="card"><div class="card-h"><h2>{% if r.grad_type != "thesis" %}<span id="retained">{{ t.STAFF_RETAINED_THESIS }}</span>{% else %}{{ t.SECTION_THESIS }}{% endif %}</h2></div><div class="card-b">
 <dl class="fields" id="thesis-fields">
     <dt>{{ fields.phone }}</dt><dd>{{ r.phone }}</dd>
     <dt>{{ fields.programme }}</dt><dd>{{ programme_label }}</dd>
@@ -23,49 +35,51 @@
       <dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>
     {% endfor %}
 </dl>
+</div></div>
 {% endif %}
 
 {% if requests %}
-<section id="requests">
-  <h2>{{ t.STAFF_REQUESTS_TITLE }}</h2>
-  <ul>
+<section id="requests" class="card"><div class="card-h"><h2>{{ t.STAFF_REQUESTS_TITLE }}</h2></div><div class="card-b">
+  <ul class="log" role="list">
   {% for q, label in requests %}
     <li>
       {{ t.STAFF_REQUEST_LINE.format(label, q.sup_email, (q.sent_at|datetime) or "—") }}
-      {% if q.answer %}<br>{{ t.STAFF_REQUEST_ANSWER.format(t.ANSWER_WORD[q.answer], q.answered_at|datetime) }}{% endif %}
+      {% if q.answer %}<br><span class="chip {{ 'ok' if q.answer == 'confirm' else 'no' }}">{{ t.ANSWER_WORD[q.answer] }}</span> <span class="when">{{ q.answered_at|datetime }}</span>{% endif %}
       {% if q.comment %}<br>{{ t.STAFF_REQUEST_COMMENT.format(q.comment) }}{% endif %}
-      {% if q.reminders_sent %}<br>{{ t.STAFF_REMINDERS.format(q.reminders_sent) }}{% endif %}
-      {% if q.replaced_at %}<br>{{ t.STAFF_REQUEST_REPLACED.format(q.replaced_at|datetime) }}{% endif %}
+      {% if q.reminders_sent %}<br><span class="when">{{ t.STAFF_REMINDERS.format(q.reminders_sent) }}</span>{% endif %}
+      {% if q.replaced_at %}<br><span class="when">{{ t.STAFF_REQUEST_REPLACED.format(q.replaced_at|datetime) }}</span>{% endif %}
     </li>
   {% endfor %}
   </ul>
-</section>
+</div></section>
 {% endif %}
 
-<section id="checks">
-  <h2>{{ t.STAFF_CHECKS_TITLE }}</h2>
-  <ul>
+<section id="checks" class="card"><div class="card-h"><h2>{{ t.STAFF_CHECKS_TITLE }}</h2></div><div class="card-b">
+  {% if checks %}<ul class="log" role="list">
   {% for c in checks %}
-    <li>{{ t.STAFF_CHECK_LINE.format(t.STAFF_CHECK[c.result], c.username, c.at|datetime) }}{% if c.note %}: {{ c.note }}{% endif %}</li>
+    <li><span class="chip {{ 'ok' if c.result == 'passed' else 'no' }}">{{ t.STAFF_CHECK[c.result] }}</span> <span class="when">{{ c.username }}, {{ c.at|datetime }}</span>{% if c.note %}<br>{{ c.note }}{% endif %}</li>
   {% endfor %}
-  </ul>
+  </ul>{% endif %}
   <form method="post" action="/staff/application/{{ r.id }}/check">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <fieldset>
+    <fieldset class="{{ 'subsection' if checks }}">
       <legend>{{ t.STAFF_CHECK_FORM }}</legend>
-      <label class="choice"><input type="radio" name="result" value="passed"> {{ t.STAFF_CHECK_PASSED }}</label>
-      <label class="choice"><input type="radio" name="result" value="not_passed"> {{ t.STAFF_CHECK_NOT_PASSED }}</label>
+      <div class="choices two">
+        <label class="choice"><input type="radio" name="result" value="passed"> {{ t.STAFF_CHECK_PASSED }}</label>
+        <label class="choice"><input type="radio" name="result" value="not_passed"> {{ t.STAFF_CHECK_NOT_PASSED }}</label>
+      </div>
       {% if errors.result %}<p class="error">{{ errors.result }}</p>{% endif %}
-      <label for="note">{{ t.STAFF_CHECK_NOTE }}</label>
-      <input type="text" id="note" name="note">
-      <button type="submit" id="record-check">{{ t.STAFF_CHECK_RECORD }}</button>
+      <div class="f" style="margin-top: 16px">
+        <label for="note">{{ t.STAFF_CHECK_NOTE }}</label>
+        <input type="text" id="note" name="note">
+      </div>
+      <div class="actions"><button type="submit" id="record-check"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>{{ t.STAFF_CHECK_RECORD }}</button></div>
     </fieldset>
   </form>
-</section>
+</div></section>
 
-<section id="corrections">
-  <h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2>
-  <ul>
+<section id="corrections" class="card"><div class="card-h"><h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2></div><div class="card-b">
+  {% if corrections %}<ul class="log" role="list">
   {% for c in corrections %}
     {% if c.field == "grad_type" %}
     <li>{{ t.STAFF_CORRECTION_LINE.format(fields.grad_type, t.STAFF_TYPE.get(c.old_value, c.old_value), t.STAFF_TYPE.get(c.new_value, c.new_value), c.username, c.at|datetime) }}</li>
@@ -73,75 +87,91 @@
     <li>{{ t.STAFF_CORRECTION_LINE.format(fields.get(c.field, c.field), c.old_value, c.new_value, c.username, c.at|datetime) }}</li>
     {% endif %}
   {% endfor %}
-  </ul>
+  </ul>{% endif %}
   <form method="post" action="/staff/application/{{ r.id }}/correct">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <fieldset>
+    <fieldset class="{{ 'subsection' if corrections }}">
       <legend>{{ t.STAFF_CORRECT_FORM }}</legend>
-      <label for="field">{{ t.STAFF_CORRECT_FIELD }}</label>
-      <select id="field" name="field">
-        {% for name in correctable %}<option value="{{ name }}">{{ fields[name] }}</option>{% endfor %}
-      </select>
-      <label for="value">{{ t.STAFF_CORRECT_VALUE }}</label>
-      <textarea id="value" name="value"></textarea>
-      <p class="hint">{{ t.STAFF_CORRECT_PROGRAMME_HINT }} {% for code, p in lists.programmes.items() %}{{ code }} ({{ p.degree }} {{ p.name }}, {{ p.form }}){% if not loop.last %}; {% endif %}{% endfor %}</p>
+      <div class="row two">
+        <div class="f">
+          <label for="field">{{ t.STAFF_CORRECT_FIELD }}</label>
+          <select id="field" name="field">
+            {% for name in correctable %}<option value="{{ name }}">{{ fields[name] }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="f">
+        <label for="value">{{ t.STAFF_CORRECT_VALUE }}</label>
+        <textarea id="value" name="value" style="min-height: 4.5rem"></textarea>
+        <p class="hint">{{ t.STAFF_CORRECT_PROGRAMME_HINT }} {% for code, p in lists.programmes.items() %}{{ code }} ({{ p.degree }} {{ p.name }}, {{ p.form }}){% if not loop.last %}; {% endif %}{% endfor %}</p>
+      </div>
       {% if errors.correction %}<p class="error">{{ errors.correction }}</p>{% endif %}
-      <button type="submit">{{ t.STAFF_CORRECT_SAVE }}</button>
+      <div class="actions"><button type="submit" class="secondary">{{ t.STAFF_CORRECT_SAVE }}</button></div>
     </fieldset>
   </form>
   <form method="post" action="/staff/application/{{ r.id }}/type" id="type-form">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <fieldset>
+    <fieldset class="subsection">
       <legend>{{ t.STAFF_TYPE_FORM }}</legend>
       <p class="hint">{{ t.STAFF_TYPE_HINT }}</p>
-      <label class="choice"><input type="radio" name="grad_type" value="thesis" {% if r.grad_type == "thesis" %}checked{% endif %}> {{ t.GRAD_THESIS }}</label>
-      <label class="choice"><input type="radio" name="grad_type" value="exam" {% if r.grad_type == "exam" %}checked{% endif %}> {{ t.GRAD_EXAM }}</label>
+      <div class="choices two">
+        <label class="choice"><input type="radio" name="grad_type" value="thesis" {% if r.grad_type == "thesis" %}checked{% endif %}> {{ t.GRAD_THESIS }}</label>
+        <label class="choice"><input type="radio" name="grad_type" value="exam" {% if r.grad_type == "exam" %}checked{% endif %}> {{ t.GRAD_EXAM }}</label>
+      </div>
       {% if r.grad_type != "thesis" %}
+        <div class="f" style="margin-top: 16px">
         <label for="type_professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
         <select id="type_professor" name="professor">
           <option value="">{{ t.SUPERVISOR_NONE }}</option>
           {% for code, p in lists.professors.items() %}<option value="{{ code }}" {% if r.professor == code %}selected{% endif %}>{{ p.title }} {{ p.name }}</option>{% endfor %}
         </select>
+        </div>
         <p class="hint">{{ t.SUPERVISOR_OUTSIDE }}</p>
-        <label for="type_sup_title">{{ fields.sup_title }}</label>
-        <select id="type_sup_title" name="sup_title">
-          <option value="">{{ t.SUPERVISOR_NONE }}</option>
-          {% for title in lists.titles %}<option value="{{ title }}">{{ title }}</option>{% endfor %}
-        </select>
-        <label for="type_sup_name">{{ fields.sup_name }}</label>
-        <input type="text" id="type_sup_name" name="sup_name">
-        <label for="type_sup_email">{{ fields.sup_email }}</label>
-        <input type="email" id="type_sup_email" name="sup_email">
+        <div class="row two">
+          <div class="f"><label for="type_sup_title">{{ fields.sup_title }}</label>
+          <select id="type_sup_title" name="sup_title">
+            <option value="">{{ t.SUPERVISOR_NONE }}</option>
+            {% for title in lists.titles %}<option value="{{ title }}">{{ title }}</option>{% endfor %}
+          </select></div>
+          <div class="f"><label for="type_sup_name">{{ fields.sup_name }}</label>
+          <input type="text" id="type_sup_name" name="sup_name"></div>
+        </div>
+        <div class="f"><label for="type_sup_email">{{ fields.sup_email }}</label>
+        <input type="email" id="type_sup_email" name="sup_email"></div>
       {% endif %}
       {% if errors.type %}<p class="error" id="type-error">{{ errors.type }}</p>{% endif %}
-      <button type="submit" id="change-type">{{ t.STAFF_TYPE_SAVE }}</button>
+      <div class="actions" style="margin-top: 16px"><button type="submit" id="change-type" class="secondary">{{ t.STAFF_TYPE_SAVE }}</button></div>
     </fieldset>
   </form>
   {% if r.grad_type == "thesis" %}
   <form method="post" action="/staff/application/{{ r.id }}/supervisor">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <fieldset>
+    <fieldset class="subsection">
       <legend>{{ t.STAFF_SUPERVISOR_FORM }}</legend>
       <p class="hint">{{ t.STAFF_SUPERVISOR_HINT }}</p>
+      <div class="f">
       <label for="professor">{{ t.SUPERVISOR_FROM_LIST }}</label>
       <select id="professor" name="professor">
         <option value="">{{ t.SUPERVISOR_NONE }}</option>
         {% for code, p in lists.professors.items() %}<option value="{{ code }}">{{ p.title }} {{ p.name }}</option>{% endfor %}
       </select>
+      </div>
       <p class="hint">{{ t.SUPERVISOR_OUTSIDE }}</p>
-      <label for="sup_title">{{ fields.sup_title }}</label>
-      <select id="sup_title" name="sup_title">
-        <option value="">{{ t.SUPERVISOR_NONE }}</option>
-        {% for title in lists.titles %}<option value="{{ title }}">{{ title }}</option>{% endfor %}
-      </select>
-      <label for="sup_name">{{ fields.sup_name }}</label>
-      <input type="text" id="sup_name" name="sup_name">
-      <label for="sup_email">{{ fields.sup_email }}</label>
-      <input type="email" id="sup_email" name="sup_email">
+      <div class="row two">
+        <div class="f"><label for="sup_title">{{ fields.sup_title }}</label>
+        <select id="sup_title" name="sup_title">
+          <option value="">{{ t.SUPERVISOR_NONE }}</option>
+          {% for title in lists.titles %}<option value="{{ title }}">{{ title }}</option>{% endfor %}
+        </select></div>
+        <div class="f"><label for="sup_name">{{ fields.sup_name }}</label>
+        <input type="text" id="sup_name" name="sup_name"></div>
+      </div>
+      <div class="f"><label for="sup_email">{{ fields.sup_email }}</label>
+      <input type="email" id="sup_email" name="sup_email"></div>
       {% for key, message in errors.items() if key.startswith("supervisor_") %}<p class="error">{{ message }}</p>{% endfor %}
-      <button type="submit">{{ t.STAFF_SUPERVISOR_SAVE }}</button>
+      <div class="actions"><button type="submit" class="secondary"><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>{{ t.STAFF_SUPERVISOR_SAVE }}</button></div>
     </fieldset>
   </form>
   {% endif %}
-</section>
+</div></section>
 {% endblock %}

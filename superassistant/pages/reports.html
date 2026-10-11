@@ -1,21 +1,26 @@
 {% extends "base.html" %}
 {% block title %}{{ t.REPORTS_TITLE }}{% endblock %}
 {% block content %}
-<h1>{{ t.REPORTS_TITLE }}</h1>
-<p class="hint">{{ t.REPORTS_INTRO }}</p>
+<div class="page-head">
+  <h1>{{ t.REPORTS_TITLE }}</h1>
+  <p class="lead">{{ t.REPORTS_INTRO }}</p>
+</div>
+<div class="card"><div class="card-h"><h2>{{ t.REPORTS_GENERATE }}</h2></div><div class="card-b">
+  <form method="post" action="/staff/reports">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="f">
+      <label for="programme">{{ t.REPORTS_PROGRAMME }}</label>
+      <select id="programme" name="programme" required>
+        {% for choice in choices %}
+        <option value="{{ choice.code }}">{{ choice.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="actions"><button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-doc"/></svg>{{ t.REPORTS_GENERATE }}</button></div>
+  </form>
+</div></div>
 
-<form method="post" action="/staff/reports">
-  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <label for="programme">{{ t.REPORTS_PROGRAMME }}</label>
-  <select id="programme" name="programme" required>
-    {% for choice in choices %}
-    <option value="{{ choice.code }}">{{ choice.label }}</option>
-    {% endfor %}
-  </select>
-  <button type="submit">{{ t.REPORTS_GENERATE }}</button>
-</form>
-
-<h2>{{ t.REPORTS_KEPT }}</h2>
+<div class="card"><div class="card-h"><h2>{{ t.REPORTS_KEPT }}</h2></div>
 {% if kept %}
 <div class="table-wrap">
   <table>
@@ -35,13 +40,14 @@
         <td>{{ report.programme }}</td>
         <td>{{ report.faculty }}</td>
         <td>{{ report.students }}</td>
-        <td><a href="/staff/reports/{{ report.id }}.docx">{{ t.REPORTS_DOWNLOAD }}</a></td>
+        <td><a class="btn secondary small" href="/staff/reports/{{ report.id }}.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.REPORTS_DOWNLOAD }}</a></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 {% else %}
-<p>{{ t.REPORTS_NONE_KEPT }}</p>
+<p class="table-empty">{{ t.REPORTS_NONE_KEPT }}</p>
 {% endif %}
+</div>
 {% endblock %}

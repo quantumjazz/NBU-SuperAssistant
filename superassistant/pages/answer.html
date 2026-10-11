@@ -2,24 +2,38 @@
 {% block title %}{{ t.ANSWER_TITLE_CONFIRM if choice == "confirm" else t.ANSWER_TITLE_DECLINE }}{% endblock %}
 {% block content %}
 {% if state == "unknown" %}
-  <p id="answer-state">{{ t.ANSWER_UNKNOWN }}</p>
+  <div class="auth"><div class="card"><div class="card-b"><p id="answer-state">{{ t.ANSWER_UNKNOWN }}</p></div></div></div>
 {% else %}
-  <h1>{{ t.ANSWER_TITLE_CONFIRM if choice == "confirm" else t.ANSWER_TITLE_DECLINE }}</h1>
-  <p>{{ t.ANSWER_INTRO.format(student=student_name, programme=programme, topic=topic) }}</p>
-  {% if state == "open" %}
-    <form method="post">
-      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-      <label for="comment">{{ t.ANSWER_COMMENT }}</label>
-      <textarea id="comment" name="comment"></textarea>
-      <button type="submit" id="record-answer">{{ t.ANSWER_RECORD_CONFIRM if choice == "confirm" else t.ANSWER_RECORD_DECLINE }}</button>
-    </form>
-  {% elif state == "recorded" %}
-    <p id="answer-state">{{ t.ANSWER_RECORDED.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at|datetime) }}</p>
-    {% if notice_failed %}<p class="error">{{ t.ANSWER_NOTICE_FAILED }}</p>{% endif %}
-  {% elif state == "answered" %}
-    <p id="answer-state">{{ t.ANSWER_ALREADY.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at|datetime) }}</p>
-  {% elif state == "replaced" %}
-    <p id="answer-state">{{ t.ANSWER_REPLACED }}</p>
-  {% endif %}
+<div class="auth" style="max-width: 560px">
+  <div class="card">
+    <div class="card-b">
+      <p><span class="chip info plain">{{ t.ANSWER_CHIP }}</span></p>
+      <h1>{{ t.ANSWER_TITLE_CONFIRM if choice == "confirm" else t.ANSWER_TITLE_DECLINE }}</h1>
+      <dl class="fields" style="margin: 16px 0 20px">
+        <dt>{{ t.ANSWER_FIELDS[0] }}</dt><dd>{{ student_name }}</dd>
+        <dt>{{ t.ANSWER_FIELDS[1] }}</dt><dd>{{ programme }}</dd>
+        <dt>{{ t.ANSWER_FIELDS[2] }}</dt><dd>{{ topic }}</dd>
+      </dl>
+      {% if state == "open" %}
+        <p class="lead" style="color: var(--muted)">{{ t.ANSWER_LEAD }}</p>
+        <form method="post">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <div class="f">
+            <label for="comment">{{ t.ANSWER_COMMENT }}</label>
+            <textarea id="comment" name="comment"></textarea>
+          </div>
+          <div class="actions"><button type="submit" id="record-answer" {% if choice != "confirm" %}class="secondary"{% endif %}>{% if choice == "confirm" %}<svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>{% endif %}{{ t.ANSWER_RECORD_CONFIRM if choice == "confirm" else t.ANSWER_RECORD_DECLINE }}</button></div>
+        </form>
+      {% elif state == "recorded" %}
+        <p class="flash ok" id="answer-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>{{ t.ANSWER_RECORDED.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at|datetime) }}</span></p>
+        {% if notice_failed %}<p class="error">{{ t.ANSWER_NOTICE_FAILED }}</p>{% endif %}
+      {% elif state == "answered" %}
+        <p id="answer-state">{{ t.ANSWER_ALREADY.format(t.ANSWER_WORD[request_row.answer], request_row.answered_at|datetime) }}</p>
+      {% elif state == "replaced" %}
+        <p id="answer-state">{{ t.ANSWER_REPLACED }}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
