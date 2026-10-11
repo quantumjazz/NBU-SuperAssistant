@@ -162,3 +162,25 @@
   - 0 moves with a writer possibly running.
   - The 71-case harness gave the same outcome in every case.
 - **Outstanding:** Codex's review of `aaf8fd2`.
+
+## 2026-10-11 — Final code approved: `aaf8fd2`; ready for owner acceptance
+
+- **Approvals of `aaf8fd2`:**
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED at aaf8fd2. M2-C3 is resolved. No further changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Findings:**
+  - M2-C1 was withdrawn by Codex, after systemd v255.4's own parser showed that CR ends a line.
+  - M2-C2 was resolved at `c479104`.
+  - M2-C3 was resolved at `aaf8fd2`.
+- **Checks:**
+  - Code and tests are unchanged since `c479104`, where 213 passed and browser 7 passed on Python 3.9.6 and 3.12.14, for Opus 5.5 and for Codex alike.
+  - The documentation fixes were verified on the laptop with invented records, and Codex's focused checks confirmed them.
+- **The live pilot** (Opus 5.5, read-only):
+  - The reminder timer's first run, on 11 October at 09:00:06, sent 0 (none was due) and ended in success.
+  - The service is active, with no error in its journal since 10 October 22:45, and `/healthz` answers ok.
+- **Phase:** READY FOR OWNER ACCEPTANCE; the owner's acceptance is outstanding.
+  - The owner's test of 10 October covered an application from a phone, the request to the supervisor, and a staff check.
+  - The supervisor's answer and the topic-approval report wait on доц. д-р Екатерина Цветанова-Георгиева: her reminders go on 13 and 16 October. A staff change of supervisor would move them on.
+- **DEFERRED:**
+  - as listed on 10 October;
+  - the sign-in limit's shared campus address (8.7).
