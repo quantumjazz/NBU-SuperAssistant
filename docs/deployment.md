@@ -543,17 +543,20 @@ sudo systemctl stop nbu-superassistant-remind.timer
 while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done
 sudo systemctl stop nbu-superassistant
 backup=/home/victor/nbu-superassistant-backup-$(date +%Y%m%d-%H%M%S).tgz
-(umask 077; set -o noclobber; tar czf - -C /home/victor nbu-superassistant-data > "$backup") && ls -l "$backup"
+(umask 077; set -o noclobber; tar czf - -C /home/victor nbu-superassistant-data > "$backup.partial") && test ! -e "$backup" && mv "$backup.partial" "$backup" && ls -l "$backup"
 sudo systemctl start nbu-superassistant
 sudo systemctl start nbu-superassistant-remind.timer
 ```
 
 Every backup gets a name of its own, to the second, and `noclobber` refuses
 to write over a file that already exists, so a backup never replaces an
-earlier one. `umask 077` makes the archive yours alone from the moment it
-exists: it holds everything people entered and the session key. If 09:00
-passed while the timer was stopped, starting it again sends that morning's
-reminders at once.
+earlier one. It is written as `….tgz.partial` and gets its `.tgz` name only
+once `tar` has finished without an error, so a backup cut short never looks
+like a whole one; a `.partial` file left behind is a failed backup, to be
+deleted. `umask 077` makes the archive yours alone from the moment it exists:
+it holds everything people entered and the session key. If 09:00 passed while
+the timer was stopped, starting it again sends that morning's reminders at
+once.
 
 Keep a copy off the laptop as well; a backup on the same disk goes with the
 disk. On the Mac:
@@ -573,18 +576,41 @@ sudo systemctl stop nbu-superassistant-remind.timer
 while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done
 sudo systemctl stop nbu-superassistant
 kept=/home/victor/nbu-superassistant-data.before-restore-$(date +%Y%m%d-%H%M%S)
-test -f "$backup" && test ! -e "$kept" && mv /home/victor/nbu-superassistant-data "$kept" && tar xzf "$backup" -C /home/victor && chmod 700 /home/victor/nbu-superassistant-data && ls -ld "$kept" /home/victor/nbu-superassistant-data && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
+test -f "$backup" && test ! -e "$kept" && staging=$(mktemp -d /home/victor/nbu-superassistant-restore-XXXXXX) && tar xzf "$backup" -C "$staging" nbu-superassistant-data && test -d "$staging/nbu-superassistant-data" && test ! -L "$staging/nbu-superassistant-data" && mv /home/victor/nbu-superassistant-data "$kept" && mv "$staging/nbu-superassistant-data" /home/victor/nbu-superassistant-data && rmdir "$staging" && chmod 700 /home/victor/nbu-superassistant-data && ls -ld "$kept" /home/victor/nbu-superassistant-data && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
 curl -s http://127.0.0.1:8791/healthz
 ```
 
-The long line stops at the first step that fails, and then the service stays
-stopped, because started without its records folder it would make a new,
-empty installation in its place. If the backup's name was wrong, nothing has
-moved: correct the first line and run the rest again. If the unpacking
-failed, the current records are in the kept folder: put them back with
-`mv "$kept" /home/victor/nbu-superassistant-data` in the same window, then
-start the service and the timer. Delete the kept folder only once the
-restored records are confirmed.
+The backup is first unpacked into a private folder of its own,
+`nbu-superassistant-restore-…` (mode 700), and `tar` takes only the records
+folder out of it, so a wrong archive writes nothing anywhere else. The
+current records are moved aside only once the unpacking succeeded and gave a
+real folder. The long line stops at the first step that fails, and nothing
+starts. So if the backup's name was wrong, or the backup is damaged, the
+current records have not moved: whatever was unpacked stays in the
+`restore-…` folder to be looked at, then deleted (it holds the session key),
+and `sudo systemctl start nbu-superassistant && sudo systemctl start
+nbu-superassistant-remind.timer` brings everything back as it was; or
+correct the first line and run the rest again. Delete the kept folder only
+once the restored records are confirmed.
+
+To undo a restore, or if the line stopped after moving the current records
+aside, put the kept records back, setting aside whatever is at the records
+path:
+
+```bash
+failed=/home/victor/nbu-superassistant-data.failed-restore-$(date +%Y%m%d-%H%M%S)
+test -n "$kept" && test -d "$kept" && { test ! -e /home/victor/nbu-superassistant-data || { test ! -e "$failed" && mv /home/victor/nbu-superassistant-data "$failed" && chmod 700 "$failed"; }; } && test ! -e /home/victor/nbu-superassistant-data && mv "$kept" /home/victor/nbu-superassistant-data && ls -ld /home/victor/nbu-superassistant-data* && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
+```
+
+It does nothing unless the kept folder is there. It moves a partial records
+folder to a failed-restore name of its own, private (mode 700) like the
+records, where it stays to be looked at, never into another folder. It moves
+the kept records back only to an empty path, and it starts the service and
+the timer only once they are back. Like the restore, it stops at the first
+step that fails, with both still stopped. Run it in the same window as the
+restore; in a new one, first set `kept` to the folder `ls -d
+/home/victor/nbu-superassistant-data.before-restore-*` shows for that
+restore.
 
 ## What is public without signing in
 
