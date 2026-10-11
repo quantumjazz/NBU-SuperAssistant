@@ -599,15 +599,18 @@ path:
 
 ```bash
 failed=/home/victor/nbu-superassistant-data.failed-restore-$(date +%Y%m%d-%H%M%S)
-test -n "$kept" && test -d "$kept" && { test ! -e /home/victor/nbu-superassistant-data || { test ! -e "$failed" && mv /home/victor/nbu-superassistant-data "$failed" && chmod 700 "$failed"; }; } && test ! -e /home/victor/nbu-superassistant-data && mv "$kept" /home/victor/nbu-superassistant-data && ls -ld /home/victor/nbu-superassistant-data* && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
+test -n "$kept" && test -d "$kept" && sudo systemctl stop nbu-superassistant-remind.timer && { while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done; } && sudo systemctl stop nbu-superassistant && { test ! -e /home/victor/nbu-superassistant-data || { test ! -e "$failed" && mv /home/victor/nbu-superassistant-data "$failed" && chmod 700 "$failed"; }; } && test ! -e /home/victor/nbu-superassistant-data && mv "$kept" /home/victor/nbu-superassistant-data && ls -ld /home/victor/nbu-superassistant-data* && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
 ```
 
-It does nothing unless the kept folder is there. It moves a partial records
-folder to a failed-restore name of its own, private (mode 700) like the
-records, where it stays to be looked at, never into another folder. It moves
-the kept records back only to an empty path, and it starts the service and
-the timer only once they are back. Like the restore, it stops at the first
-step that fails, with both still stopped. Run it in the same window as the
+It does nothing unless the kept folder is there. Then, like a backup and a
+restore, and before it moves anything, it stops the timer, waits for a
+reminder run under way to end, and stops the service: after a restore that
+succeeded, both are running again. It moves whatever is at the records path
+to a failed-restore name of its own, private (mode 700) like the records,
+where it stays to be looked at, never into another folder. It moves the kept
+records back only to an empty path, and it starts the service and the timer
+only once they are back. Like the restore, it stops at the first step that
+fails, with both still stopped. Run it in the same window as the
 restore; in a new one, first set `kept` to the folder `ls -d
 /home/victor/nbu-superassistant-data.before-restore-*` shows for that
 restore.
