@@ -227,3 +227,19 @@
   - long-token and 16px touch-field checks.
 - **Not checked by either agent:** Safari's own window and the iOS Simulator.
 - **Outstanding:** the documented update on the laptop (pull, restart, `/healthz`); every live page opened; the owner's acceptance on a phone and in Safari.
+
+## 2026-10-11 — Interface restyle COMPLETE: accepted by the owner
+
+- **Owner acceptance** (verbatim): "I accept, the pages look fine on phone and Safari".
+- **Deployed:** GitHub `main` and the laptop are at `d09a221`. The code is `c89c2d6`, approved by Codex and Opus 5.5. The owner ran the documented restart, and `/healthz` answered `{"status":"ok"}`.
+- **Live check** (Opus 5.5, built-in browser, read-only):
+  - `/`, `/staff/sign-in`, `/staff/register`, an unknown `/answer/…` link and `/healthz` render the new templates.
+  - The stylesheet link is `?v=148d6ee5e31c`, the SHA-256 prefix of `style.css` at `c89c2d6`.
+  - No development banner shows (mode send).
+  - The owner checked the signed-in pages.
+- **Open owner questions:**
+  - whether to commit `docs/design/ui-mockup-2026-10-11/` as the design record;
+  - whether this task's record stays in this file.
+  The three new sentences were live at acceptance, and no change was asked.
+- **DEFERRED:** as in the entry for `c89c2d6`. In addition, an iPad with a trackpad may get 15px fields.
+- **Status:** COMPLETE.
