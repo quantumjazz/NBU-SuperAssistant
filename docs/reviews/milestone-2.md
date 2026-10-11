@@ -184,3 +184,18 @@
 - **DEFERRED:**
   - as listed on 10 October;
   - the sign-in limit's shared campus address (8.7).
+
+## 2026-10-11 — COMPLETE: accepted by the owner
+
+- **Owner acceptance** (verbatim): "I accept, push to github, pull to the laptop and I will do real world testing - the results - -> in another chat".
+- **Accepted code:** `aaf8fd2`, approved by Codex and Opus 5.5 (the entry above), running at https://nbu-superassistant.visiometrica.com. Milestone 2 had no `NOW.md`, on the owner's waiver in this record's first entry.
+- **Not seen before acceptance:** the supervisor's answer and the topic-approval report for the owner's test application. Both wait on the supervisor.
+- **Next:** the owner's real-world testing, with the results in a new chat.
+- **DEFERRED:**
+  - limits on staff sign-in;
+  - the typed-supervisor message;
+  - DMARC and a paid Resend plan;
+  - the sign-in limit's shared campus address;
+  - the owner's student list and faculty list (future tasks);
+  - roles the owner assigns.
+- **Status:** COMPLETE.
