@@ -127,3 +127,24 @@
   - Both procedures were run from the doc's blocks on the laptop, against fake records.
 - **Checks on `c479104`** (Opus 5.5): Python 3.9.6 and 3.12.14, 213 passed and browser 7 passed on each.
 - **Outstanding:** Codex's review of `c479104`, covering M2-C1's evidence and the M2-C2 and M2-C3 fixes only.
+
+## 2026-10-11 — Codex's re-review of `c479104`; M2-C3 fixed again in `9d34f5b`
+
+- **Review** (Codex, relayed by the owner): CHANGES REQUESTED at `c479104`.
+  - M2-C1 is withdrawn. Codex confirmed in systemd v255.4's parser that CR and LF both end a line.
+  - M2-C2 is resolved.
+  - M2-C3 stays open: after a partial unpacking, the documented `mv "$kept" …` nested the kept records inside the partial folder.
+  - Codex's checks: 213 + 7 passed on each Python.
+- **An independent adversarial check** (one delegated agent, 71 cases on the laptop, invented records in /tmp) passed Codex's guarded recovery. It broke the restore itself:
+  - a retried or undone restore could start the service on a partial extraction;
+  - a wrong archive could write over another folder in the home folder.
+- **Fixed in `9d34f5b`** (`docs/deployment.md` only):
+  - The restore unpacks only the records folder into a private staging folder. It moves the current records aside only once that succeeded and gave a real folder.
+  - Codex's guarded sequence stays as the undo.
+  - Backups are written as `.tgz.partial` and renamed only after `tar` succeeds.
+- **Rerun of the 71 cases:**
+  - every damaged or wrong archive left the current records in place and started nothing;
+  - the retried and undone restores ended on the original records;
+  - the other app's folder was untouched.
+- **Residual:** a tar stream cut at a member boundary inside a valid gzip unpacks with status 0. The `.partial` naming keeps the doc's own backups from ever being such a file.
+- **Outstanding:** Codex's review of `9d34f5b`.
