@@ -14,7 +14,7 @@
       </div>
       <div class="actions"><button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>{{ t.SIGNIN_SEND }}</button></div>
     </form>
-    <ol class="how">{% for step in t.SIGNIN_HOW %}<li>{{ step }}</li>{% endfor %}</ol>
+    <ol class="how" role="list">{% for step in t.SIGNIN_HOW %}<li>{{ step }}</li>{% endfor %}</ol>
   </div></div>
   <p class="auth-foot"><a href="/staff/sign-in">{{ t.SIGNIN_STAFF_LINK }}</a></p>
 </div>

@@ -71,7 +71,7 @@
         {% if standing.check == "passed" %}<p>{{ t.STATUS_CHECK_PASSED }}</p>
         {% elif standing.check == "not_passed" %}<p>{{ t.STATUS_CHECK_NOT_PASSED }}</p>
         {% else %}<p>{{ t.STATUS_NO_CHECK }}</p>{% endif %}
-        {# After a confirmation, the next step is the check; once a check is recorded, its own sentence above says what follows. #}
+        {# After a confirmation the next step is the check; once a check is recorded no next-step line is shown (a failed check's sentence says what follows). #}
         {% if state in t.STATUS_NEXT and not (state == "confirm" and standing.check) %}<p class="next">{{ t.STATUS_NEXT[state] }}</p>{% endif %}
       </div>
     </div>

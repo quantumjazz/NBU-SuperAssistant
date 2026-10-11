@@ -184,7 +184,7 @@ td form.inline-fields label { margin: 0; position: absolute; left: -9999px; }
 dl.fields { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px 24px; }
 dl.fields dt { color: var(--muted); font-size: 0.8rem; margin: 0; }
 dl.fields dd { margin: 2px 0 0; white-space: pre-wrap; }
-dl.fields dd, .card-h p, .lead, h1 { overflow-wrap: anywhere; }
+dl.fields dd, .card-h p, .lead, h1, .log li { overflow-wrap: anywhere; }
 @media (min-width: 640px) { dl.fields { grid-template-columns: 12rem minmax(0, 1fr); gap: 10px 24px; } dl.fields dt { font-size: 0.875rem; padding-top: 1px; } dl.fields dd { margin: 0; } }
 .downloads { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0; margin: 0; }
 .downloads li { margin: 0; }

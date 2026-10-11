@@ -895,3 +895,6 @@ def test_the_stylesheet_address_carries_a_hash_of_the_file_served(tmp_path,
     before = web.style_version(Copy)
     stylesheet.write_bytes(b"body { color: #1f2933; }\n")
     assert web.style_version(Copy) != before
+    stylesheet.unlink()                     # a start refusal, in one line
+    with pytest.raises(StartupError, match="style.css cannot be read"):
+        web.style_version(Copy)

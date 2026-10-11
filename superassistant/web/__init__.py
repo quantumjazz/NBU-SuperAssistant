@@ -145,8 +145,13 @@ def style_version(app):
     old stylesheet. A stylesheet with other content gets another address.
     Read at start: the documented update restarts the service.
     """
-    with open(os.path.join(app.static_folder, "style.css"), "rb") as handle:
-        return hashlib.sha256(handle.read()).hexdigest()[:12]
+    path = os.path.join(app.static_folder, "style.css")
+    try:
+        with open(path, "rb") as handle:
+            return hashlib.sha256(handle.read()).hexdigest()[:12]
+    except OSError as exc:
+        raise StartupError("The stylesheet " + path + " cannot be read: "
+                           + (exc.strerror or str(exc)))
 
 
 def mail_note(settings):
