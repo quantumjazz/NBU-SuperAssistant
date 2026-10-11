@@ -215,3 +215,15 @@
 - **Not checked:** Safari's own window and the iOS Simulator. No screen-recording permission; Xcode's licence unaccepted.
 - **Outstanding:** Codex's review; the push and the documented update; every live page opened; the owner's acceptance on a phone and in Safari.
 - **DEFERRED** (these predate the restyle): the answer page's title and heading in some states; the choose-again mail-failure message; "одобрена".
+
+## 2026-10-11 — Interface restyle: `c89c2d6` approved; pushed for the laptop update
+
+- **Approvals of `c89c2d6`** (range `a0c7e2b..c89c2d6`):
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED — interface restyle at `c89c2d6`, covering `a0c7e2b..c89c2d6`. No R-C findings or required changes."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, in scratch copies:
+  - 214 passed and 7 browser passed on Python 3.9.6 and 3.12.14;
+  - the 66 states rendered in Chromium and the Mac's WebKit;
+  - long-token and 16px touch-field checks.
+- **Not checked by either agent:** Safari's own window and the iOS Simulator.
+- **Outstanding:** the documented update on the laptop (pull, restart, `/healthz`); every live page opened; the owner's acceptance on a phone and in Safari.
