@@ -254,3 +254,16 @@
 - **Checks:** 219 passed and 7 browser passed on Python 3.9.6 and 3.12.14. A ФДЕНО and a БФ report were rendered and looked at. Four read-only subagent checks found one vacuous assertion, now removed.
 - **Outstanding:** Codex's review; the push; the laptop's `faculties.csv` cell, on the owner's yes; the update; a live confirmation reaching the test student; the owner's acceptance.
 - **DEFERRED** (predates this task): the `supervision.py` docstring says every message is sent inside its recording transaction; neither notice is.
+
+## 2026-10-12 — Confirmation notice and the ФДЕНО address line: `0641e0f` approved; pushed for the laptop update
+
+- **Approvals of `0641e0f`** (range `617aa11..0641e0f`):
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED — code `0641e0f`, range `617aa11..0641e0f`. No code changes required."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, in a scratch copy:
+  - 219 passed and 7 browser passed on Python 3.9.6 and 3.12.14;
+  - one notice per recorded confirmation, none for a duplicate or replaced link; a relay or throttle failure keeps the answer and shows the notice;
+  - the three faculties' reports generated, read back and looked at;
+  - an existing `faculties.csv` untouched by start and restart.
+- **Correction**, found by Codex. It supersedes "Five new tests fail without the change" in the entry for `0641e0f`: three of the five new cases fail without the change, namely the two confirmation flow tests and the УБП-ДО report case. The БФ and МФ report cases are guards that also pass on `617aa11`.
+- **Outstanding:** the laptop's `faculties.csv` cell, on the owner's yes; the documented update and the owner's restart; a live confirmation reaching the test student; the owner's acceptance.
