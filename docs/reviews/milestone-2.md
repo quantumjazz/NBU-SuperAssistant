@@ -243,3 +243,14 @@
   The three new sentences were live at acceptance, and no change was asked.
 - **DEFERRED:** as in the entry for `c89c2d6`. In addition, an iPad with a trackpad may get 15px fields.
 - **Status:** COMPLETE.
+
+## 2026-10-12 — Confirmation notice and the ФДЕНО address line, an owner-authorized task: code `0641e0f` for Codex
+
+- **Authorization** (the owner, quoted in Fable's brief to Opus 5.5): "I think that students are not notified when the proposed advisor decides on their application". On Fable's proposal to fix the confirmation email and the ФДЕНО address line before milestone 3: "you are correct, go ahead". The ФДЕНО report "will read exatly like other reports, but with this "ДОЦ. Д-Р ВЕНЦИСЛАВ ДЖАМБАЗОВ / ДЕКАН НА ФДЕНО"". A task, not a milestone.
+- **Code `0641e0f`** (range `617aa11..0641e0f`):
+  - a recorded confirmation emails the student, as a decline does: after the answer, under the same "notice" bound. A refusal keeps the answer, and the page says so;
+  - the starter list names ФДЕНО „ФДЕНО“; БФ and МФ stay in full.
+- **Tests:** the only existing assertion changed is the starter name in `tests/test_foundation.py`, as the brief directs. Five new tests fail without the change.
+- **Checks:** 219 passed and 7 browser passed on Python 3.9.6 and 3.12.14. A ФДЕНО and a БФ report were rendered and looked at. Four read-only subagent checks found one vacuous assertion, now removed.
+- **Outstanding:** Codex's review; the push; the laptop's `faculties.csv` cell, on the owner's yes; the update; a live confirmation reaching the test student; the owner's acceptance.
+- **DEFERRED** (predates this task): the `supervision.py` docstring says every message is sent inside its recording transaction; neither notice is.
