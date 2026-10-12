@@ -380,6 +380,25 @@ def assert_untouched_report(document):
             assert new == old
 
 
+@pytest.mark.parametrize("code, dean, address", [
+    ("УБП-ДО", "ДОЦ. Д-Р ВЕНЦИСЛАВ ДЖАМБАЗОВ", "ДЕКАН НА ФДЕНО"),
+    ("УБП-РО", "ДОЦ. Д-Р ИЛИЯ КОЖУХАРОВ", "ДЕКАН НА БАКАЛАВЪРСКИ ФАКУЛТЕТ"),
+    ("БА-РО", "ПРОФ. Д-Р БОРИС СЕРГИНОВ", "ДЕКАН НА МАГИСТЪРСКИ ФАКУЛТЕТ"),
+])
+def test_with_the_starter_lists_each_dean_is_addressed_as_the_samples_do(
+        tmp_path, code, dean, address):
+    # The owner, 12 October 2026: „ДЕКАН НА ФДЕНО“, as the ФДЕНО samples
+    # write it; БФ and МФ in full.
+    lists.write_starter(tmp_path)
+    starter = lists.load(tmp_path)
+    rows = [{"position": 1, "application_id": 1, "fn": "F1",
+             "name": "Ана Бойкова Вълчева", "topic": "Тема",
+             "supervisor": "доц. д-р Петър Иванов"}]
+    body = [p.text for p in read(documents.doklad_temi(
+        code, rows, "2026-10-12T09:00:00+00:00", starter)).paragraphs]
+    assert body[1:3] == [dean, address]
+
+
 # --- The templates themselves ------------------------------------------------
 
 def test_the_report_template_holds_the_header_and_one_templated_row():

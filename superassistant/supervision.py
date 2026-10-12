@@ -110,6 +110,16 @@ def _decline_message(settings, lists, record, request):
                         texts.DECLINE_TEXT.format(**values))
 
 
+def _confirm_message(settings, lists, record, request):
+    values = {"student": applications.full_name(record),
+              "supervisor": request_label(request, lists),
+              "topic": record["topic"],
+              "link": settings.base_url + "/application"}
+    return mail.Message(record["email"],
+                        texts.CONFIRM_SUBJECT.format(**values),
+                        texts.CONFIRM_TEXT.format(**values))
+
+
 def request_label(request, lists):
     """Who a request went to, as written at the time it was made."""
     if request["professor"] and request["professor"] in lists.professors:
@@ -275,6 +285,15 @@ def tell_student_of_decline(connection, settings, lists, request):
     """The decline notice. Raises mail.MailFailed; the answer stays recorded."""
     record = applications.get(connection, request["application_id"])
     message = _decline_message(settings, lists, record, request)
+    _throttle(connection, "notice", message.to, in_transaction=False)
+    mail.send(settings, message)
+
+
+def tell_student_of_confirm(connection, settings, lists, request):
+    """The confirmation notice. Raises mail.MailFailed; the answer stays
+    recorded."""
+    record = applications.get(connection, request["application_id"])
+    message = _confirm_message(settings, lists, record, request)
     _throttle(connection, "notice", message.to, in_transaction=False)
     mail.send(settings, message)
 

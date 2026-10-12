@@ -20,11 +20,12 @@ MAIL_PER_SOURCE_WINDOW = 3600
 
 # Every other message has a finite bound too (constitution 6.6). One
 # supervisor may rightly be asked by many students near a deadline, so the
-# bound per supervisor's address is generous; a student receives a decline
-# notice only now and then. All mail together is capped as well, which is
-# what keeps the sending domain off blocklists whatever goes wrong.
+# bound per supervisor's address is generous; a student receives a notice of
+# a supervisor's answer (a confirmation or a decline) only now and then. All
+# mail together is capped as well, which is what keeps the sending domain off
+# blocklists whatever goes wrong.
 SUPERVISOR_PER_ADDRESS = 30     # requests, new requests and reminders, an hour
-NOTICE_PER_ADDRESS = 10         # decline notices to one student, an hour
+NOTICE_PER_ADDRESS = 10         # answer notices to one student, an hour
 ALL_MAIL = 300                  # every message, an hour
 WINDOW = 3600
 

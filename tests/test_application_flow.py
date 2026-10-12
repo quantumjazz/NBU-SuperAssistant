@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-from superassistant import applications, db, supervision
+from superassistant import applications, db, supervision, texts
 from tests.conftest import connect, make_account
 
 THESIS_TAB_1 = {
@@ -255,6 +255,38 @@ def test_a_decline_notice_the_relay_refuses_still_records_the_answer(
     connection = connect(settings)
     assert applications.current_request(connection, record["id"])["answer"] \
         == "decline"
+    connection.close()
+
+
+def test_a_confirmation_tells_the_student(client, new_client, settings,
+                                          outbox):
+    as_student(client, "confirmed@example.org")
+    submit_thesis(client)
+    new_client().post(link_from(outbox.messages[0], "confirm"),
+                      data={"comment": ""})
+    notice = outbox.to("confirmed@example.org")
+    assert len(notice) == 1 and len(outbox.messages) == 2
+    assert notice[0].subject == texts.CONFIRM_SUBJECT
+    for expected in ("Мария Петрова Тодорова", "доц. д-р Петър Иванов",
+                     "„Управление на риска в малки фирми“",
+                     settings.base_url + "/application"):
+        assert expected in notice[0].text
+    page = client.get("/application").get_data(as_text=True)
+    assert texts.STATUS_CONFIRMED in page
+
+
+def test_a_confirmation_notice_the_relay_refuses_still_records_the_answer(
+        client, new_client, settings, outbox):
+    as_student(client, "confirm-notice@example.org")
+    submit_thesis(client)
+    link = link_from(outbox.messages[0], "confirm")
+    outbox.refuse = True
+    page = new_client().post(link, data={}).get_data(as_text=True)
+    assert texts.ANSWER_NOTICE_FAILED in page
+    record = record_for(settings, "confirm-notice@example.org")
+    connection = connect(settings)
+    assert applications.current_request(connection, record["id"])["answer"] \
+        == "confirm"
     connection.close()
 
 

@@ -321,7 +321,7 @@ longer show the development notice. The messages are: a student's sign-in
 link and code, the request to a supervisor (when a student submits or
 chooses another supervisor after a decline, or staff change the supervisor or
 the graduation type), the reminders, and the notice to a student whose
-supervisor declined.
+supervisor confirmed or declined.
 
 The relay is proved with `mail-test` during the first install (*Prove the
 mail*); run it again whenever mail is in doubt.
@@ -357,8 +357,9 @@ nothing pretends it was sent:
   because the message to the supervisor could not be sent;
 - a staff change of supervisor or graduation type changes nothing, and the
   page says the request could not be sent;
-- a supervisor's decline is still recorded, and the page says the student
-  was not told by mail; the student sees it on the application page;
+- a supervisor's confirmation or decline is still recorded, and the page
+  says the student was not told by mail; the student sees it on the
+  application page;
 - the reminder run names each reminder it could not send and ends with
   status 1. Nothing is recorded for those, so the next morning's run tries
   them again.

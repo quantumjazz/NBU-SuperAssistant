@@ -110,6 +110,7 @@ In the samples, the Рецензент column of the topic-approval report is em
   - Бакалавърски факултет: доц. д-р Илия Кожухаров
   - Магистърски факултет: проф. д-р Борис Сергинов
   - ФДЕНО: доц. д-р Венцислав Джамбазов
+- **The dean's address line:** in every report the ФДЕНО dean is addressed „ДЕКАН НА ФДЕНО“, the deans of БФ and МФ with the faculty's name in full (the owner, 12 October 2026).
 - **Programmes seen in the samples (the owner completes the list):**
   - БП „Администрация и управление“
   - БП „Управление на бизнеса и предприемачество“ (РО, ДО)

@@ -13,6 +13,10 @@ from superassistant import web
 
 blueprint = Blueprint("supervisor", __name__)
 
+# The student is told of each answer by mail, once it is recorded.
+NOTICES = {"confirm": supervision.tell_student_of_confirm,
+           "decline": supervision.tell_student_of_decline}
+
 
 def _page(request_row, choice, state, notice_failed=False, status=200):
     record = applications.get(web.connection(), request_row["application_id"])
@@ -47,10 +51,10 @@ def record(token, choice):
     if state == "unknown":
         return render_template("answer.html", state="unknown"), 404
     notice_failed = False
-    if state == "recorded" and row["answer"] == "decline":
+    if state == "recorded" and row["answer"] in NOTICES:
         try:
-            supervision.tell_student_of_decline(
-                web.connection(), web.settings(), web.current_lists(), row)
+            NOTICES[row["answer"]](web.connection(), web.settings(),
+                                   web.current_lists(), row)
         except mail.MailFailed:
             notice_failed = True
     return _page(row, choice, state, notice_failed)

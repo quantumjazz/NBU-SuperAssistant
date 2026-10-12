@@ -31,15 +31,15 @@ FORMS = ("РО", "ДО")
 
 # Starting values, from docs/domain.md (October 2026). The faculty of each
 # programme follows the mapping the owner confirmed on 9 October 2026:
-# ДО to ФДЕНО, РО bachelor's to БФ, РО master's to МФ.
+# ДО to ФДЕНО, РО bachelor's to БФ, РО master's to МФ. ФДЕНО's name is the
+# abbreviation, as every report writes it: „ДЕКАН НА ФДЕНО“ (the owner, 12
+# October 2026); БФ and МФ are written in full.
 STARTER = {
     TITLES: [["проф. д-р"], ["доц. д-р"], ["гл. ас. д-р"], ["ас. д-р"]],
     FACULTIES: [
         ["БФ", "Бакалавърски факултет", "доц. д-р", "Илия Кожухаров"],
         ["МФ", "Магистърски факултет", "проф. д-р", "Борис Сергинов"],
-        ["ФДЕНО",
-         "Факултет за дистанционно, електронно и непрекъснато обучение",
-         "доц. д-р", "Венцислав Джамбазов"],
+        ["ФДЕНО", "ФДЕНО", "доц. д-р", "Венцислав Джамбазов"],
     ],
     PROGRAMMES: [
         ["АУ-РО", "БП", "Администрация и управление", "РО", "БФ"],
