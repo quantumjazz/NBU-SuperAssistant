@@ -285,3 +285,15 @@
 - **Codex's checks**, in a scratch copy, on Python 3.9.6 and 3.12.14: valid syntax, and the executable code is identical outside the module docstring. The full suites were not repeated in that pass. Opus 5.5's run on `14e8580`: 219 passed and 7 browser passed on both.
 - **Deployed:** this entry is pushed and pulled to the laptop. A docstring needs no restart.
 - **Outstanding:** a live confirmation reaching the test student; the owner's acceptance; then the completion entry.
+
+## 2026-10-13 — The task before milestone 3: code `4e83744` for Codex
+
+- **Authorization:** the owner's "Scope: I agree" and "hardcode “F” so students enter only the numbers", 13 October 2026 (`milestone-3.md`).
+- **Code `4e83744`** (range `b756685..4e83744`): the brief's five changes.
+- **New wording:** „Молба за научно ръководство“; DECLARE_CREDITS, the form's sentence; „Отбележете това поле, за да подадете заявлението.“; „Въведете само цифрите на факултетния номер.“; „Код“, „Кредити“, „Код на програмата“, „Декларира покрити кредити“, „да“, „—“; „Изтрий“, „Изтриване на доклад“, „Изтриването премахва файла и записа на доклада. Изброените в него студенти отново чакат доклад.“, „Изтрий доклада“, „Докладът е изтрит.“, „Изтрити доклади“, „Изтрит“.
+- **New tests failing with their change reverted:** answer page 3 of 5 (open, recorded are guards); declaration 5 of 8 (another student, type correction, заявление are guards); F№ 8/8; programmes 11/11; deletion 5/5.
+- **Adjusted fixtures:** the brief's, plus `thesis_data` and the browser's F400001/F400002; unchanged after checking: `test_application_flow.py` 409–420, `test_documents.py` 76–81 and 307, browser 211.
+- **Programmes, for the owner:** BSNADM01, BSNADM04, BSNBUB04, BSNDIU01, BSNTUR01, BSNDIT01, BSNDIT04, MSNADM21, MSNALH03, MSNHRB05, MSNHRE08, MSNMBA01, MSNMBA12, MSNMBA81, MSNMBA80, MSNSMQ11, MSNSMQ09.
+- **Checks:** 256 passed, 7 browser passed on Python 3.9.6 and 3.12.14; two Word-rendered reports and tab 1 at 390 px looked at.
+- **Laptop, after the owner's yes to the list:** pull per "Updating", no restart; copy the 17-row list over `programmes.csv`, keeping `programmes.csv.<date>`; restart; `/healthz`. That start records the old codes' moves as the owner's corrections. Likewise the Mac.
+- **Outstanding:** Codex's review; the owner's yes; the update; acceptance.
