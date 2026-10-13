@@ -276,3 +276,12 @@
 - **Docstring `14e8580`** (range `abf31dd..14e8580`), on the owner's "address the second deferred item now": the `supervision.py` docstring now says that requests and reminders are sent inside their transaction and both notices are sent after the answer's. Docstring only. 219 passed and 7 browser passed on Python 3.9.6 and 3.12.14. This resolves the DEFERRED docstring item.
 - **Outstanding:** Codex's review of `14e8580`; a live confirmation reaching the test student; the owner's acceptance.
 - **Moved to a new thread** by the owner: the answer page's title for an invalid link, and the owner's new ideas.
+
+## 2026-10-13 — Docstring `14e8580` approved; pushed and pulled to the laptop
+
+- **Approvals of `14e8580`** (range `abf31dd..14e8580`):
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED — 14e8580, range abf31dd..14e8580. No changes required."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, in a scratch copy, on Python 3.9.6 and 3.12.14: valid syntax, and the executable code is identical outside the module docstring. The full suites were not repeated in that pass. Opus 5.5's run on `14e8580`: 219 passed and 7 browser passed on both.
+- **Deployed:** this entry is pushed and pulled to the laptop. A docstring needs no restart.
+- **Outstanding:** a live confirmation reaching the test student; the owner's acceptance; then the completion entry.
