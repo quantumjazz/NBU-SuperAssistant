@@ -267,3 +267,12 @@
   - an existing `faculties.csv` untouched by start and restart.
 - **Correction**, found by Codex. It supersedes "Five new tests fail without the change" in the entry for `0641e0f`: three of the five new cases fail without the change, namely the two confirmation flow tests and the УБП-ДО report case. The БФ and МФ report cases are guards that also pass on `617aa11`.
 - **Outstanding:** the laptop's `faculties.csv` cell, on the owner's yes; the documented update and the owner's restart; a live confirmation reaching the test student; the owner's acceptance.
+
+## 2026-10-13 — Confirmation notice and the ФДЕНО address line: deployed; docstring `14e8580` for Codex
+
+- **Deployed:** the laptop is at `abf31dd`.
+  - Line 4 of its `faculties.csv` now reads `ФДЕНО,ФДЕНО,доц. д-р,Венцислав Джамбазов`, changed on the owner's "yes, change line 4". The old file is kept beside it as `faculties.csv.2026-10-13`.
+  - The owner restarted the service at 09:50:47, after the 09:00 reminder run, and `/healthz` answered `{"status":"ok"}`. The public pages render.
+- **Docstring `14e8580`** (range `abf31dd..14e8580`), on the owner's "address the second deferred item now": the `supervision.py` docstring now says that requests and reminders are sent inside their transaction and both notices are sent after the answer's. Docstring only. 219 passed and 7 browser passed on Python 3.9.6 and 3.12.14. This resolves the DEFERRED docstring item.
+- **Outstanding:** Codex's review of `14e8580`; a live confirmation reaching the test student; the owner's acceptance.
+- **Moved to a new thread** by the owner: the answer page's title for an invalid link, and the owner's new ideas.
