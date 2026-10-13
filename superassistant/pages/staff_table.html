@@ -34,7 +34,9 @@
         <td><a class="name" href="/staff/application/{{ row.record.id }}">{{ row.name or row.record.email }}</a><span class="sub">{{ row.record.email }}</span></td>
         <td>{{ row.record.fn }}</td>
         <td>{{ row.programme }}</td>
+        <td class="code">{{ row.code }}</td>
         <td>{{ t.STAFF_TYPE.get(row.record.grad_type, "") }}</td>
+        <td class="declared">{{ t.STAFF_DECLARED_VALUE[row.declared] }}</td>
         <td>{{ row.record.topic if row.record.grad_type == "thesis" }}</td>
         <td>{{ row.supervisor }}</td>
         <td>{% if row.record.grad_type == "thesis" %}<div class="marks">

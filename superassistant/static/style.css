@@ -204,3 +204,14 @@ dl.fields dd, .card-h p, .lead, h1, .log li { overflow-wrap: anywhere; }
   .brand-dept { font-size: 0.72rem; }
   .topbar .container { gap: 8px 12px; }
 }
+
+/* --- The task of 13 October 2026 ------------------------------------------- */
+/* F№: the fixed „F“ before the digits the student types. */
+.prefixed { display: flex; align-items: stretch; }
+.prefixed .prefix { display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--field-line); border-right: 0; border-radius: var(--radius-s) 0 0 var(--radius-s); background: var(--ground); font-weight: 600; color: var(--ink); }
+.prefixed input { border-radius: 0 var(--radius-s) var(--radius-s) 0; min-width: 0; }
+/* The declaration: a long sentence beside its box. */
+label.choice.declare { align-items: flex-start; font-size: 0.95rem; line-height: 1.45; }
+label.choice.declare input { margin-top: 2px; }
+button.danger { background: var(--error); border-color: var(--error); }
+button.danger:hover { background: #8f1c13; border-color: #8f1c13; }

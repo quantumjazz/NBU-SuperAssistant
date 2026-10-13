@@ -426,10 +426,16 @@ The owner's lists are four CSV files in
 
 They are UTF-8, one entry per line, separated by commas, under that header,
 which must stay as it is. The first start writes them from the values in
-`domain.md`. **`professors.csv` starts empty**, with its header only. Until
-8.7 is decided, it lists only supervisors who agreed to test, with their own
-addresses: a student who chooses one makes NBU-SuperAssistant mail them. A
-professor's title must be one in `titles.csv`.
+`domain.md`. `programmes.csv` starts with the owner's 17 programmes of 13
+October 2026, one row per programme and form, each with its code in Locus:
+BSNADM01, BSNADM04, BSNBUB04, BSNDIU01, BSNTUR01, BSNDIT01, BSNDIT04,
+MSNADM21, MSNALH03, MSNHRB05, MSNHRE08, MSNMBA01, MSNMBA12, MSNMBA81,
+MSNMBA80, MSNSMQ11 and MSNSMQ09. Students choose a programme by its name and
+form; staff see its code. **`professors.csv` starts empty**, with its header
+only. Until 8.7 is decided, it lists only supervisors who agreed to test,
+with their own addresses: a student who chooses one makes
+NBU-SuperAssistant mail them. A professor's title must be one in
+`titles.csv`.
 
 Edit them on the laptop:
 

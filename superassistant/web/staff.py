@@ -5,6 +5,11 @@ for a check, or, confirmed and passed, for their first report stand out.
 Every check and every correction is a new row that keeps what came before.
 A staff change of the supervisor sends a new request; an answer already
 recorded stays with the earlier request.
+
+Staff see the programme's code beside its name, which students never see
+(constitution 5.3), and whether the student ticked the declaration that the
+credits are covered. A correction of F№ takes the digits, with or without
+„F“ or „f“ before them, and stores „F“ and the digits.
 """
 
 from flask import Blueprint, abort, flash, redirect, render_template, request
@@ -32,6 +37,8 @@ def _row(connection, record, lists):
         "name": applications.full_name(record),
         "programme": ("{} {}".format(programme["degree"], programme["name"])
                       + ", " + programme["form"]) if programme else "",
+        "code": record["programme"],
+        "declared": record["credits_declared_at"] is not None,
         "supervisor": (applications.supervisor_label(record, lists)
                        if record["grad_type"] == "thesis" else ""),
     }
@@ -106,7 +113,8 @@ def correct(application_id):
         abort(400)
     values, refusals = applications.clean({field: request.form.get("value",
                                                                    "")},
-                                          [field], web.current_lists())
+                                          [field], web.current_lists(),
+                                          fn_letter=True)
     required = applications.REQUIRED_ALL + (
         applications.REQUIRED_THESIS if record["grad_type"] == "thesis"
         else ())

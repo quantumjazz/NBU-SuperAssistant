@@ -37,6 +37,33 @@ def _check_owner(settings, connection):
             "set the setting and start again.")
 
 
+def _rename_programmes(settings, connection):
+    """Move the records off the first starting list's programme codes, once.
+
+    The owner's list of 13 October 2026 gave each programme a new code
+    (lists.RENAMED_PROGRAMMES). The first start after that update moves each
+    application still holding an old code, as a correction under the owner's
+    account, and the kept reports with them. Like the starting lists, it is
+    recorded in the database in the same transaction that reads whether it
+    was done, so the service and the reminder run, starting together, do it
+    once between them. Without the owner's account nothing is moved; an old
+    code still in use then stops the start (lists.check_used), naming it.
+    """
+    if not settings.owner_username:
+        return
+    owner = accounts.by_username(connection, settings.owner_username)
+    if owner is None:
+        return
+    with db.transaction(connection):
+        if connection.execute(
+                "SELECT 1 FROM installation WHERE key = 'programme codes'"
+        ).fetchone() is None:
+            lists.rename_programmes(connection, owner["id"])
+            connection.execute(
+                "INSERT INTO installation (key, value) VALUES "
+                "('programme codes', ?)", (db.now(),))
+
+
 def prepare(settings):
     """Make the data directory ready and check it. Returns the lists."""
     problem = settings.problem()
@@ -61,6 +88,7 @@ def prepare(settings):
                 connection.execute(
                     "INSERT INTO installation (key, value) VALUES "
                     "('lists', ?)", (db.now(),))
+        _rename_programmes(settings, connection)
         try:
             loaded = lists.load(settings.lists_dir)
             lists.check_used(loaded, connection)

@@ -179,6 +179,12 @@ def _send_new_request(connection, settings, lists, application_id):
 def submit(connection, settings, lists, application_id):
     """Submit an application. Returns a list of Refusals, empty on success.
 
+    The student's declaration that the credits are covered must be ticked
+    ("must be ticked to submit, as he signs the same sentence on paper", the
+    owner, 13 October 2026), and is recorded with the moment of submission.
+    The tick is the student's submission's own condition: a staff correction
+    of the type (staff_change_type) neither needs it nor changes it.
+
     A thesis is submitted only once its request to the supervisor has gone:
     if the relay refuses it, mail.MailFailed propagates and nothing changes.
     """
@@ -187,11 +193,15 @@ def submit(connection, settings, lists, application_id):
         if record["submitted_at"] is not None:
             return []
         missing = applications.missing_for_submission(record)
+        if not record["credits_declared"]:
+            missing.append(applications.Refusal("credits_declared", "tick"))
         if missing:
             return missing
+        stamp = db.now()
         connection.execute(
-            "UPDATE applications SET submitted_at = ?, updated_at = ? "
-            "WHERE id = ?", (db.now(), db.now(), application_id))
+            "UPDATE applications SET submitted_at = ?, credits_declared_at = ?,"
+            " updated_at = ? WHERE id = ?",
+            (stamp, stamp, stamp, application_id))
         if record["grad_type"] == "thesis":
             _send_new_request(connection, settings, lists, application_id)
     return []

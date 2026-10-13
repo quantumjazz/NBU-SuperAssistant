@@ -26,7 +26,7 @@ from tests.test_application_flow import (THESIS_TAB_1, THESIS_TAB_2,
 def submit_exam(client, address, extra=None):
     as_student(client, address)
     fields = {"name1": "Калина", "name2": "Иванова", "name3": "Стоева",
-              "fn": "F500001", "grad_type": "exam"}
+              "fn": "500001", "grad_type": "exam", "credits_declared": "1"}
     fields.update(extra or {})
     assert save(client, 1, fields, "submit").status_code == 302
 
@@ -36,6 +36,7 @@ def thesis_data():
     data.update(THESIS_TAB_2)
     data.pop("grad_type")
     data.pop("professor")
+    data.pop("credits_declared")
     return data
 
 
@@ -98,7 +99,7 @@ def test_exam_to_thesis_and_back_keeps_history_and_answers(
     connection = connect(settings)
     loaded = lists.load(settings.lists_dir)
     qualifying = lambda: [r["id"] for r in reports.qualifying(connection,
-                                                              "УБП-РО")]
+                                                              "BSNBUB04")]
     assert record["id"] not in qualifying()
     new_client().post(link_from(request_mail, "confirm"), data={})
     applications.record_check(connection, record["id"], "passed", "",
@@ -132,7 +133,7 @@ def test_a_list_removed_after_installation_stops_the_start(tmp_path):
         "Администрация и управление", "Публична администрация")
     path.write_text(text, encoding="utf-8")
     from tests.conftest import insert_application
-    insert_application(settings, "c5@example.org", programme="АУ-РО")
+    insert_application(settings, "c5@example.org", programme="BSNADM01")
     path.unlink()
     with pytest.raises(StartupError) as raised:
         create_app(settings)
@@ -474,10 +475,10 @@ def test_the_signature_block_is_kept_together_in_a_filled_report(settings):
     rows = [documents.report_row(i + 1, {
         "id": i, "name1": "Име", "name2": "Бащино", "name3": "Ф" + str(i),
         "fn": "F{}".format(i), "topic": "Тема", "professor": "ivanov",
-        "sup_name": "", "sup_title": "", "programme": "АУ-РО",
+        "sup_name": "", "sup_title": "", "programme": "BSNADM01",
         "grad_type": "thesis"}, loaded) for i in range(3)]
     document = Document(io.BytesIO(documents.doklad_temi(
-        "АУ-РО", rows, "2026-10-10T09:00:00+00:00", loaded)))
+        "BSNADM01", rows, "2026-10-10T09:00:00+00:00", loaded)))
     body = list(document.element.body.iterchildren())
     after = [Paragraph(el, document)
              for el in body[body.index(document.tables[0]._tbl) + 1:]
@@ -555,7 +556,7 @@ def test_a_failed_first_start_leaves_no_partial_list(tmp_path, monkeypatch):
     monkeypatch.setattr(lists.os, "replace", real_replace)
     create_app(settings)                        # the retry completes the lists
     loaded = lists.load(settings.lists_dir)
-    assert "АУ-РО" in loaded.programmes and loaded.titles
+    assert "BSNADM01" in loaded.programmes and loaded.titles
 
 
 TYPED_BAD_ADDRESS = {"professor": "", "sup_title": "проф. д-р",
@@ -587,10 +588,11 @@ def test_a_typed_address_that_is_not_one_is_wrong_not_missing(
 def test_a_retained_title_alone_is_shown(client, new_client, settings, staff):
     as_student(client, "titleonly@example.org")
     save(client, 1, {"name1": "Мила", "name2": "Петрова", "name3": "Нейкова",
-                     "fn": "F700001", "grad_type": "thesis",
+                     "fn": "700001", "grad_type": "thesis",
                      "sup_title": "проф. д-р"})
     save(client, 1, {"name1": "Мила", "name2": "Петрова", "name3": "Нейкова",
-                     "fn": "F700001", "grad_type": "exam"}, "submit")
+                     "fn": "700001", "grad_type": "exam",
+                     "credits_declared": "1"}, "submit")
     record = record_for(settings, "titleonly@example.org")
     assert record["sup_title"] == "проф. д-р"
     page = as_staff(new_client(), staff).get(

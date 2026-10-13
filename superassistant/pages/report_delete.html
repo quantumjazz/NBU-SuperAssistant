@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ t.REPORTS_DELETE_TITLE }}{% endblock %}
+{% block content %}
+<a class="back" href="/staff/reports"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_REPORTS }}</a>
+<div class="page-head">
+  <h1>{{ t.REPORTS_DELETE_TITLE }}</h1>
+  <p class="lead">{{ t.REPORTS_DELETE_LEAD }}</p>
+</div>
+<div class="card"><div class="card-b">
+  <dl class="fields" id="report">
+    <dt>{{ t.REPORTS_COL_FILE }}</dt><dd>{{ report.name }}</dd>
+    <dt>{{ t.REPORTS_COL_PROGRAMME }}</dt><dd>{{ report.programme }}</dd>
+    <dt>{{ t.REPORTS_COL_DATE }}</dt><dd>{{ report.date }}</dd>
+    <dt>{{ t.REPORTS_COL_STUDENTS }}</dt><dd>{{ report.students }}</dd>
+  </dl>
+  <form method="post" action="/staff/reports/{{ report.id }}/delete">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="actions" style="margin-top: 20px"><button type="submit" id="delete-report" class="danger">{{ t.REPORTS_DELETE_CONFIRM }}</button><a class="btn secondary" href="/staff/reports">{{ t.BACK }}</a></div>
+  </form>
+</div></div>
+{% endblock %}

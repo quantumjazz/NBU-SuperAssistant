@@ -3,7 +3,12 @@
 The entry rules (NOW.md requirement 2) live here, so the student's form and a
 staff correction obey the same ones:
 
-- every entry is kept as typed, without spaces at either end, F№ in capitals;
+- every entry is kept as typed, without spaces at either end;
+- F№ is typed as digits after a fixed „F“ and stored as „F“ and the digits,
+  so every document prints it as before; staff may also type the letter, „F“
+  or „f“ (the owner, 13 October 2026: "hardcode “F” so students enter only
+  the numbers"). Anything else is refused. A value stored before the rule is
+  kept as it is, for staff to correct;
 - a character a Word file cannot hold is refused: a control character, other
   than a line break in the proposal's sections (Word files are XML 1.0);
 - in the student's names, the topic and a typed supervisor's name, a word
@@ -11,6 +16,9 @@ staff correction obey the same ones:
   run of letters, so „CRM-система“ passes (adopted from docs/domain.md).
 
 Refusals name the characters, so the student can find and retype them.
+
+The student's declaration that the credits are covered is a tick, not an
+entry: supervision.submit refuses a submission without it.
 """
 
 import unicodedata
@@ -30,12 +38,17 @@ REQUIRED_THESIS = ("phone", "programme", "topic", "average_grade") \
     + MULTI_LINE_FIELDS
 
 
+# F№: the letter every stored F№ begins with, and the digits after it.
+FN_LETTER = "F"
+FN_DIGITS = "0123456789"
+
+
 class Refusal(object):
     """Why one entry was refused: the field, a reason code, the characters."""
 
     def __init__(self, field, reason, characters=""):
         self.field = field
-        self.reason = reason            # 'control', 'mixed', 'required', ...
+        self.reason = reason            # 'control', 'mixed', 'fn', 'tick', ...
         self.characters = characters
 
     def __repr__(self):
@@ -105,11 +118,42 @@ def _line_breaks(field, value):
 
 
 def normalise(field, value):
-    """The value as it will be stored: line breaks as \\n, ends trimmed."""
-    value = _line_breaks(field, value).strip()
-    if field == "fn":
-        value = value.upper()
-    return value
+    """The value as it will be stored: line breaks as \\n, ends trimmed.
+    F№ follows its own rule (faculty_number)."""
+    return _line_breaks(field, value).strip()
+
+
+def faculty_number(typed, letter=False):
+    """F№ as stored, from what was typed: „F“ and the digits; "" for an empty
+    entry; None when refused.
+
+    The student types the digits only; staff (letter=True) may type „F“ or
+    „f“ before them. Only the digits 0 to 9 count as digits. Spaces at either
+    end are trimmed, as in every entry, but a control character is looked
+    for before trimming, so trimming never makes one pass (check_entry).
+    """
+    typed = typed if isinstance(typed, str) else ""
+    if forbidden_characters(typed):
+        return None
+    value = typed.strip()
+    if not value:
+        return ""
+    if letter and value[0] in (FN_LETTER, FN_LETTER.lower()):
+        value = value[1:]
+    if value and all(ch in FN_DIGITS for ch in value):
+        return FN_LETTER + value
+    return None
+
+
+def fn_digits(stored):
+    """What the student's F№ field shows of a stored F№: the digits after
+    „F“, or a value stored before the rule as it is, to be retyped."""
+    stored = stored or ""
+    rest = stored[len(FN_LETTER):]
+    if stored.startswith(FN_LETTER) and rest and all(ch in FN_DIGITS
+                                                     for ch in rest):
+        return rest
+    return stored
 
 
 def forbidden_characters(text, multi_line=False):
@@ -138,15 +182,23 @@ def check_entry(field, value):
     return None
 
 
-def clean(form, fields, lists=None):
+def clean(form, fields, lists=None, fn_letter=False):
     """Normalise and check the given fields of a submitted form.
 
     Returns (values, refusals): the values to store, and one Refusal per field
     that breaks a rule. Choice fields must name an entry of the owner's lists.
+    F№ follows faculty_number; fn_letter=True is staff's correction.
     """
     values, refusals = {}, []
     for field in fields:
         raw = form.get(field, "")
+        if field == "fn":
+            value = faculty_number(raw, fn_letter)
+            if value is None:
+                refusals.append(Refusal(field, "fn"))
+            else:
+                values[field] = value
+            continue
         refusal = check_entry(field, raw)
         value = normalise(field, raw)
         if refusal is None and lists is not None and value:

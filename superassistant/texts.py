@@ -146,6 +146,11 @@ REFUSED_MIXED = ("В дума са смесени латински и кирил
                  "отново: {}")
 REFUSED_CHOICE = "Изберете стойност от списъка."
 REFUSED_REQUIRED = "Попълнете това поле."
+REFUSED_FN = "Въведете само цифрите на факултетния номер."
+# The form's own sentence, verbatim (the owner, 13 October 2026).
+DECLARE_CREDITS = ("Декларирам, че към момента съм покрил(а) всички кредити "
+                   "по програмна схема към програмата.")
+TICK_REQUIRED = "Отбележете това поле, за да подадете заявлението."
 STATUS_TITLE = "Къде е заявлението"
 STATUS_DRAFT = "Не е подадено."
 STATUS_SUBMITTED = "Подадено на {}."
@@ -241,6 +246,9 @@ CONFIRM_TEXT = (
     "{link}\n")
 ANSWER_TITLE_CONFIRM = "Потвърждавам научното ръководство"
 ANSWER_TITLE_DECLINE = "Не потвърждавам научното ръководство"
+# The title and heading of an answer page that can no longer record an answer
+# (an invalid link, an answered or a replaced request): it names no choice.
+ANSWER_TITLE_NEUTRAL = "Молба за научно ръководство"
 ANSWER_INTRO = "{student}, {programme}, тема „{topic}“."
 ANSWER_CHIP = "Молба за научно ръководство"
 ANSWER_LEAD = "Студентът ви посочва за научен ръководител. Запишете отговора си с бутона по-долу; коментарът е по желание."
@@ -309,8 +317,11 @@ STAFF_TO_STUDENTS = "Вход за студенти"
 # --- Staff work: tables, checks, corrections ---------------------------------
 
 STAFF_TABLE_TITLE = "Подадени заявления"
-STAFF_COLUMNS = ("Студент", "F№", "Програма", "Вид", "Тема",
-                 "Научен ръководител", "Отговор", "Проверка")
+STAFF_COLUMNS = ("Студент", "F№", "Програма", "Код", "Вид", "Кредити",
+                 "Тема", "Научен ръководител", "Отговор", "Проверка")
+STAFF_PROGRAMME_CODE = "Код на програмата"
+STAFF_DECLARED = "Декларира покрити кредити"
+STAFF_DECLARED_VALUE = {True: "да", False: "—"}
 STAFF_EMPTY = "Още няма подадени заявления."
 STAFF_TYPE = {"thesis": "теза", "exam": "държавен изпит"}
 STAFF_ANSWER = {"awaited": "чака отговор", "confirm": "потвърди",
@@ -428,6 +439,14 @@ REPORTS_COL_FACULTY = "Факултет"
 REPORTS_COL_STUDENTS = "Студенти"
 REPORTS_COL_FILE = "Файл"
 REPORTS_DOWNLOAD = "Изтегли"
+REPORTS_DELETE = "Изтрий"
+REPORTS_DELETE_TITLE = "Изтриване на доклад"
+REPORTS_DELETE_LEAD = ("Изтриването премахва файла и записа на доклада. "
+                       "Изброените в него студенти отново чакат доклад.")
+REPORTS_DELETE_CONFIRM = "Изтрий доклада"
+REPORTS_DELETED = "Докладът е изтрит."
+REPORTS_DELETIONS = "Изтрити доклади"
+REPORTS_COL_DELETED = "Изтрит"
 
 
 

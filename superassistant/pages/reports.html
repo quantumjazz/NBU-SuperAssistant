@@ -40,7 +40,7 @@
         <td>{{ report.programme }}</td>
         <td>{{ report.faculty }}</td>
         <td>{{ report.students }}</td>
-        <td><a class="btn secondary small" href="/staff/reports/{{ report.id }}.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.REPORTS_DOWNLOAD }}</a></td>
+        <td><div class="actions" style="margin: 0"><a class="btn secondary small" href="/staff/reports/{{ report.id }}.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.REPORTS_DOWNLOAD }}</a><a class="btn secondary small" href="/staff/reports/{{ report.id }}/delete">{{ t.REPORTS_DELETE }}</a></div></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -50,4 +50,33 @@
 <p class="table-empty">{{ t.REPORTS_NONE_KEPT }}</p>
 {% endif %}
 </div>
+
+{% if deleted %}
+<section id="deletions" class="card"><div class="card-h"><h2>{{ t.REPORTS_DELETIONS }}</h2></div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t.REPORTS_COL_DATE }}</th>
+        <th>{{ t.REPORTS_COL_PROGRAMME }}</th>
+        <th>{{ t.REPORTS_COL_STUDENTS }}</th>
+        <th>{{ t.REPORTS_COL_FILE }}</th>
+        <th>{{ t.REPORTS_COL_DELETED }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in deleted %}
+      <tr>
+        <td>{{ line.date }}</td>
+        <td>{{ line.programme }}</td>
+        <td>{{ line.students }}</td>
+        <td>{{ line.name }}</td>
+        <td>{{ line.by }}, {{ line.at|datetime }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+</section>
+{% endif %}
 {% endblock %}

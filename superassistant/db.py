@@ -4,9 +4,13 @@ Python's own sqlite3, nothing else. The schema grows only by migrations that
 keep existing rows (CLAUDE.md "Records"): each entry in MIGRATIONS runs once,
 in order, and the number reached is kept in the file itself.
 
-Nothing here is ever deleted or overwritten by the application: a correction
-is a new row in `corrections`, a check a new row in `checks`, a changed
-supervisor a new row in `requests` that marks the earlier one replaced.
+Nothing people entered is ever deleted or overwritten by the application: a
+correction is a new row in `corrections`, a check a new row in `checks`, a
+changed supervisor a new row in `requests` that marks the earlier one
+replaced. A generated report is not among them: staff may delete one, which
+removes its rows in `reports` and `report_students`, and a row in
+`report_deletions` keeps who deleted which report and when (CLAUDE.md
+"Protect and verify"; constitution 5.14).
 """
 
 import fcntl
@@ -145,6 +149,26 @@ MIGRATIONS = [
     CREATE TABLE installation (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+    );
+    """,
+    # Version 3: the task of 13 October 2026. The student's declaration that
+    # the credits are covered, ticked in the draft and recorded with when at
+    # submission; an application submitted before it holds none. And the log
+    # of deleted reports: the report's id is a plain number, not a foreign
+    # key, because its row is gone.
+    """
+    ALTER TABLE applications ADD COLUMN credits_declared INTEGER NOT NULL
+        DEFAULT 0;
+    ALTER TABLE applications ADD COLUMN credits_declared_at TEXT;
+    CREATE TABLE report_deletions (
+        id INTEGER PRIMARY KEY,
+        report_id INTEGER NOT NULL,
+        programme TEXT NOT NULL,
+        generated_at TEXT NOT NULL,
+        students INTEGER NOT NULL,
+        filename TEXT NOT NULL,
+        deleted_by INTEGER NOT NULL REFERENCES accounts(id),
+        deleted_at TEXT NOT NULL
     );
     """,
 ]

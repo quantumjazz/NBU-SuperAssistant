@@ -55,10 +55,11 @@ def fill_thesis_tab_1(page, student):
     page.fill("#fn", student[3])
     page.check("input[name=grad_type][value=thesis]")
     page.fill("#phone", "0888 123 456")
-    page.select_option("#programme", "МОС-ДО")
+    page.select_option("#programme", "MSNSMQ09")
     page.fill("#topic", student[4])
     page.fill("#average_grade", "5,75")
     page.select_option("#professor", "georgieva")
+    page.check("#credits_declared")
 
 
 def fill_thesis_tab_2(page):
@@ -77,7 +78,7 @@ def submit_thesis(page, server, address, student):
     expect(page.locator("#status")).to_be_visible()
 
 
-STUDENT = ("Десислава", "Петкова", "Маринова", "f201234",
+STUDENT = ("Десислава", "Петкова", "Маринова", "201234",
            "Качество на услугите в публичния сектор")
 
 
@@ -126,8 +127,9 @@ def test_a_state_exam_application_has_no_second_tab(live_server, open_page):
     page.fill("#name1", "Калоян")
     page.fill("#name2", "Иванов")
     page.fill("#name3", "Стоев")
-    page.fill("#fn", "F300123")
+    page.fill("#fn", "300123")
     page.check("input[name=grad_type][value=exam]")
+    page.check("#credits_declared")
     expect(page.locator("#tab2-link")).to_be_hidden()
     expect(page.locator("#thesis-fields")).to_be_hidden()
     page.locator("#submit-exam").click()
@@ -138,9 +140,9 @@ def test_a_state_exam_application_has_no_second_tab(live_server, open_page):
 
 def test_a_supervisor_answers_through_each_button(live_server, open_page):
     students = {
-        "first@example.org": ("Анелия", "Рускова", "Борисова", "F400001",
+        "first@example.org": ("Анелия", "Рускова", "Борисова", "400001",
                               "Тема първа"),
-        "second@example.org": ("Борислав", "Георгиев", "Христов", "F400002",
+        "second@example.org": ("Борислав", "Георгиев", "Христов", "400002",
                                "Тема втора"),
     }
     pages = {}

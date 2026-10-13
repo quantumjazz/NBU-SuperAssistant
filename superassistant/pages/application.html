@@ -133,7 +133,12 @@
         {{ field("name3") }}
       </div>
       <div class="row two">
-        {{ field("fn") }}
+        <div class="f">
+          <label for="fn">{{ fields.fn }}</label>
+          {# The letter is fixed: the student types the digits after it. #}
+          <div class="prefixed"><span class="prefix" aria-hidden="true">{{ fn_letter }}</span><input type="text" id="fn" name="fn" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="{{ values.fn or "" }}"></div>
+          {% if errors.fn %}<p class="error" id="fn-error">{{ errors.fn }}</p>{% endif %}
+        </div>
       </div>
     </div></div>
 
@@ -171,13 +176,18 @@
       </div></div>
     </div>
 
+    <div class="card"><div class="card-b">
+      <label class="choice declare" for="credits_declared"><input type="checkbox" id="credits_declared" name="credits_declared" value="1" {% if values.credits_declared %}checked{% endif %}> <span>{{ t.DECLARE_CREDITS }}</span></label>
+      {% if errors.credits_declared %}<p class="error" id="credits_declared-error">{{ errors.credits_declared }}</p>{% endif %}
+    </div></div>
+
     <div class="actions end">
       <button type="submit" name="action" value="save" class="secondary">{{ t.SAVE_DRAFT }}</button>
       <button type="submit" name="action" value="next" id="next-button" {% if not thesis %}hidden{% endif %}>{{ t.NEXT_TAB }}</button>
       <button type="submit" name="action" value="submit" id="submit-exam" {% if thesis %}hidden{% endif %}>{{ t.SUBMIT }}</button>
     </div>
   {% else %}
-    <div class="card"><div class="card-h"><div><h2>{{ t.STEP_2 }}</h2><p>{{ (values.name1 ~ " " ~ values.name2 ~ " " ~ values.name3)|trim }} ({{ values.fn }}). {{ t.TOPIC_LINE.format(values.topic) }}</p></div></div><div class="card-b">
+    <div class="card"><div class="card-h"><div><h2>{{ t.STEP_2 }}</h2><p>{{ (values.name1 ~ " " ~ values.name2 ~ " " ~ values.name3)|trim }} ({{ record.fn }}). {{ t.TOPIC_LINE.format(values.topic) }}</p></div></div><div class="card-b">
       {% for name in ["rationale", "aims", "object_subject", "methodology", "information_base", "plan", "schedule"] %}
         {{ field(name, "textarea", t.FIELD_HINTS[name]) }}
       {% endfor %}

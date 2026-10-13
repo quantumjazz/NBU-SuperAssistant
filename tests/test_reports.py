@@ -18,7 +18,7 @@ import docx
 import pytest
 from hypothesis import event, given, settings as hsettings, strategies as st
 
-from superassistant import db, documents, lists, reports
+from superassistant import db, documents, lists, reports, texts
 from tests.conftest import (Client, insert_application, insert_check,
                             insert_request, make_account, make_settings,
                             prepare_data_dir)
@@ -135,7 +135,7 @@ def test_a_programme_leads_to_its_faculty_and_dean(files, data):
 
 # --- Which applications a report lists ---------------------------------------
 
-PROGRAMMES = ("АУ-РО", "БА-РО")
+PROGRAMMES = ("BSNADM01", "MSNMBA01")
 NAMES = ["Ана", "Боян", "Вера", "Галин", "Дора", "Емил", "Жана", "Зорница",
          "Ивайло", "Йоана", "Калин", "Лия"]
 
@@ -255,7 +255,7 @@ def test_earlier_reports_are_kept_with_their_date_and_students(rounds):
                 clock[0] = clock[0].replace(day=clock[0].day + 1)
                 try:
                     report_id = reports.generate(d.connection, d.settings,
-                                                 d.lists, "АУ-РО", d.account)
+                                                 d.lists, "BSNADM01", d.account)
                 except reports.NothingToReport:
                     continue
                 report = reports.get(d.connection, report_id)
@@ -290,13 +290,13 @@ def test_nothing_qualifying_makes_no_report(tmp_path):
     try:
         account = add_account(connection)
         number = insert_application(settings, "a@example.org",
-                                    grad_type="thesis", programme="АУ-РО",
+                                    grad_type="thesis", programme="BSNADM01",
                                     name1="Ана", fn="F1", professor="ivanov")
         insert_request(settings, number, answer="confirm")
         insert_check(settings, number, "not_passed", account)
         with pytest.raises(reports.NothingToReport):
             reports.generate(connection, settings, lists.load(
-                settings.lists_dir), "АУ-РО", account)
+                settings.lists_dir), "BSNADM01", account)
         assert reports.kept(connection) == []
         assert not settings.reports_dir.exists() or not list(
             settings.reports_dir.iterdir())
@@ -318,7 +318,7 @@ def test_staff_generate_list_and_download_reports(settings, app, clock):
     staff = make_account(settings)
     client = staff_client(app, staff)
     number = insert_application(settings, "a@example.org",
-                                grad_type="thesis", programme="АУ-РО",
+                                grad_type="thesis", programme="BSNADM01",
                                 name1="Ана", name2="Бойкова",
                                 name3="Вълчева", fn="F300001",
                                 topic="Тема", professor="ivanov")
@@ -326,17 +326,17 @@ def test_staff_generate_list_and_download_reports(settings, app, clock):
     insert_check(settings, number, "passed", staff["id"])
 
     page = client.get("/staff/reports").get_data(as_text=True)
-    assert documents.programme_label("АУ-РО", app.extensions[
+    assert documents.programme_label("BSNADM01", app.extensions[
         "superassistant"]["lists"]) in page
     assert "заявления за доклада: 1" in page
     assert reports_count(settings) == 0
 
-    reply = client.post("/staff/reports", {"programme": "БА-РО"},
+    reply = client.post("/staff/reports", {"programme": "MSNMBA01"},
                         follow_redirects=True)
     assert "Няма заявление за доклада" in reply.get_data(as_text=True)
     assert reports_count(settings) == 0
 
-    reply = client.post("/staff/reports", {"programme": "АУ-РО"},
+    reply = client.post("/staff/reports", {"programme": "BSNADM01"},
                         follow_redirects=True)
     page = reply.get_data(as_text=True)
     assert "Докладът е създаден." in page
@@ -349,7 +349,7 @@ def test_staff_generate_list_and_download_reports(settings, app, clock):
         "1", "F300001", "Ана Бойкова Вълчева"]
 
     clock.advance(days=1)
-    client.post("/staff/reports", {"programme": "АУ-РО"})
+    client.post("/staff/reports", {"programme": "BSNADM01"})
     assert reports_count(settings) == 2
     assert client.get("/staff/reports/1.docx").data == reply.data
     assert client.get("/staff/reports/3.docx").status_code == 404
@@ -377,6 +377,214 @@ def test_only_approved_staff_reach_reports(settings, app):
             reply = client.get(url)
             assert reply.status_code == 302
             assert reply.headers["Location"].endswith("/staff/sign-in")
-        reply = client.post("/staff/reports", {"programme": "АУ-РО"})
+        reply = client.post("/staff/reports", {"programme": "BSNADM01"})
         assert reply.status_code == 302
     assert reports_count(settings) == 0
+
+
+# --- Deleting a report (the task of 13 October 2026; constitution 5.14) -------
+# "the report disappears": its file and its rows. Who deleted which report and
+# when is kept; the students it listed wait for a report again, and the next
+# report of their programme lists them.
+
+@hsettings(max_examples=40, deadline=None)
+@given(st.lists(st.one_of(
+    st.tuples(st.just("generate"), st.sampled_from(PROGRAMMES)),
+    st.tuples(st.just("delete"), st.integers(0, 5))), min_size=2,
+    max_size=8),
+    st.lists(generated_application(), max_size=6))
+def test_deleting_reports_keeps_the_others_and_logs_each(operations,
+                                                         applications):
+    with Data() as d:
+        # One that qualifies in each programme, so every report is made.
+        sure = [{"programme": programme, "grad_type": "thesis",
+                 "submitted": True, "name": "Ана Тест", "fn": "F1",
+                 "requests": [("confirm", False)], "checks": ["passed"]}
+                for programme in PROGRAMMES]
+        for index, generated in enumerate(sure + applications):
+            insert(d, generated, index)
+        model, log, used = {}, [], set()     # id: (programme, students)
+        for kind, value in operations:
+            if kind == "generate":
+                try:
+                    report_id = reports.generate(d.connection, d.settings,
+                                                 d.lists, value, d.account)
+                except reports.NothingToReport:
+                    continue
+                assert report_id not in used          # never a number again
+                used.add(report_id)
+                model[report_id] = (value, [r["id"] for r in
+                                            reports.qualifying(d.connection,
+                                                               value)])
+            elif model:
+                report_id = sorted(model)[value % len(model)]
+                file = reports.path(d.settings, reports.get(d.connection,
+                                                            report_id))
+                assert reports.delete(d.connection, d.settings, report_id,
+                                      d.account)
+                assert not file.exists()
+                log.append((report_id,) + (model[report_id][0],
+                                           len(model.pop(report_id)[1])))
+        event("{} deleted, {} kept".format(len(log), len(model)))
+        assert sorted(r["id"] for r in reports.kept(d.connection)) == \
+            sorted(model)
+        for report_id, (programme, listed) in model.items():
+            assert [r["application_id"] for r in reports.students(
+                d.connection, report_id)] == listed
+        files = (d.settings.reports_dir.iterdir()
+                 if d.settings.reports_dir.exists() else [])
+        assert sorted(p.name for p in files) == sorted(
+            r["filename"] for r in reports.kept(d.connection))
+        assert [(r["report_id"], r["programme"], r["students"])
+                for r in reports.deletions(d.connection)] == list(
+                    reversed(log))
+        assert d.connection.execute(
+            "SELECT COUNT(*) FROM report_students WHERE report_id NOT IN "
+            "(SELECT id FROM reports)").fetchone()[0] == 0
+        # Waiting for a report: exactly the qualifying applications no kept
+        # report lists.
+        from superassistant import applications as module
+        listed = set(a for _, ids in model.values() for a in ids)
+        for row in d.connection.execute("SELECT * FROM applications"):
+            standing = module.standing(d.connection, row)
+            qualifies = row["id"] in [r["id"] for programme in PROGRAMMES
+                                      for r in reports.qualifying(
+                                          d.connection, programme)]
+            assert standing.waiting_for_report == (
+                qualifies and row["id"] not in listed)
+
+
+def test_staff_delete_a_report_after_a_page_that_names_it(settings, app,
+                                                          clock):
+    staff = make_account(settings)
+    client = staff_client(app, staff)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="BSNADM01",
+                                name1="Ана", name2="Бойкова",
+                                name3="Вълчева", fn="F300001",
+                                topic="Тема", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+    client.post("/staff/reports", {"programme": "BSNADM01"})
+    connection = db.connect(settings.db_path)
+    report = reports.get(connection, 1)
+    file = reports.path(settings, report)
+    assert file.is_file()
+    page = client.get("/staff/reports").get_data(as_text=True)
+    assert 'href="/staff/reports/1/delete"' in page
+    assert "чака доклад" not in client.get("/staff").get_data(as_text=True)
+
+    # The second step names the report, its programme, date and students.
+    page = client.get("/staff/reports/1/delete").get_data(as_text=True)
+    for shown in ("doklad-temi-1-2026-10-12.docx",
+                  "БП „Администрация и управление“, РО", "12.10.2026",
+                  "<dd>1</dd>", texts.REPORTS_DELETE_CONFIRM):
+        assert shown in page, shown
+    assert reports.get(connection, 1) is not None       # nothing deleted yet
+
+    clock.advance(hours=2)
+    reply = client.post("/staff/reports/1/delete", follow_redirects=True)
+    page = reply.get_data(as_text=True)
+    assert texts.REPORTS_DELETED in page
+    assert not file.exists()
+    assert reports.get(connection, 1) is None
+    assert reports_count(settings) == 0
+    assert connection.execute("SELECT COUNT(*) FROM report_students"
+                              ).fetchone()[0] == 0
+    (deletion,) = reports.deletions(connection)
+    assert (deletion["report_id"], deletion["programme"],
+            deletion["generated_at"], deletion["students"],
+            deletion["filename"], deletion["username"],
+            deletion["deleted_at"]) == (
+        1, "BSNADM01", report["generated_at"], 1, report["filename"],
+        staff["username"], db.now())
+    log = page.split('id="deletions"')[1]
+    for shown in ("doklad-temi-1-2026-10-12.docx", "12.10.2026",
+                  "БП „Администрация и управление“, РО",
+                  "{}, {}".format(staff["username"],
+                                  db.local_datetime(db.now()))):
+        assert shown in log, shown
+    assert client.get("/staff/reports/1.docx").status_code == 404
+    assert client.get("/staff/reports/1/delete").status_code == 404
+    assert client.post("/staff/reports/1/delete").status_code == 404
+
+    # The student waits for a report again, and the next report lists them
+    # under a new number.
+    assert "чака доклад" in client.get("/staff").get_data(as_text=True)
+    client.post("/staff/reports", {"programme": "BSNADM01"})
+    (kept,) = reports.kept(connection)
+    assert kept["id"] == 2
+    assert [r["application_id"] for r in reports.students(connection, 2)] \
+        == [number]
+    connection.close()
+
+
+def test_a_missing_file_does_not_stop_the_deletion(settings, app):
+    staff = make_account(settings)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="BSNADM01",
+                                name1="Ана", fn="F1", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+    connection = db.connect(settings.db_path)
+    loaded = lists.load(settings.lists_dir)
+    report_id = reports.generate(connection, settings, loaded, "BSNADM01",
+                                 staff["id"])
+    reports.path(settings, reports.get(connection, report_id)).unlink()
+    assert reports.delete(connection, settings, report_id, staff["id"])
+    assert reports.kept(connection) == []
+    assert len(reports.deletions(connection)) == 1
+    assert reports.delete(connection, settings, report_id, staff["id"]) \
+        is False
+    connection.close()
+
+
+def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
+                                                        monkeypatch):
+    staff = make_account(settings)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="BSNADM01",
+                                name1="Ана", fn="F1", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+    connection = db.connect(settings.db_path)
+    report_id = reports.generate(connection, settings, lists.load(
+        settings.lists_dir), "BSNADM01", staff["id"])
+
+    def refuse(self, *args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr(type(settings.reports_dir), "unlink", refuse)
+    with pytest.raises(PermissionError):
+        reports.delete(connection, settings, report_id, staff["id"])
+    monkeypatch.undo()
+    assert [r["id"] for r in reports.kept(connection)] == [report_id]
+    assert len(reports.students(connection, report_id)) == 1
+    assert reports.deletions(connection) == []
+    connection.close()
+
+
+def test_only_approved_staff_may_delete_a_report(settings, app):
+    staff = make_account(settings)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="BSNADM01",
+                                name1="Ана", fn="F1", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+    connection = db.connect(settings.db_path)
+    report_id = reports.generate(connection, settings, lists.load(
+        settings.lists_dir), "BSNADM01", staff["id"])
+    file = reports.path(settings, reports.get(connection, report_id))
+    waiting = make_account(settings, username="waiting", approved=False)
+    student = Client(app.test_client())
+    with student.raw.session_transaction() as session:
+        session["student"] = "a@example.org"
+    url = "/staff/reports/{}/delete".format(report_id)
+    for client in (Client(app.test_client()), student,
+                   staff_client(app, waiting)):
+        for reply in (client.get(url), client.post(url)):
+            assert reply.status_code == 302
+            assert reply.headers["Location"].endswith("/staff/sign-in")
+            assert "Ана" not in reply.get_data(as_text=True)
+    assert [r["id"] for r in reports.kept(connection)] == [report_id]
+    assert file.is_file() and reports.deletions(connection) == []
+    connection.close()

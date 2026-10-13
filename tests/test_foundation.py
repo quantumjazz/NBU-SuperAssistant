@@ -20,9 +20,11 @@ def test_starts_from_an_empty_directory(tmp_path):
     app = create_app(settings)
     assert app is not None
     loaded = lists.load(settings.lists_dir)
-    assert loaded.programme_faculty("УБП-ДО")["name"] == "ФДЕНО"
-    assert loaded.programme_faculty("АУ-РО")["name"] == "Бакалавърски факултет"
-    assert loaded.programme_faculty("БА-РО")["name"] == "Магистърски факултет"
+    assert loaded.programme_faculty("BSNDIU01")["name"] == "ФДЕНО"
+    assert loaded.programme_faculty("BSNADM01")["name"] == \
+        "Бакалавърски факултет"
+    assert loaded.programme_faculty("MSNMBA01")["name"] == \
+        "Магистърски факултет"
     assert loaded.professors == {}
 
 

@@ -8,6 +8,11 @@ requirement 6); the professors list starts empty, for the owner to fill.
 A list that cannot be read, or that no longer holds an entry an application
 uses, stops the service from starting, naming the file and the line: a wrong
 list must never reach an email or a document.
+
+A programme is listed once per form of study, by name, with one code, which
+only staff see (constitution 2.6 and 5.3). The codes of the first starting
+list were replaced on 13 October 2026; rename_programmes moves the records
+that still hold one to its new code, once (web.prepare).
 """
 
 import csv
@@ -33,7 +38,12 @@ FORMS = ("РО", "ДО")
 # programme follows the mapping the owner confirmed on 9 October 2026:
 # ДО to ФДЕНО, РО bachelor's to БФ, РО master's to МФ. ФДЕНО's name is the
 # abbreviation, as every report writes it: „ДЕКАН НА ФДЕНО“ (the owner, 12
-# October 2026); БФ and МФ are written in full.
+# October 2026); БФ and МФ are written in full. The programmes are the
+# owner's of 13 October 2026, one row per programme and form, each with its
+# code in Locus: "Remove “Курсист - Бизнес администрация” and “Управление на
+# здравеопазването” completely, each other program stays in the list only
+# once with each form or study". Where Locus has two codes for one programme
+# and form, the row takes the first (MSNHRB05, MSNSMQ11, MSNSMQ09).
 STARTER = {
     TITLES: [["проф. д-р"], ["доц. д-р"], ["гл. ас. д-р"], ["ас. д-р"]],
     FACULTIES: [
@@ -42,23 +52,47 @@ STARTER = {
         ["ФДЕНО", "ФДЕНО", "доц. д-р", "Венцислав Джамбазов"],
     ],
     PROGRAMMES: [
-        ["АУ-РО", "БП", "Администрация и управление", "РО", "БФ"],
-        ["УБП-РО", "БП", "Управление на бизнеса и предприемачество", "РО",
+        ["BSNADM01", "БП", "Администрация и управление", "РО", "БФ"],
+        ["BSNADM04", "БП", "Публичен мениджмънт и регионално развитие",
+         "РО", "БФ"],
+        ["BSNBUB04", "БП", "Управление на бизнеса и предприемачество", "РО",
          "БФ"],
-        ["УБП-ДО", "БП", "Управление на бизнеса и предприемачество", "ДО",
+        ["BSNDIU01", "БП", "Управление на бизнеса и предприемачество", "ДО",
          "ФДЕНО"],
-        ["АМ-РО", "МП",
+        ["BSNTUR01", "БП", "Туризъм", "РО", "БФ"],
+        ["BSNDIT01", "БП", "Туризъм", "ДО", "ФДЕНО"],
+        ["BSNDIT04", "БП", "Управление на туризма", "ДО", "ФДЕНО"],
+        ["MSNADM21", "МП",
          "Артмениджмънт. Управление на културни институции и творчески "
          "индустрии", "РО", "МФ"],
-        ["МОС-РО", "МП", "Мениджмънт за организационно съвършенство", "РО",
+        ["MSNALH03", "МП", "Управление на луксозното хотелиерство", "РО",
          "МФ"],
-        ["МОС-ДО", "МП", "Мениджмънт за организационно съвършенство", "ДО",
+        ["MSNHRB05", "МП",
+         "Управление и развитие на човешките ресурси (на български и "
+         "английски език)", "РО", "МФ"],
+        ["MSNHRE08", "МП",
+         "Управление и развитие на човешките ресурси (на английски език)",
+         "ДО", "ФДЕНО"],
+        ["MSNMBA01", "МП", "Бизнес администрация", "РО", "МФ"],
+        ["MSNMBA12", "МП", "Бизнес администрация", "ДО", "ФДЕНО"],
+        ["MSNMBA81", "МП", "Мениджмънт на туристическия бизнес", "РО", "МФ"],
+        ["MSNMBA80", "МП", "Мениджмънт на туристическия бизнес", "ДО",
          "ФДЕНО"],
-        ["УРЧР-РО", "МП", "Управление и развитие на човешките ресурси", "РО",
+        ["MSNSMQ11", "МП", "Мениджмънт за организационно съвършенство", "РО",
          "МФ"],
-        ["БА-РО", "МП", "Бизнес администрация", "РО", "МФ"],
+        ["MSNSMQ09", "МП", "Мениджмънт за организационно съвършенство", "ДО",
+         "ФДЕНО"],
     ],
     PROFESSORS: [],
+}
+
+
+# The codes of the first starting list, used by the pilot until 13 October
+# 2026, and the code of the same programme and form in the owner's list.
+RENAMED_PROGRAMMES = {
+    "АУ-РО": "BSNADM01", "УБП-РО": "BSNBUB04", "УБП-ДО": "BSNDIU01",
+    "АМ-РО": "MSNADM21", "МОС-РО": "MSNSMQ11", "МОС-ДО": "MSNSMQ09",
+    "УРЧР-РО": "MSNHRB05", "БА-РО": "MSNMBA01",
 }
 
 
@@ -244,3 +278,24 @@ def check_used(lists, connection):
                             "{} but is no longer listed".format(
                                 what, value, ", ".join(
                                     str(i) for i in missing[value])))
+
+
+def rename_programmes(connection, account_id):
+    """Move every application holding an old starter code to its new code.
+
+    Drafts included, since check_used reads every application. Each move is a
+    correction under account_id (the owner's), keeping the old code; a kept
+    report's programme is moved too, since nothing else records it. Runs
+    inside the caller's transaction. Returns how many applications moved.
+    """
+    from superassistant import applications
+    moved = 0
+    for old, new in sorted(RENAMED_PROGRAMMES.items()):
+        for record in connection.execute(
+                "SELECT * FROM applications WHERE programme = ? ORDER BY id",
+                (old,)).fetchall():
+            moved += len(applications.correct(connection, record,
+                                              {"programme": new}, account_id))
+        connection.execute("UPDATE reports SET programme = ? WHERE "
+                           "programme = ?", (new, old))
+    return moved

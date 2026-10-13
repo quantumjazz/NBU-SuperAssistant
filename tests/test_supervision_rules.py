@@ -62,9 +62,10 @@ def new_thesis(connection, settings, loaded, number, professor="ivanov"):
     applications.save_draft(connection, record, dict(
         name1="Име", name2="Бащино", name3="Фамилия{}".format(number),
         fn="F{}".format(1000 + number), grad_type="thesis", phone="1",
-        programme="АУ-РО", topic="Тема {}".format(number), average_grade="5",
-        professor=professor, rationale="а", aims="б", object_subject="в",
-        methodology="г", information_base="д", plan="е", schedule="ж"))
+        programme="BSNADM01", topic="Тема {}".format(number),
+        average_grade="5", professor=professor, rationale="а", aims="б",
+        object_subject="в", methodology="г", information_base="д", plan="е",
+        schedule="ж", credits_declared=1))
     assert supervision.submit(connection, settings, loaded, record["id"]) == []
     return record["id"]
 

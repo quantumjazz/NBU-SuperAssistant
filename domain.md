@@ -111,13 +111,24 @@ In the samples, the Рецензент column of the topic-approval report is em
   - Магистърски факултет: проф. д-р Борис Сергинов
   - ФДЕНО: доц. д-р Венцислав Джамбазов
 - **The dean's address line:** in every report the ФДЕНО dean is addressed „ДЕКАН НА ФДЕНО“, the deans of БФ and МФ with the faculty's name in full (the owner, 12 October 2026).
-- **Programmes seen in the samples (the owner completes the list):**
-  - БП „Администрация и управление“
-  - БП „Управление на бизнеса и предприемачество“ (РО, ДО)
-  - МП „Артмениджмънт. Управление на културни институции и творчески индустрии“
-  - МП „Мениджмънт за организационно съвършенство“ (РО, ДО)
-  - МП „Управление и развитие на човешките ресурси“
-  - МП „Бизнес администрация“
+- **Programmes (the owner's list of 13 October 2026):** one row per programme and form, with its code in Locus, which only staff see. „Курсист - Бизнес администрация“ and „Управление на здравеопазването“ are left out. Where Locus has two codes for one programme and form, the row takes the first: MSNHRB05 (also MSNHRB07), MSNSMQ11 (also MSNSMQ13), MSNSMQ09 (also MSNSMQ14). The faculty follows the mapping above.
+  - BSNADM01: БП „Администрация и управление“, РО
+  - BSNADM04: БП „Публичен мениджмънт и регионално развитие“, РО
+  - BSNBUB04: БП „Управление на бизнеса и предприемачество“, РО
+  - BSNDIU01: БП „Управление на бизнеса и предприемачество“, ДО
+  - BSNTUR01: БП „Туризъм“, РО
+  - BSNDIT01: БП „Туризъм“, ДО
+  - BSNDIT04: БП „Управление на туризма“, ДО
+  - MSNADM21: МП „Артмениджмънт. Управление на културни институции и творчески индустрии“, РО
+  - MSNALH03: МП „Управление на луксозното хотелиерство“, РО
+  - MSNHRB05: МП „Управление и развитие на човешките ресурси (на български и английски език)“, РО
+  - MSNHRE08: МП „Управление и развитие на човешките ресурси (на английски език)“, ДО
+  - MSNMBA01: МП „Бизнес администрация“, РО
+  - MSNMBA12: МП „Бизнес администрация“, ДО
+  - MSNMBA81: МП „Мениджмънт на туристическия бизнес“, РО
+  - MSNMBA80: МП „Мениджмънт на туристическия бизнес“, ДО
+  - MSNSMQ11: МП „Мениджмънт за организационно съвършенство“, РО
+  - MSNSMQ09: МП „Мениджмънт за организационно съвършенство“, ДО
 - **Professors:** the owner supplies the department's list, with each title written one way: доц. д-р, гл. ас. д-р, проф. д-р, ас. д-р.
 
 ## Errors found in the samples

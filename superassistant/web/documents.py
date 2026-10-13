@@ -4,7 +4,9 @@ topic-approval reports (NOW.md requirements 4 and 7).
 A student downloads only the forms of their own application, and only once
 it is submitted; Приложение 2 only for a thesis. Anything else is "not
 found", so a student learns nothing about other applications. Staff choose a
-programme, generate its report, and download any kept report.
+programme, generate its report, and download any kept report. Staff may
+delete a kept report, after a second page that names it (constitution 5.14);
+the reports page lists the deletions below the kept reports.
 """
 
 import io
@@ -84,15 +86,51 @@ def reports_page():
         else:
             flash(texts.REPORTS_MADE, "ok")
         return redirect("/staff/reports")
-    kept = [{"id": row["id"],
-             "date": documents.local_date(row["generated_at"]),
-             "programme": documents.programme_label(row["programme"], lists)
-             or row["programme"],
-             "faculty": row["faculty"], "students": row["students"]}
-            for row in reports.kept(connection)]
+    kept = [_kept(row, lists) for row in reports.kept(connection)]
+    deleted = [{"name": reports.download_name(row["report_id"],
+                                              row["generated_at"]),
+                "date": documents.local_date(row["generated_at"]),
+                "programme": documents.programme_label(row["programme"], lists)
+                or row["programme"],
+                "students": row["students"], "by": row["username"],
+                "at": row["deleted_at"]}
+               for row in reports.deletions(connection)]
     return render_template(
         "reports.html", choices=_choices(lists, reports.counts(connection)),
-        kept=kept)
+        kept=kept, deleted=deleted)
+
+
+def _kept(row, lists):
+    """A kept report as the pages show it."""
+    return {"id": row["id"],
+            "name": reports.download_name(row["id"], row["generated_at"]),
+            "date": documents.local_date(row["generated_at"]),
+            "programme": documents.programme_label(row["programme"], lists)
+            or row["programme"],
+            "faculty": row["faculty"], "students": row["students"]}
+
+
+@blueprint.route("/staff/reports/<int:report_id>/delete")
+@web.staff_required
+def delete_page(report_id):
+    """The second step: the report named, and the button that deletes it."""
+    connection = web.connection()
+    report = reports.get(connection, report_id)
+    if report is None:
+        abort(404)
+    row = dict(report, students=len(reports.students(connection, report_id)))
+    return render_template("report_delete.html",
+                           report=_kept(row, web.current_lists()))
+
+
+@blueprint.route("/staff/reports/<int:report_id>/delete", methods=["POST"])
+@web.staff_required
+def delete(report_id):
+    if not reports.delete(web.connection(), web.settings(), report_id,
+                          web.session_staff()["id"]):
+        abort(404)
+    flash(texts.REPORTS_DELETED, "ok")
+    return redirect("/staff/reports")
 
 
 @blueprint.route("/staff/reports/<int:report_id>.docx")
@@ -104,5 +142,5 @@ def report_file(report_id):
     path = reports.path(web.settings(), report)
     if not path.is_file():
         abort(404)
-    return _send(path.read_bytes(), "doklad-temi-{}-{}.docx".format(
-        report_id, report["generated_at"][:10]))
+    return _send(path.read_bytes(), reports.download_name(
+        report_id, report["generated_at"]))

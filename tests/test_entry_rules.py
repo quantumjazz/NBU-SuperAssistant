@@ -22,17 +22,18 @@ def _holdable(ch, multi):
             and ch not in ("￾", "￿"))
 
 
-@given(field=st.sampled_from(applications.ONE_LINE_FIELDS
-                             + applications.MULTI_LINE_FIELDS),
-       value=any_text)
-def test_stored_as_typed_trimmed_fn_in_capitals_or_refused(field, value):
+# F№ has its own rule since 13 October 2026, tested in its own tests below.
+TRIMMED_FIELDS = tuple(f for f in applications.ONE_LINE_FIELDS if f != "fn") \
+    + applications.MULTI_LINE_FIELDS
+
+
+@given(field=st.sampled_from(TRIMMED_FIELDS), value=any_text)
+def test_stored_as_typed_trimmed_or_refused(field, value):
     stored = applications.normalise(field, value)
     multi = field in applications.MULTI_LINE_FIELDS
     typed = value.replace("\r\n", "\n").replace("\r", "\n") if multi \
         else value
     expected = typed.strip()
-    if field == "fn":
-        expected = expected.upper()
     assert stored == expected
     # Refused characters are looked for in what was typed, ends included.
     refusal = applications.check_entry(field, value)
@@ -49,8 +50,7 @@ controls = st.characters(whitelist_categories=("Cc",)).filter(
     lambda ch: ch != "\n")
 
 
-@given(field=st.sampled_from(applications.ONE_LINE_FIELDS
-                             + applications.MULTI_LINE_FIELDS),
+@given(field=st.sampled_from(TRIMMED_FIELDS),
        before=st.lists(controls, max_size=2), after=st.lists(controls,
                                                              max_size=2),
        middle=st.text(alphabet="Иван Петров", min_size=1, max_size=10))
@@ -76,8 +76,9 @@ def test_the_refused_controls_are_shown_by_their_codes(client):
     from tests.test_application_flow import as_student, save
     as_student(client, "codes@example.org")
     response = save(client, 1, {"name1": "\x0bИван\x0c", "name2": "Иванов",
-                                "name3": "Петров", "fn": "F1",
-                                "grad_type": "exam"}, "submit")
+                                "name3": "Петров", "fn": "1",
+                                "grad_type": "exam",
+                                "credits_declared": "1"}, "submit")
     page = response.get_data(as_text=True)
     assert response.status_code == 400
     assert "U+000B" in page and "U+000C" in page
@@ -151,9 +152,9 @@ def test_choices_must_name_an_entry_of_the_lists(tmp_path):
         loaded)
     assert sorted(r.field for r in refusals) == ["programme", "sup_title"]
     values, refusals = applications.clean(
-        {"programme": "АУ-РО", "sup_title": "доц. д-р"},
+        {"programme": "BSNADM01", "sup_title": "доц. д-р"},
         ["programme", "sup_title"], loaded)
-    assert refusals == [] and values["programme"] == "АУ-РО"
+    assert refusals == [] and values["programme"] == "BSNADM01"
 
 
 def test_dates_people_read_are_sofia_time():
@@ -163,3 +164,70 @@ def test_dates_people_read_are_sofia_time():
     assert db.local_datetime("2026-10-09T21:30:00+00:00") == "10.10.2026 00:30"
     # And in winter, UTC+2.
     assert db.local_date("2026-12-31T22:30:00+00:00") == "01.01.2027"
+
+
+# --- F№: digits after a fixed „F“ (the task of 13 October 2026) --------------
+# The owner: "hardcode “F” so students enter only the numbers". The student
+# types the digits; staff may also type „F“ or „f“ before them. Both store
+# „F“ and the digits; anything else is refused.
+
+DIGITS = "0123456789"
+# Characters near the rule's edges: letters like F, Cyrillic Ф, other digits,
+# separators, spaces at the ends and controls.
+NEAR = DIGITS + "FfФфXx-./  ٠١۱１²Ⅷ\x0b\n\t"
+typed_fn = st.text(alphabet=st.one_of(st.sampled_from(NEAR),
+                                      st.characters()), max_size=14)
+
+
+def _expected_fn(typed, letter):
+    """The rule, written again: refused (None), empty, or „F“ and digits."""
+    if any(not _holdable(ch, False) for ch in typed):
+        return None
+    value = typed.strip()
+    if not value:
+        return ""
+    found = re.fullmatch(("[Ff]?" if letter else "") + "([0-9]+)", value)
+    return "F" + found.group(1) if found else None
+
+
+@given(digits=st.text(alphabet=DIGITS, min_size=1, max_size=12),
+       before=st.sampled_from(["", " ", "  "]),
+       after=st.sampled_from(["", " ", " "]))
+def test_fn_digits_are_stored_after_the_letter(digits, before, after):
+    typed = before + digits + after
+    assert applications.faculty_number(typed) == "F" + digits
+    for letter in ("", "F", "f"):
+        assert applications.faculty_number(before + letter + digits + after,
+                                           letter=True) == "F" + digits
+    # The student's field shows the digits of what it stored.
+    assert applications.fn_digits("F" + digits) == digits
+
+
+@hsettings(max_examples=300)
+@given(typed=typed_fn)
+def test_fn_anything_else_is_refused(typed):
+    for letter in (False, True):
+        expected = _expected_fn(typed, letter)
+        assert applications.faculty_number(typed, letter) == expected
+        values, refusals = applications.clean({"fn": typed}, ["fn"],
+                                              fn_letter=letter)
+        if expected is None:
+            assert values == {} and [(r.field, r.reason)
+                                     for r in refusals] == [("fn", "fn")]
+        else:
+            assert refusals == [] and values == {"fn": expected}
+
+
+def test_fn_examples():
+    refused = ["Ф12345", "ф12345", "F12345", "f12345", "F", "12 345", "12-34",
+               "F-12345", "１２３", "٣٤٥", "12345\n", "\x0b12345", "FF12"]
+    for typed in refused:
+        assert applications.faculty_number(typed) is None, typed
+    for typed in ("Ф12345", "F", "f", "F 12345", "FF12", "12a", "\x0b12345"):
+        assert applications.faculty_number(typed, letter=True) is None, typed
+    assert applications.faculty_number("F12345", letter=True) == "F12345"
+    assert applications.faculty_number("f012345", letter=True) == "F012345"
+    assert applications.faculty_number(" 090737 ") == "F090737"
+    # A value stored before the rule shows as it is, for the student to retype.
+    for stored in ("104999", "Ф104999", "F", "F-1", ""):
+        assert applications.fn_digits(stored) == stored

@@ -381,9 +381,9 @@ def assert_untouched_report(document):
 
 
 @pytest.mark.parametrize("code, dean, address", [
-    ("УБП-ДО", "ДОЦ. Д-Р ВЕНЦИСЛАВ ДЖАМБАЗОВ", "ДЕКАН НА ФДЕНО"),
-    ("УБП-РО", "ДОЦ. Д-Р ИЛИЯ КОЖУХАРОВ", "ДЕКАН НА БАКАЛАВЪРСКИ ФАКУЛТЕТ"),
-    ("БА-РО", "ПРОФ. Д-Р БОРИС СЕРГИНОВ", "ДЕКАН НА МАГИСТЪРСКИ ФАКУЛТЕТ"),
+    ("BSNDIU01", "ДОЦ. Д-Р ВЕНЦИСЛАВ ДЖАМБАЗОВ", "ДЕКАН НА ФДЕНО"),
+    ("BSNBUB04", "ДОЦ. Д-Р ИЛИЯ КОЖУХАРОВ", "ДЕКАН НА БАКАЛАВЪРСКИ ФАКУЛТЕТ"),
+    ("MSNMBA01", "ПРОФ. Д-Р БОРИС СЕРГИНОВ", "ДЕКАН НА МАГИСТЪРСКИ ФАКУЛТЕТ"),
 ])
 def test_with_the_starter_lists_each_dean_is_addressed_as_the_samples_do(
         tmp_path, code, dean, address):
@@ -456,7 +456,7 @@ def test_a_student_downloads_only_their_own_submitted_forms(tmp_path):
     settings, app = _app(tmp_path)
     insert_application(settings, "thesis@example.org", grad_type="thesis",
                        name1="Ина", name2="Йорданова", name3="Кирова",
-                       fn="F200001", programme="АУ-РО", professor="ivanov",
+                       fn="F200001", programme="BSNADM01", professor="ivanov",
                        topic="Тема на тезата", rationale="ред 1\nред 2")
     insert_application(settings, "exam@example.org", grad_type="exam",
                        name1="Лора", name2="Методиева", name3="Ненова",

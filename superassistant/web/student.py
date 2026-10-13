@@ -3,6 +3,9 @@
 The first tab follows the заявление-декларация, the second Приложение 2. A
 field both paper forms have (names, F№, topic) is asked once, on the first
 tab. A state exam asks only the three names and F№, and has no second tab.
+F№ is typed as digits after a fixed „F“. The first tab also carries, for
+both types, the form's declaration that the credits are covered: a tick saved
+with the draft, without which the application is not submitted.
 After submission the page shows where the application stands; the student may
 change only the supervisor, and only after a decline.
 """
@@ -23,6 +26,7 @@ COMMON_FIELDS = ("name1", "name2", "name3", "fn")
 FIELD_TAB = dict((field, tab) for tab, fields in TAB_FIELDS.items()
                  for field in fields)
 FIELD_TAB["grad_type"] = 1
+FIELD_TAB["credits_declared"] = 1
 
 
 def _record():
@@ -45,6 +49,10 @@ def _messages(refusals):
             out[refusal.field] = texts.MAIL_BAD_ADDRESS
         elif refusal.reason == "choice":
             out[refusal.field] = texts.REFUSED_CHOICE
+        elif refusal.reason == "fn":
+            out[refusal.field] = texts.REFUSED_FN
+        elif refusal.reason == "tick":
+            out[refusal.field] = texts.TICK_REQUIRED
         else:
             out[refusal.field] = texts.REFUSED_REQUIRED
     return out
@@ -54,9 +62,14 @@ def _render(record, tab, values=None, errors=None, status=200, again=None):
     lists = web.current_lists()
     shown = dict(record)
     shown.update(values or {})
+    # The F№ field holds the digits after the fixed „F“; what was typed, when
+    # the page comes back with a refusal.
+    shown["fn"] = (values["fn"] if values and "fn" in values
+                   else applications.fn_digits(record["fn"]))
     standing = applications.standing(web.connection(), record)
     return render_template(
         "application.html", record=record, values=shown, tab=tab,
+        fn_letter=applications.FN_LETTER,
         errors=errors or {}, lists=lists, standing=standing,
         submitted=record["submitted_at"] is not None,
         current=applications.current_request(web.connection(), record["id"]),
@@ -96,11 +109,15 @@ def save():
                                           web.current_lists())
     if tab == 1:
         values["grad_type"] = grad_type
+        values["credits_declared"] = 1 if request.form.get(
+            "credits_declared") else 0
         if not refusals and grad_type == "thesis":
             values.update(supervision.supervisor_values(values))
     if refusals:
         typed = dict((f, request.form.get(f, "")) for f in fields)
         typed["grad_type"] = grad_type
+        typed["credits_declared"] = values.get("credits_declared",
+                                               record["credits_declared"])
         flash(texts.FIX_BELOW, "error")
         return _render(record, tab, typed, _messages(refusals), 400)
     applications.save_draft(web.connection(), record, values)

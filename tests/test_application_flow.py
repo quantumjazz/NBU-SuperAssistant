@@ -14,9 +14,9 @@ from tests.conftest import connect, make_account
 
 THESIS_TAB_1 = {
     "name1": "Мария", "name2": "Петрова", "name3": "Тодорова",
-    "fn": "f104999", "grad_type": "thesis", "phone": "0888 000 111",
-    "programme": "УБП-РО", "topic": "Управление на риска в малки фирми",
-    "average_grade": "5,50", "professor": "ivanov",
+    "fn": "104999", "grad_type": "thesis", "phone": "0888 000 111",
+    "programme": "BSNBUB04", "topic": "Управление на риска в малки фирми",
+    "average_grade": "5,50", "professor": "ivanov", "credits_declared": "1",
 }
 THESIS_TAB_2 = {
     "rationale": "Обосновка\nвтори ред", "aims": "Цели", "object_subject":
@@ -73,13 +73,14 @@ def test_a_state_exam_asks_names_and_fn_only_and_has_no_second_tab(
     page = client.get("/application").get_data(as_text=True)
     assert "Преди да подадете заявлението" in page        # the 5.1 reminder
     save(client, 1, {"name1": "Иван", "name2": "Иванов", "name3": "Петров",
-                     "fn": "f12345", "grad_type": "exam"})
+                     "fn": "12345", "grad_type": "exam"})
     page = client.get("/application?tab=2").get_data(as_text=True)
     assert 'id="tab2-link"' in page and re.search(r'id="tab2-link"[^>]*hidden',
                                                   page)
     response = save(client, 1, {"name1": "Иван", "name2": "Иванов",
-                                "name3": "Петров", "fn": "f12345",
-                                "grad_type": "exam"}, "submit")
+                                "name3": "Петров", "fn": "12345",
+                                "grad_type": "exam",
+                                "credits_declared": "1"}, "submit")
     assert response.status_code == 302
     record = record_for(settings, "exam@example.org")
     assert record["submitted_at"] and record["fn"] == "F12345"
@@ -304,6 +305,86 @@ def test_a_supervisor_link_reaches_only_its_own_request(
     assert new_client().get("/answer/not-a-token/confirm").status_code == 404
 
 
+# --- The answer page's title and heading (the task of 13 October 2026) -------
+# They name the choice only while the page can record it or has just recorded
+# it; otherwise both read ANSWER_TITLE_NEUTRAL and the body says what stands.
+
+CHOICE_TITLES = (texts.ANSWER_TITLE_CONFIRM, texts.ANSWER_TITLE_DECLINE)
+
+
+def title_of(page):
+    return re.search(r"<title>(.*?) \| ", page).group(1)
+
+
+def heading_of(page):
+    found = re.search(r"<h1>(.*?)</h1>", page)
+    return found.group(1) if found else None
+
+
+def test_an_invalid_link_names_no_choice(new_client):
+    for choice in ("confirm", "decline"):
+        for send in ("get", "post"):
+            response = getattr(new_client(), send)(
+                "/answer/not-a-token/" + choice)
+            page = response.get_data(as_text=True)
+            assert response.status_code == 404
+            assert title_of(page) == texts.ANSWER_TITLE_NEUTRAL
+            assert texts.ANSWER_UNKNOWN in page
+            assert not any(title in page for title in CHOICE_TITLES)
+
+
+def test_an_open_link_names_its_choice(client, new_client, outbox):
+    as_student(client, "open@example.org")
+    submit_thesis(client)
+    for choice, title in zip(("confirm", "decline"), CHOICE_TITLES):
+        page = new_client().get(link_from(outbox.messages[0], choice)
+                                ).get_data(as_text=True)
+        assert title_of(page) == heading_of(page) == title
+        assert texts.ANSWER_CHIP in page
+
+
+def test_a_recorded_answer_names_its_choice(client, new_client, outbox):
+    as_student(client, "recorded@example.org")
+    submit_thesis(client)
+    page = new_client().post(link_from(outbox.messages[0], "decline"),
+                             data={}).get_data(as_text=True)
+    assert title_of(page) == heading_of(page) == texts.ANSWER_TITLE_DECLINE
+    assert texts.ANSWER_RECORDED.split("{")[0] in page
+
+
+def test_an_answered_request_reads_neutrally_and_shows_the_answer(
+        client, new_client, settings, outbox):
+    as_student(client, "answered@example.org")
+    submit_thesis(client)
+    request_mail = outbox.messages[0]
+    new_client().post(link_from(request_mail, "decline"), data={})
+    page = new_client().get(link_from(request_mail, "confirm")).get_data(
+        as_text=True)
+    assert title_of(page) == heading_of(page) == texts.ANSWER_TITLE_NEUTRAL
+    assert not any(title in page for title in CHOICE_TITLES)
+    assert "вече е записан" in page and texts.ANSWER_WORD["decline"] in page
+    record = record_for(settings, "answered@example.org")
+    connection = connect(settings)
+    assert applications.current_request(connection, record["id"])[
+        "answer"] == "decline"
+    connection.close()
+
+
+def test_a_replaced_request_reads_neutrally(client, new_client, settings,
+                                            outbox):
+    as_student(client, "replaced@example.org")
+    submit_thesis(client)
+    old_confirm = link_from(outbox.messages[0], "confirm")
+    record = record_for(settings, "replaced@example.org")
+    viewer = as_staff(new_client(), make_account(settings, "staff1"))
+    assert viewer.post("/staff/application/{}/supervisor".format(
+        record["id"]), data={"professor": "dimitrov"}).status_code == 302
+    page = new_client().get(old_confirm).get_data(as_text=True)
+    assert title_of(page) == heading_of(page) == texts.ANSWER_TITLE_NEUTRAL
+    assert not any(title in page for title in CHOICE_TITLES)
+    assert texts.ANSWER_REPLACED in page
+
+
 # --- Reminders --------------------------------------------------------------
 
 def test_reminders_carry_links_that_still_record_an_answer(
@@ -461,7 +542,8 @@ def test_a_student_reaches_only_their_own_application(
     other = as_student(new_client(), "other@example.org")
     page = other.get("/application").get_data(as_text=True)
     assert "Мария" not in page and "Управление на риска" not in page
-    for url in ("/staff", "/staff/application/1", "/owner", "/staff/reports"):
+    for url in ("/staff", "/staff/application/1", "/owner", "/staff/reports",
+                "/staff/reports/1/delete"):
         response = other.get(url)
         assert response.status_code in (302, 403, 404)
         assert "Мария" not in response.get_data(as_text=True)

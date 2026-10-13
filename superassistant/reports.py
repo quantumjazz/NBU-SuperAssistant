@@ -7,12 +7,19 @@ one not replaced) is a confirmation, and its latest check (the highest id)
 passed. Students are listed in alphabetical order of their names as printed,
 then by F№.
 
-Each report is kept: its .docx in the data directory's reports folder, and a
-row in `reports` with one row per student in `report_students`, so a report
-can be read again with the students it listed when it was made. A later
-report never removes or overwrites an earlier one. DEFERRED (NOW.md): leaving
-students already reported out of a later report; until then a later report
-lists them again.
+Each report is kept until staff delete it: its .docx in the data directory's
+reports folder, and a row in `reports` with one row per student in
+`report_students`, so a report can be read again with the students it listed
+when it was made. A later report never removes or overwrites an earlier one.
+DEFERRED (NOW.md): leaving students already reported out of a later report;
+until then a later report lists them again.
+
+Staff may delete a report: "the report disappears", with its file and its
+rows (the owner, 13 October 2026; constitution 5.14). The students it listed
+then wait for a report again, and the next report of their programme lists
+them. A row in `report_deletions` keeps who deleted which report and when.
+A deleted report's number is never given to a later report, so the log's
+number names one report only.
 """
 
 import secrets
@@ -81,11 +88,16 @@ def generate(connection, settings, lists, programme, account_id):
             filename = "doklad-temi-{}-{}.docx".format(
                 db.now_dt().strftime("%Y%m%d-%H%M%S"),
                 secrets.token_hex(4))
-            cursor = connection.execute(
-                "INSERT INTO reports (programme, faculty, generated_at, "
-                "generated_by, filename) VALUES (?,?,?,?,?)",
-                (programme, faculty, generated_at, account_id, filename))
-            report_id = cursor.lastrowid
+            # SQLite would give the number of a deleted last report again.
+            report_id = 1 + connection.execute(
+                "SELECT MAX(COALESCE((SELECT MAX(id) FROM reports), 0), "
+                "COALESCE((SELECT MAX(report_id) FROM report_deletions), 0))"
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT INTO reports (id, programme, faculty, generated_at, "
+                "generated_by, filename) VALUES (?,?,?,?,?,?)",
+                (report_id, programme, faculty, generated_at, account_id,
+                 filename))
             connection.executemany(
                 "INSERT INTO report_students (report_id, position, "
                 "application_id, fn, name, topic, supervisor) "
@@ -130,3 +142,46 @@ def students(connection, report_id):
 
 def path(settings, report):
     return settings.reports_dir / report["filename"]
+
+
+def download_name(report_id, generated_at):
+    """The report's name as staff download it, and as the pages name it."""
+    return "doklad-temi-{}-{}.docx".format(report_id, generated_at[:10])
+
+
+def delete(connection, settings, report_id, account_id):
+    """Delete a kept report: its rows and its file, logging who and when.
+
+    One transaction: the log row is written and the rows of `report_students`
+    and then `reports` removed, and the file last; a file already missing
+    does not stop the deletion, any other failure to remove it keeps
+    everything. Returns False when no such report is kept.
+    """
+    with db.transaction(connection):
+        report = get(connection, report_id)
+        if report is None:
+            return False
+        count = connection.execute(
+            "SELECT COUNT(*) FROM report_students WHERE report_id = ?",
+            (report_id,)).fetchone()[0]
+        connection.execute(
+            "INSERT INTO report_deletions (report_id, programme, generated_at,"
+            " students, filename, deleted_by, deleted_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (report_id, report["programme"], report["generated_at"], count,
+             report["filename"], account_id, db.now()))
+        connection.execute("DELETE FROM report_students WHERE report_id = ?",
+                           (report_id,))
+        connection.execute("DELETE FROM reports WHERE id = ?", (report_id,))
+        try:
+            path(settings, report).unlink()
+        except FileNotFoundError:
+            pass
+    return True
+
+
+def deletions(connection):
+    """Every deletion, newest first, with the username of who deleted."""
+    return connection.execute(
+        "SELECT d.*, a.username FROM report_deletions d JOIN accounts a ON "
+        "a.id = d.deleted_by ORDER BY d.id DESC").fetchall()
