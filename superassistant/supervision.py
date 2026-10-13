@@ -11,8 +11,11 @@ student choosing again after a decline, or by staff changing the supervisor);
 afterwards they only show the answer, if one was recorded. Opening a link
 records nothing: the page it opens has the button that does (8.2).
 
-Every message is sent inside the transaction that records it, so a message
-the relay refuses leaves nothing recorded as sent.
+Every request and reminder is sent inside the transaction that records it,
+so one the relay refuses leaves nothing recorded as sent. The notice telling
+the student of an answer, a confirmation or a decline, is sent after the
+answer's own transaction: if the relay refuses it, the answer stays recorded
+and the supervisor's page says the student was not told by mail.
 """
 
 import base64
