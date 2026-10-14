@@ -315,3 +315,11 @@
 - **Tests:** real folder rights through the page; order of move, COMMIT and put-back; a start finishing a stopped deletion; the tidy's lock; SQLite's own rollback. Each fails on `42a25f4` or a mutation; the T13-C1 regression still passes.
 - **Checks:** 266 passed and 7 browser passed on Python 3.9.6 and 3.12.14; Codex's two scripts: rows and file kept, retry deletes. Three read-only verifiers at `8e1d259`, killed processes included: holds, one test gap, closed in `dfceedb`.
 - **Outstanding:** Codex's review; the owner's yes to replacing `programmes.csv`; the update; acceptance.
+
+## 2026-10-14 — The task before milestone 3: Codex's review of `dfceedb`; fix `f37fcf4` for Codex
+
+- **Codex, on `dfceedb`** (range `42a25f4..dfceedb`, record `a569638`), relayed by the owner: CHANGES REQUESTED; "The original T13-C1 and T13-C2 reproductions now pass." T13-C3 [P2]: after an automatic rollback the report check and the file's restoration were unlocked; a second deletion committing between them left rows 0/0, one deletion logged, and the original file present, untouched by `tidy`. Codex also verified 266 and 7 browser tests on both Pythons.
+- **Fix `f37fcf4`** (range `a569638..f37fcf4`): once the deletion's transaction has ended without its ROLLBACK, the write lock is taken again before the records are read and held until the file is settled: back while the report is kept, removed once it is not. `tidy` settles by the same rule.
+- **Tests:** a deterministic two-connection regression (hooks on the file moves), failing on `dfceedb`; the "committed, then an error" case now expects the file gone at once; the order test pins one held lock. Every mutation tried, including the unlocked settle, fails a test on both Pythons.
+- **Checks:** 267 passed and 7 browser passed on Python 3.9.6 and 3.12.14. Codex's scripts: folder rights and the 30 s reader lock keep report, rows and file; the race script now finds the second deletion held off by the lock, the report kept.
+- **Outstanding:** Codex's review; the owner's yes to replacing `programmes.csv`; the update; acceptance.
