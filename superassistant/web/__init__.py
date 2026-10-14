@@ -19,7 +19,7 @@ from functools import wraps
 
 from flask import Flask, abort, g, redirect, request, session
 
-from superassistant import accounts, db, lists, mail, texts
+from superassistant import accounts, db, lists, mail, reports, texts
 from superassistant.settings import from_env
 
 
@@ -89,6 +89,13 @@ def prepare(settings):
                     "INSERT INTO installation (key, value) VALUES "
                     "('lists', ?)", (db.now(),))
         _rename_programmes(settings, connection)
+        # A report deletion a stopped process left half-done is finished or
+        # undone before anything reads the reports.
+        try:
+            reports.tidy(connection, settings)
+        except OSError as exc:
+            raise StartupError("The reports folder cannot be tidied: "
+                               + str(exc))
         try:
             loaded = lists.load(settings.lists_dir)
             lists.check_used(loaded, connection)

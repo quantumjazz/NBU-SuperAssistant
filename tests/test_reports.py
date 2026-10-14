@@ -8,6 +8,7 @@ files and generated applications; everyone is invented.
 import csv
 import hashlib
 import io
+import os
 import secrets
 import shutil
 import sqlite3
@@ -575,6 +576,7 @@ def test_a_commit_held_off_by_a_reader_keeps_the_report_and_its_file(
         reports.delete(connection, settings, report_id, staff["id"])
     assert "locked" in str(raised.value)
     assert file.is_file() and file.read_bytes() == content
+    assert not aside(file).exists()
     assert not connection.in_transaction            # rolled back at once
     reader.execute("ROLLBACK")
     reader.close()
@@ -605,35 +607,179 @@ def test_a_failure_inside_the_deletion_keeps_everything_and_names_itself(
     with pytest.raises(sqlite3.IntegrityError):         # no such account
         reports.delete(connection, settings, report_id, 999999)
     assert not connection.in_transaction
-    assert file.is_file()
+    assert file.is_file() and not aside(file).exists()
     assert [r["id"] for r in reports.kept(connection)] == [report_id]
     assert len(reports.students(connection, report_id)) == 1
     assert reports.deletions(connection) == []
     connection.close()
 
 
-def test_a_file_that_cannot_be_removed_after_the_commit_is_reported(
-        settings, app, monkeypatch):
-    """After the commit the deletion stands; a failure to remove the file,
-    other than its being gone already, is raised for the journal and leaves
-    the file of a deleted report."""
+def aside(file):
+    return file.with_name(file.name + reports.ASIDE)
+
+
+def counts(settings):
+    connection = db.connect(settings.db_path)
+    try:
+        return tuple(connection.execute("SELECT COUNT(*) FROM " + table
+                                        ).fetchone()[0]
+                     for table in ("reports", "report_students",
+                                   "report_deletions"))
+    finally:
+        connection.close()
+
+
+def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
+                                                        monkeypatch):
+    """Codex T13-C2: the deletion is whole or nothing. A file that cannot
+    be moved aside, as removing it needs the same rights, keeps the report,
+    its rows and its file, logs nothing, and the deletion can be retried."""
     staff, report_id = kept_report(settings)
     connection = db.connect(settings.db_path)
     file = reports.path(settings, reports.get(connection, report_id))
 
     def refuse(self, *args, **kwargs):
         raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr(type(settings.reports_dir), "replace", refuse)
     monkeypatch.setattr(type(settings.reports_dir), "unlink", refuse)
     with pytest.raises(PermissionError):
         reports.delete(connection, settings, report_id, staff["id"])
     monkeypatch.undo()
     assert not connection.in_transaction
-    assert reports.kept(connection) == []
-    assert reports.students(connection, report_id) == []
-    assert [r["report_id"] for r in reports.deletions(connection)] == [
-        report_id]
-    assert file.is_file()
+    assert file.is_file() and not aside(file).exists()
+    assert counts(settings) == (1, 1, 0)
+    assert reports.delete(connection, settings, report_id, staff["id"])
+    assert not file.exists() and not aside(file).exists()
+    assert counts(settings) == (0, 0, 1)
     connection.close()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores folder rights")
+def test_a_reports_folder_that_refuses_changes_keeps_the_report(settings,
+                                                                app):
+    """Codex T13-C2 with real folder rights, through the page as the host
+    serves it: an error page, nothing changed, the report still downloads,
+    and once the rights are back the deletion goes through."""
+    app.config.update(TESTING=False, PROPAGATE_EXCEPTIONS=False)
+    staff, report_id = kept_report(settings)
+    client = staff_client(app, staff)
+    connection = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(connection, report_id))
+    connection.close()
+    content = file.read_bytes()
+    url = "/staff/reports/{}".format(report_id)
+    mode = settings.reports_dir.stat().st_mode & 0o777
+    settings.reports_dir.chmod(0o500)
+    try:
+        assert client.post(url + "/delete").status_code == 500
+    finally:
+        settings.reports_dir.chmod(mode)
+    assert counts(settings) == (1, 1, 0)
+    assert file.read_bytes() == content and not aside(file).exists()
+    reply = client.get(url + ".docx")
+    assert reply.status_code == 200 and reply.data == content
+    assert client.post(url + "/delete").status_code == 302
+    assert counts(settings) == (0, 0, 1)
+    assert not file.exists() and not aside(file).exists()
+    assert client.get(url + ".docx").status_code == 404
+
+
+def test_the_file_is_aside_at_the_commit_and_back_before_the_rollback(
+        settings, app):
+    """The order that makes a failed deletion whole: the file is moved
+    before the COMMIT, and put back before the ROLLBACK gives up the write
+    lock, which tidy waits for."""
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    connection.execute("PRAGMA busy_timeout = 200")
+    file = reports.path(settings, reports.get(connection, report_id))
+    seen = []
+    connection.set_trace_callback(lambda sql: seen.append(
+        (sql, file.exists(), aside(file).exists())))
+    reader = db.connect(settings.db_path)
+    reader.execute("BEGIN")
+    reader.execute("SELECT COUNT(*) FROM reports").fetchone()
+    with pytest.raises(sqlite3.OperationalError):
+        reports.delete(connection, settings, report_id, staff["id"])
+    connection.set_trace_callback(None)
+    reader.execute("ROLLBACK")
+    reader.close()
+    assert ("COMMIT", False, True) in seen
+    assert seen[-1] == ("ROLLBACK", True, False)
+    assert counts(settings) == (1, 1, 0)
+    connection.close()
+
+
+def test_a_start_finishes_what_a_stopped_deletion_left(settings, app,
+                                                       monkeypatch):
+    """A process stopped between setting the file aside and the COMMIT
+    leaves a kept report's file aside; one stopped after the COMMIT leaves
+    the file of a deleted report. The next start puts back the first and
+    removes the second."""
+    from superassistant.web import create_app
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    kept_file = reports.path(settings, reports.get(connection, report_id))
+    content = kept_file.read_bytes()
+    kept_file.replace(aside(kept_file))               # stopped before COMMIT
+    deleted_id = reports.generate(connection, settings, lists.load(
+        settings.lists_dir), "BSNADM01", staff["id"])
+    deleted_file = reports.path(settings, reports.get(connection,
+                                                      deleted_id))
+    monkeypatch.setattr(type(settings.reports_dir), "unlink",
+                        lambda self, *a, **k: None)   # stopped after COMMIT
+    assert reports.delete(connection, settings, deleted_id, staff["id"])
+    monkeypatch.undo()
+    connection.close()
+    assert aside(deleted_file).exists() and not deleted_file.exists()
+    assert counts(settings) == (1, 1, 1)
+    started = create_app(settings)
+    assert kept_file.read_bytes() == content and not aside(kept_file).exists()
+    assert not aside(deleted_file).exists() and not deleted_file.exists()
+    assert sorted(p.name for p in settings.reports_dir.iterdir()) == [
+        kept_file.name]
+    reply = staff_client(started, staff).get(
+        "/staff/reports/{}.docx".format(report_id))
+    assert reply.status_code == 200 and reply.data == content
+
+
+def test_tidying_waits_for_a_deletion_in_another_process(settings, app):
+    """tidy holds the write lock while it looks, so a deletion still running
+    elsewhere, which holds it until its COMMIT or ROLLBACK, is waited for."""
+    other = db.connect(settings.db_path)
+    other.execute("BEGIN IMMEDIATE")
+    connection = db.connect(settings.db_path)
+    connection.execute("PRAGMA busy_timeout = 200")
+    with pytest.raises(sqlite3.OperationalError) as raised:
+        reports.tidy(connection, settings)
+    assert "locked" in str(raised.value)
+    other.execute("ROLLBACK")
+    other.close()
+    reports.tidy(connection, settings)
+    assert not connection.in_transaction
+    connection.close()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores folder rights")
+def test_a_reports_folder_that_cannot_be_tidied_stops_the_start(settings,
+                                                                app):
+    from superassistant.web import StartupError, create_app
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(connection, report_id))
+    connection.close()
+    file.replace(aside(file))
+    mode = settings.reports_dir.stat().st_mode & 0o777
+    settings.reports_dir.chmod(0o500)
+    try:
+        with pytest.raises(StartupError) as raised:
+            create_app(settings)
+    finally:
+        settings.reports_dir.chmod(mode)
+    assert "reports folder" in str(raised.value)
+    assert aside(file).exists()
+    create_app(settings)
+    assert file.is_file() and not aside(file).exists()
 
 
 def test_only_approved_staff_may_delete_a_report(settings, app):

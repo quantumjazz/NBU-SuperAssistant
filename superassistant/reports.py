@@ -19,7 +19,8 @@ rows (the owner, 13 October 2026; constitution 5.14). The students it listed
 then wait for a report again, and the next report of their programme lists
 them. A row in `report_deletions` keeps who deleted which report and when.
 A deleted report's number is never given to a later report, so the log's
-number names one report only.
+number names one report only. A deletion happens whole or not at all: until
+it has committed its file is only set aside, and goes back if it fails.
 """
 
 import secrets
@@ -149,49 +150,112 @@ def download_name(report_id, generated_at):
     return "doklad-temi-{}-{}.docx".format(report_id, generated_at[:10])
 
 
+# A report's file while its deletion is not yet committed: set aside under
+# this second name, so it can go back if the deletion fails (tidy).
+ASIDE = ".deleting"
+
+
+def _aside(file):
+    return file.with_name(file.name + ASIDE)
+
+
+def _put_back(file):
+    """The file set aside, back under its own name, if it is aside."""
+    try:
+        _aside(file).replace(file)
+    except FileNotFoundError:
+        pass
+
+
 def delete(connection, settings, report_id, account_id):
     """Delete a kept report: its rows and its file, logging who and when.
 
-    One transaction writes the log row and removes the rows of
-    `report_students` and then `reports`. The file is removed only once that
-    transaction has committed, so a kept report never loses its file: if the
-    transaction fails, its COMMIT included (another connection still reading
-    holds the COMMIT off past the busy timeout; Codex T13-C1), it is rolled
-    back at once and the file stays. After the commit the deletion stands: a
-    file already missing does not matter, and any other failure to remove it
-    is raised, for the journal, leaving the file of a deleted report behind.
-    Returns False when no such report is kept.
+    All or nothing. One transaction writes the log row and removes the rows
+    of `report_students` and then `reports`; before its COMMIT the file is
+    set aside under a second name (ASIDE), which needs the same rights in
+    the reports folder as removing it. If anything fails before the COMMIT
+    has succeeded (the file cannot be moved, Codex T13-C2; a write fails;
+    another connection still reading holds the COMMIT off past the busy
+    timeout, T13-C1), the file is put back and then the transaction rolled
+    back, so the report, its rows and its file stay, nothing is logged, and
+    the deletion can be tried again. The file goes back while this
+    connection still holds the write lock, so tidy, waiting for that lock,
+    never finds it aside for a kept report. After the COMMIT the file set
+    aside is removed; should that fail, or the process stop first, the next
+    start removes it (tidy). A file already missing does not stop the
+    deletion. Returns False when no such report is kept.
+
+    The transaction is written out here rather than through db.transaction,
+    because the file must go back before the ROLLBACK, a failed COMMIT
+    included.
     """
+    file = None
+    connection.execute("BEGIN IMMEDIATE")
     try:
-        with db.transaction(connection):
-            report = get(connection, report_id)
-            if report is None:
-                return False
-            count = connection.execute(
-                "SELECT COUNT(*) FROM report_students WHERE report_id = ?",
-                (report_id,)).fetchone()[0]
-            connection.execute(
-                "INSERT INTO report_deletions (report_id, programme, "
-                "generated_at, students, filename, deleted_by, deleted_at) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (report_id, report["programme"], report["generated_at"],
-                 count, report["filename"], account_id, db.now()))
-            connection.execute(
-                "DELETE FROM report_students WHERE report_id = ?",
-                (report_id,))
-            connection.execute("DELETE FROM reports WHERE id = ?",
-                               (report_id,))
-    except BaseException:
-        # A COMMIT that fails leaves the transaction open; it is rolled back
-        # here rather than whenever the connection is closed.
-        if connection.in_transaction:
+        report = get(connection, report_id)
+        if report is None:
             connection.execute("ROLLBACK")
+            return False
+        count = connection.execute(
+            "SELECT COUNT(*) FROM report_students WHERE report_id = ?",
+            (report_id,)).fetchone()[0]
+        connection.execute(
+            "INSERT INTO report_deletions (report_id, programme, "
+            "generated_at, students, filename, deleted_by, deleted_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (report_id, report["programme"], report["generated_at"], count,
+             report["filename"], account_id, db.now()))
+        connection.execute("DELETE FROM report_students WHERE report_id = ?",
+                           (report_id,))
+        connection.execute("DELETE FROM reports WHERE id = ?", (report_id,))
+        file = path(settings, report)
+        try:
+            file.replace(_aside(file))
+        except FileNotFoundError:
+            pass
+        connection.execute("COMMIT")
+    except BaseException:
+        try:
+            if file is not None:
+                _put_back(file)
+        finally:
+            if connection.in_transaction:
+                connection.execute("ROLLBACK")
         raise
     try:
-        path(settings, report).unlink()
-    except FileNotFoundError:
-        pass
+        _aside(file).unlink()
+    except OSError:
+        pass            # the deletion stands; the next start removes it
     return True
+
+
+def tidy(connection, settings):
+    """Finish what a stopped process left half-done in the reports folder.
+
+    A file set aside for a deletion that never committed goes back under its
+    name, its report being still kept; one whose report is gone is removed.
+    It holds the write lock while it looks, so a deletion running in another
+    process is waited for and found finished either way. It writes no row,
+    so it ends with ROLLBACK, which no other connection can hold off.
+    Raises OSError when a file cannot be moved or removed.
+    """
+    if not settings.reports_dir.is_dir():
+        return
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        kept = set(row["filename"] for row in connection.execute(
+            "SELECT filename FROM reports"))
+        for aside in sorted(settings.reports_dir.glob("*" + ASIDE)):
+            name = aside.name[:-len(ASIDE)]
+            try:
+                if name in kept:
+                    aside.replace(aside.with_name(name))
+                else:
+                    aside.unlink()
+            except FileNotFoundError:
+                pass
+    finally:
+        connection.execute("ROLLBACK")
 
 
 def deletions(connection):
