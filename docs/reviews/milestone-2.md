@@ -297,3 +297,12 @@
 - **Checks:** 256 passed, 7 browser passed on Python 3.9.6 and 3.12.14; two Word-rendered reports and tab 1 at 390 px looked at.
 - **Laptop, after the owner's yes to the list:** pull per "Updating", no restart; copy the 17-row list over `programmes.csv`, keeping `programmes.csv.<date>`; restart; `/healthz`. That start records the old codes' moves as the owner's corrections. Likewise the Mac.
 - **Outstanding:** Codex's review; the owner's yes; the update; acceptance.
+
+## 2026-10-14 — The task before milestone 3: Codex's review of `4e83744`; fix `42a25f4` for Codex
+
+- **Codex, on `4e83744`** (range `b756685..4e83744`, record `53f2cc2`), relayed by the owner: CHANGES REQUESTED, one finding, T13-C1 [P2]: `reports.delete` removed the file before COMMIT; a real reader lock makes COMMIT fail, the rows roll back, and the kept report's download returns 404. Codex also verified the tests on both Pythons, the recorded reversion counts, the mapping done once by two simultaneous starts, and the laptop ordering: "No other required changes found."
+- **Fix** (range `53f2cc2..42a25f4`): `8560b14` removes the file only after the deletion commits; a failed transaction, COMMIT included, is rolled back at once and the file stays. `42a25f4` is test only.
+- **Trade-off, to accept knowingly:** after the commit the deletion stands; a removal failure other than a missing file is raised and leaves that file.
+- **Tests:** a regression with a real reader lock (report, student row, file and download remain, nothing logged; fails on `4e83744` at the file check); a failure inside the transaction surfaces as itself; the unlink test adjusted to the new order.
+- **Checks:** 258 passed and 7 browser passed on Python 3.9.6 and 3.12.14; Codex's script, 30 s timeout: file and rows kept. Three read-only verifiers (web route on both Pythons, adversarial review, five mutations): holds.
+- **Outstanding:** Codex's review of the fix; the owner's yes to replacing `programmes.csv`; the update; acceptance.
