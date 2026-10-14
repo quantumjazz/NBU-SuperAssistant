@@ -686,10 +686,10 @@ def committed_then_interrupted(real):
 ])
 def test_the_records_decide_whether_the_file_goes_back(settings, app, commit,
                                                        error, kept):
-    """The file goes back only while its report is still kept: after
-    SQLite's own rollback it does; after a COMMIT that succeeded it stays
-    aside, and the next start removes it, never leaving under its name the
-    file of a deleted report, which tidy would not see."""
+    """The records, read again under the write lock, decide: after
+    SQLite's own rollback the report is kept and its file goes back; after
+    a COMMIT that succeeded it is gone, and so is its file, never left
+    under its name, where tidy would not see it."""
     staff, report_id = kept_report(settings)
     real = db.connect(settings.db_path)
     file = reports.path(settings, reports.get(real, report_id))
@@ -703,10 +703,73 @@ def test_the_records_decide_whether_the_file_goes_back(settings, app, commit,
         assert file.read_bytes() == content and not aside(file).exists()
     else:
         assert counts(settings) == (0, 0, 1)
-        assert not file.exists() and aside(file).exists()
-        reports.tidy(real, settings)
-        assert not aside(file).exists()
+        assert not file.exists() and not aside(file).exists()
     real.close()
+
+
+def test_a_second_deletion_cannot_slip_between_the_look_and_the_put_back(
+        settings, app, monkeypatch):
+    """Codex T13-C3. The first deletion's transaction ends without its
+    ROLLBACK (SQLite rolling back by itself at the COMMIT), so it reads the
+    records again to settle its file. A second deletion of the same report,
+    on a second connection, is started at the moment the first would put
+    the file back, and held after its own COMMIT until the first has
+    settled. Unlocked, the second commits in between and the file of a
+    deleted report goes back under its name; under the write lock the
+    second waits, and the report ends deleted with its file gone."""
+    import threading
+    staff, report_id = kept_report(settings)
+    first = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(first, report_id))
+    second_committed = threading.Event()
+    first_settled = threading.Event()
+    outcome = {}
+
+    def run_second():
+        second = db.connect(settings.db_path)   # its own thread's connection
+        try:
+            outcome["second"] = reports.delete(second, settings, report_id,
+                                               staff["id"])
+        except BaseException as exc:            # reported by the assertion
+            outcome["second"] = exc
+        outcome["open"] = second.in_transaction
+        second.close()
+    worker = threading.Thread(target=run_second)
+    path_type = type(file)
+    real_replace, real_unlink = path_type.replace, path_type.unlink
+
+    def replace(self, target):
+        putting_back = (threading.current_thread() is not worker
+                        and self.name.endswith(reports.ASIDE))
+        if putting_back:
+            worker.start()
+            second_committed.wait(timeout=1)
+        try:
+            return real_replace(self, target)
+        finally:
+            if putting_back:
+                first_settled.set()
+
+    def unlink(self, *args, **kwargs):
+        if (threading.current_thread() is worker
+                and self.name.endswith(reports.ASIDE)):
+            second_committed.set()
+            first_settled.wait(timeout=5)
+        return real_unlink(self, *args, **kwargs)
+    monkeypatch.setattr(path_type, "replace", replace)
+    monkeypatch.setattr(path_type, "unlink", unlink)
+    with pytest.raises(sqlite3.OperationalError) as raised:
+        reports.delete(CommitAs(first, rolled_back_by_sqlite), settings,
+                       report_id, staff["id"])
+    worker.join(timeout=60)
+    monkeypatch.undo()
+    assert not worker.is_alive()
+    assert "disk I/O" in str(raised.value)
+    assert outcome["second"] is True
+    assert not first.in_transaction and outcome["open"] is False
+    assert counts(settings) == (0, 0, 1)
+    assert not file.exists() and not aside(file).exists()
+    first.close()
 
 
 def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
@@ -786,6 +849,11 @@ def test_the_file_is_aside_at_the_commit_and_back_before_the_rollback(
     reader.close()
     assert ("COMMIT", False, True) in seen
     assert seen[-1] == ("ROLLBACK", True, False)
+    # The transaction still open, the file goes back under the lock it
+    # already holds, without letting it go and taking it again.
+    assert [sql for sql, _, _ in seen if sql in (
+        "BEGIN IMMEDIATE", "COMMIT", "ROLLBACK")] == [
+        "BEGIN IMMEDIATE", "COMMIT", "ROLLBACK"]
     assert counts(settings) == (1, 1, 0)
     connection.close()
 

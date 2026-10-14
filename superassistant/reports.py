@@ -170,6 +170,40 @@ def _put_back(file):
         pass
 
 
+def _remove_aside(file):
+    """The file set aside, removed, if it is aside."""
+    aside = _aside(file)
+    if not aside.is_file():
+        return
+    try:
+        aside.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def _settle(file, kept):
+    """A file set aside goes back while its report is kept, and goes once
+    it is not. The caller holds the write lock, so no deletion of that
+    report can commit between its look at the records and this."""
+    if kept:
+        _put_back(file)
+    else:
+        _remove_aside(file)
+
+
+def _settle_under_lock(connection, report_id, file):
+    """_settle, after the deletion's own transaction has ended: the write
+    lock is taken again before the records are read, and held until the
+    file is settled. Without it another deletion of the same report could
+    commit between the two, and the file of a deleted report would go back
+    under its name, where tidy never looks (Codex T13-C3)."""
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        _settle(file, get(connection, report_id) is not None)
+    finally:
+        connection.execute("ROLLBACK")
+
+
 def delete(connection, settings, report_id, account_id):
     """Delete a kept report: its rows and its file, logging who and when.
 
@@ -183,14 +217,15 @@ def delete(connection, settings, report_id, account_id):
     back, so the report, its rows and its file stay, nothing is logged, and
     the deletion can be tried again. The file goes back while this
     connection still holds the write lock, so tidy, waiting for that lock,
-    never finds it aside for a kept report; when SQLite has already rolled
-    the transaction back by itself (an interrupt, an I/O error) the lock is
-    gone, and tidy would put it back just the same. Whether the file goes
-    back is decided by the records, not by where the error came from: only
-    while the report is still kept. After the COMMIT the file set aside is
-    removed; should that fail, or the process stop first, the next start
-    removes it (tidy). A file already missing does not stop the deletion.
-    Returns False when no such report is kept.
+    never finds it aside for a kept report. When the transaction has ended
+    without this connection's ROLLBACK (SQLite rolled it back by itself
+    after an interrupt or an I/O error, or an error came after its COMMIT),
+    the lock is taken again, and the records, read under it, decide: the
+    file goes back while the report is kept, and is removed once it is not
+    (T13-C3). After the COMMIT the file set aside is removed; should that
+    fail, or the process stop first, the next start removes it (tidy). A
+    file already missing does not stop the deletion. Returns False when no
+    such report is kept.
 
     The transaction is written out here rather than through db.transaction,
     because the file must go back before the ROLLBACK, a failed COMMIT
@@ -223,12 +258,12 @@ def delete(connection, settings, report_id, account_id):
         connection.execute("COMMIT")
     except BaseException:
         try:
-            # Still in the transaction: nothing is committed. Out of it, the
-            # COMMIT either never happened (SQLite rolled back by itself) or
-            # did, and an error came after it: the records tell which.
-            if file is not None and (connection.in_transaction or get(
-                    connection, report_id) is not None):
-                _put_back(file)
+            if file is not None:
+                if connection.in_transaction:
+                    # Nothing is committed, and the write lock is still held.
+                    _settle(file, kept=True)
+                else:
+                    _settle_under_lock(connection, report_id, file)
         finally:
             if connection.in_transaction:
                 connection.execute("ROLLBACK")
@@ -257,16 +292,8 @@ def tidy(connection, settings):
         kept = set(row["filename"] for row in connection.execute(
             "SELECT filename FROM reports"))
         for aside in sorted(settings.reports_dir.glob("*" + ASIDE)):
-            if not aside.is_file():
-                continue
             name = aside.name[:-len(ASIDE)]
-            try:
-                if name in kept:
-                    aside.replace(aside.with_name(name))
-                else:
-                    aside.unlink()
-            except FileNotFoundError:
-                pass
+            _settle(aside.with_name(name), name in kept)
     finally:
         connection.execute("ROLLBACK")
 
