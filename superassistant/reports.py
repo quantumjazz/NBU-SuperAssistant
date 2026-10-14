@@ -152,31 +152,45 @@ def download_name(report_id, generated_at):
 def delete(connection, settings, report_id, account_id):
     """Delete a kept report: its rows and its file, logging who and when.
 
-    One transaction: the log row is written and the rows of `report_students`
-    and then `reports` removed, and the file last; a file already missing
-    does not stop the deletion, any other failure to remove it keeps
-    everything. Returns False when no such report is kept.
+    One transaction writes the log row and removes the rows of
+    `report_students` and then `reports`. The file is removed only once that
+    transaction has committed, so a kept report never loses its file: if the
+    transaction fails, its COMMIT included (another connection still reading
+    holds the COMMIT off past the busy timeout; Codex T13-C1), it is rolled
+    back at once and the file stays. After the commit the deletion stands: a
+    file already missing does not matter, and any other failure to remove it
+    is raised, for the journal, leaving the file of a deleted report behind.
+    Returns False when no such report is kept.
     """
-    with db.transaction(connection):
-        report = get(connection, report_id)
-        if report is None:
-            return False
-        count = connection.execute(
-            "SELECT COUNT(*) FROM report_students WHERE report_id = ?",
-            (report_id,)).fetchone()[0]
-        connection.execute(
-            "INSERT INTO report_deletions (report_id, programme, generated_at,"
-            " students, filename, deleted_by, deleted_at) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (report_id, report["programme"], report["generated_at"], count,
-             report["filename"], account_id, db.now()))
-        connection.execute("DELETE FROM report_students WHERE report_id = ?",
-                           (report_id,))
-        connection.execute("DELETE FROM reports WHERE id = ?", (report_id,))
-        try:
-            path(settings, report).unlink()
-        except FileNotFoundError:
-            pass
+    try:
+        with db.transaction(connection):
+            report = get(connection, report_id)
+            if report is None:
+                return False
+            count = connection.execute(
+                "SELECT COUNT(*) FROM report_students WHERE report_id = ?",
+                (report_id,)).fetchone()[0]
+            connection.execute(
+                "INSERT INTO report_deletions (report_id, programme, "
+                "generated_at, students, filename, deleted_by, deleted_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (report_id, report["programme"], report["generated_at"],
+                 count, report["filename"], account_id, db.now()))
+            connection.execute(
+                "DELETE FROM report_students WHERE report_id = ?",
+                (report_id,))
+            connection.execute("DELETE FROM reports WHERE id = ?",
+                               (report_id,))
+    except BaseException:
+        # A COMMIT that fails leaves the transaction open; it is rolled back
+        # here rather than whenever the connection is closed.
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
+        raise
+    try:
+        path(settings, report).unlink()
+    except FileNotFoundError:
+        pass
     return True
 
 

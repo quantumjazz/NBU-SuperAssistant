@@ -10,6 +10,7 @@ import hashlib
 import io
 import secrets
 import shutil
+import sqlite3
 import string
 import tempfile
 from pathlib import Path
@@ -539,8 +540,8 @@ def test_a_missing_file_does_not_stop_the_deletion(settings, app):
     connection.close()
 
 
-def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
-                                                        monkeypatch):
+def kept_report(settings):
+    """A staff account and one kept report listing one student."""
     staff = make_account(settings)
     number = insert_application(settings, "a@example.org",
                                 grad_type="thesis", programme="BSNADM01",
@@ -548,8 +549,60 @@ def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
     insert_request(settings, number, answer="confirm")
     insert_check(settings, number, "passed", staff["id"])
     connection = db.connect(settings.db_path)
-    report_id = reports.generate(connection, settings, lists.load(
-        settings.lists_dir), "BSNADM01", staff["id"])
+    try:
+        report_id = reports.generate(connection, settings, lists.load(
+            settings.lists_dir), "BSNADM01", staff["id"])
+    finally:
+        connection.close()
+    return staff, report_id
+
+
+def test_a_commit_held_off_by_a_reader_keeps_the_report_and_its_file(
+        settings, app):
+    """Codex T13-C1: the file went before the COMMIT, which another
+    connection still reading can hold off past the busy timeout; the rows
+    were then rolled back, leaving a kept report without its file. A real
+    reader lock, with a short busy timeout in place of the 30 seconds."""
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    connection.execute("PRAGMA busy_timeout = 200")
+    file = reports.path(settings, reports.get(connection, report_id))
+    content = file.read_bytes()
+    reader = db.connect(settings.db_path)
+    reader.execute("BEGIN")
+    assert reader.execute("SELECT COUNT(*) FROM reports").fetchone()[0] == 1
+    with pytest.raises(sqlite3.OperationalError) as raised:
+        reports.delete(connection, settings, report_id, staff["id"])
+    assert "locked" in str(raised.value)
+    assert file.is_file() and file.read_bytes() == content
+    assert not connection.in_transaction            # rolled back at once
+    reader.execute("ROLLBACK")
+    reader.close()
+    other = db.connect(settings.db_path)
+    for seen in (connection, other):
+        assert [r["id"] for r in reports.kept(seen)] == [report_id]
+        assert len(reports.students(seen, report_id)) == 1
+        assert reports.deletions(seen) == []
+    other.close()
+    # The kept report still downloads.
+    reply = staff_client(app, staff).get(
+        "/staff/reports/{}.docx".format(report_id))
+    assert reply.status_code == 200 and reply.data == content
+    # Once nobody is reading, the same connection deletes it.
+    assert reports.delete(connection, settings, report_id, staff["id"])
+    assert not file.exists() and reports.kept(connection) == []
+    assert len(reports.deletions(connection)) == 1
+    connection.close()
+
+
+def test_a_file_that_cannot_be_removed_after_the_commit_is_reported(
+        settings, app, monkeypatch):
+    """After the commit the deletion stands; a failure to remove the file,
+    other than its being gone already, is raised for the journal and leaves
+    the file of a deleted report."""
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(connection, report_id))
 
     def refuse(self, *args, **kwargs):
         raise PermissionError(13, "Permission denied")
@@ -557,9 +610,12 @@ def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
     with pytest.raises(PermissionError):
         reports.delete(connection, settings, report_id, staff["id"])
     monkeypatch.undo()
-    assert [r["id"] for r in reports.kept(connection)] == [report_id]
-    assert len(reports.students(connection, report_id)) == 1
-    assert reports.deletions(connection) == []
+    assert not connection.in_transaction
+    assert reports.kept(connection) == []
+    assert reports.students(connection, report_id) == []
+    assert [r["report_id"] for r in reports.deletions(connection)] == [
+        report_id]
+    assert file.is_file()
     connection.close()
 
 
