@@ -306,3 +306,12 @@
 - **Tests:** a regression with a real reader lock (report, student row, file and download remain, nothing logged; fails on `4e83744` at the file check); a failure inside the transaction surfaces as itself; the unlink test adjusted to the new order.
 - **Checks:** 258 passed and 7 browser passed on Python 3.9.6 and 3.12.14; Codex's script, 30 s timeout: file and rows kept. Three read-only verifiers (web route on both Pythons, adversarial review, five mutations): holds.
 - **Outstanding:** Codex's review of the fix; the owner's yes to replacing `programmes.csv`; the update; acceptance.
+
+## 2026-10-14 — The task before milestone 3: Codex's review of `42a25f4`; fix `dfceedb` for Codex
+
+- **Codex, on `42a25f4`** (range `53f2cc2..42a25f4`, record `b249a6e`), relayed by the owner: CHANGES REQUESTED; "T13-C1’s original commit-lock failure is fixed." T13-C2 [P2]: a removal failing after the commit (real folder rights) deleted the rows and logged the deletion but left the file; download and retry returned 404. "`b249a6e` identifies the trade-off but records no owner acceptance."
+- **Correction:** supersedes `b249a6e`'s "Trade-off, to accept knowingly"; none remains.
+- **Fix** (range `42a25f4..dfceedb`): a deletion is whole or nothing. `8e1d259`: before the COMMIT the file is moved aside (`.deleting`), needing the rights removal needs; any failure puts it back, then rolls back: report, rows and file stay, nothing is logged, retry works. Every start tidies the reports folder under the write lock. `dfceedb`: the file goes back only while its report is kept.
+- **Tests:** real folder rights through the page; order of move, COMMIT and put-back; a start finishing a stopped deletion; the tidy's lock; SQLite's own rollback. Each fails on `42a25f4` or a mutation; the T13-C1 regression still passes.
+- **Checks:** 266 passed and 7 browser passed on Python 3.9.6 and 3.12.14; Codex's two scripts: rows and file kept, retry deletes. Three read-only verifiers at `8e1d259`, killed processes included: holds, one test gap, closed in `dfceedb`.
+- **Outstanding:** Codex's review; the owner's yes to replacing `programmes.csv`; the update; acceptance.
