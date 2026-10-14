@@ -323,3 +323,18 @@
 - **Tests:** a deterministic two-connection regression (hooks on the file moves), failing on `dfceedb`; the "committed, then an error" case now expects the file gone at once; the order test pins one held lock. Every mutation tried, including the unlocked settle, fails a test on both Pythons.
 - **Checks:** 267 passed and 7 browser passed on Python 3.9.6 and 3.12.14. Codex's scripts: folder rights and the 30 s reader lock keep report, rows and file; the race script now finds the second deletion held off by the lock, the report kept.
 - **Outstanding:** Codex's review; the owner's yes to replacing `programmes.csv`; the update; acceptance.
+
+## 2026-10-14 — The task before milestone 3: `f37fcf4` approved
+
+- **Approvals of `f37fcf4`** (range `a569638..f37fcf4`, record `632bf94`):
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED — `f37fcf4`, range `a569638..f37fcf4`, record `632bf94`. T13-C3 is resolved; T13-C1 and T13-C2 remain resolved. No further changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **The task's code**, `b756685..f37fcf4`: `4e83744`, the five changes, in which Codex found no other required change; then the report-deletion fixes `8560b14` and `42a25f4` (T13-C1), `8e1d259` and `dfceedb` (T13-C2), `f37fcf4` (T13-C3).
+- **Codex's checks**, on Python 3.9.6 and 3.12.14:
+  - 267 passed and 7 browser passed, no skips;
+  - the concurrency regression 10 of 10 on each, failing on `dfceedb` and the unlocked mutation; all nine reversion and mutation checks detected;
+  - a folder refusing changes keeps the download and allows retry; the 30 s reader lock keeps rows and file;
+  - settling and start-up tidying keep kept reports' files and remove deleted ones, under the write lock.
+  Automatic rollback is simulated in the concurrency test; its competing thread uses a real connection.
+- **Not pushed:** GitHub and the laptop are at `b756685`.
+- **Outstanding:** the owner's yes to replacing the laptop's `programmes.csv`; the push and the laptop update in the recorded order; the owner's acceptance, with the new wording and the 17 programmes (entry for `4e83744`).
