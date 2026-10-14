@@ -629,6 +629,86 @@ def counts(settings):
         connection.close()
 
 
+def test_a_transaction_sqlite_rolls_back_itself_reports_its_own_error(
+        settings, app):
+    """An interrupt inside the deletion makes SQLite roll the transaction
+    back by itself; the caller sees that error, not a second ROLLBACK's
+    ("cannot rollback - no transaction is active"), and nothing changes."""
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(connection, report_id))
+
+    def interrupt(sql):
+        if sql.startswith("DELETE FROM reports"):
+            connection.interrupt()
+    connection.set_trace_callback(interrupt)
+    with pytest.raises(sqlite3.OperationalError) as raised:
+        reports.delete(connection, settings, report_id, staff["id"])
+    connection.set_trace_callback(None)
+    assert "interrupt" in str(raised.value)
+    assert not connection.in_transaction
+    assert file.is_file() and not aside(file).exists()
+    assert counts(settings) == (1, 1, 0)
+    connection.close()
+
+
+class CommitAs(object):
+    """A connection whose COMMIT is replaced, standing for what a real one
+    does rarely: SQLite rolling back by itself on an I/O error, or an error
+    arriving after the COMMIT has succeeded."""
+
+    def __init__(self, real, commit):
+        self.real, self.commit = real, commit
+
+    def execute(self, sql, *args):
+        if sql == "COMMIT":
+            return self.commit(self.real)
+        return self.real.execute(sql, *args)
+
+    @property
+    def in_transaction(self):
+        return self.real.in_transaction
+
+
+def rolled_back_by_sqlite(real):
+    real.execute("ROLLBACK")
+    raise sqlite3.OperationalError("disk I/O error")
+
+
+def committed_then_interrupted(real):
+    real.execute("COMMIT")
+    raise KeyboardInterrupt()
+
+
+@pytest.mark.parametrize("commit, error, kept", [
+    (rolled_back_by_sqlite, sqlite3.OperationalError, True),
+    (committed_then_interrupted, KeyboardInterrupt, False),
+])
+def test_the_records_decide_whether_the_file_goes_back(settings, app, commit,
+                                                       error, kept):
+    """The file goes back only while its report is still kept: after
+    SQLite's own rollback it does; after a COMMIT that succeeded it stays
+    aside, and the next start removes it, never leaving under its name the
+    file of a deleted report, which tidy would not see."""
+    staff, report_id = kept_report(settings)
+    real = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(real, report_id))
+    content = file.read_bytes()
+    with pytest.raises(error):
+        reports.delete(CommitAs(real, commit), settings, report_id,
+                       staff["id"])
+    assert not real.in_transaction
+    if kept:
+        assert counts(settings) == (1, 1, 0)
+        assert file.read_bytes() == content and not aside(file).exists()
+    else:
+        assert counts(settings) == (0, 0, 1)
+        assert not file.exists() and aside(file).exists()
+        reports.tidy(real, settings)
+        assert not aside(file).exists()
+    real.close()
+
+
 def test_a_file_that_cannot_be_removed_keeps_the_report(settings, app,
                                                         monkeypatch):
     """Codex T13-C2: the deletion is whole or nothing. A file that cannot
@@ -726,18 +806,23 @@ def test_a_start_finishes_what_a_stopped_deletion_left(settings, app,
         settings.lists_dir), "BSNADM01", staff["id"])
     deleted_file = reports.path(settings, reports.get(connection,
                                                       deleted_id))
-    monkeypatch.setattr(type(settings.reports_dir), "unlink",
-                        lambda self, *a, **k: None)   # stopped after COMMIT
+    def refuse(self, *args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    # The removal after the COMMIT fails (or the process stops before it):
+    # the deletion stands and reports success.
+    monkeypatch.setattr(type(settings.reports_dir), "unlink", refuse)
     assert reports.delete(connection, settings, deleted_id, staff["id"])
     monkeypatch.undo()
     connection.close()
     assert aside(deleted_file).exists() and not deleted_file.exists()
     assert counts(settings) == (1, 1, 1)
+    folder = settings.reports_dir / ("folder" + reports.ASIDE)
+    folder.mkdir()                                  # not a file: left alone
     started = create_app(settings)
     assert kept_file.read_bytes() == content and not aside(kept_file).exists()
     assert not aside(deleted_file).exists() and not deleted_file.exists()
-    assert sorted(p.name for p in settings.reports_dir.iterdir()) == [
-        kept_file.name]
+    assert sorted(p.name for p in settings.reports_dir.iterdir()) == sorted(
+        [kept_file.name, folder.name])
     reply = staff_client(started, staff).get(
         "/staff/reports/{}.docx".format(report_id))
     assert reply.status_code == 200 and reply.data == content

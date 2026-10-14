@@ -161,8 +161,11 @@ def _aside(file):
 
 def _put_back(file):
     """The file set aside, back under its own name, if it is aside."""
+    aside = _aside(file)
+    if not aside.is_file():
+        return
     try:
-        _aside(file).replace(file)
+        aside.replace(file)
     except FileNotFoundError:
         pass
 
@@ -180,10 +183,14 @@ def delete(connection, settings, report_id, account_id):
     back, so the report, its rows and its file stay, nothing is logged, and
     the deletion can be tried again. The file goes back while this
     connection still holds the write lock, so tidy, waiting for that lock,
-    never finds it aside for a kept report. After the COMMIT the file set
-    aside is removed; should that fail, or the process stop first, the next
-    start removes it (tidy). A file already missing does not stop the
-    deletion. Returns False when no such report is kept.
+    never finds it aside for a kept report; when SQLite has already rolled
+    the transaction back by itself (an interrupt, an I/O error) the lock is
+    gone, and tidy would put it back just the same. Whether the file goes
+    back is decided by the records, not by where the error came from: only
+    while the report is still kept. After the COMMIT the file set aside is
+    removed; should that fail, or the process stop first, the next start
+    removes it (tidy). A file already missing does not stop the deletion.
+    Returns False when no such report is kept.
 
     The transaction is written out here rather than through db.transaction,
     because the file must go back before the ROLLBACK, a failed COMMIT
@@ -216,7 +223,11 @@ def delete(connection, settings, report_id, account_id):
         connection.execute("COMMIT")
     except BaseException:
         try:
-            if file is not None:
+            # Still in the transaction: nothing is committed. Out of it, the
+            # COMMIT either never happened (SQLite rolled back by itself) or
+            # did, and an error came after it: the records tell which.
+            if file is not None and (connection.in_transaction or get(
+                    connection, report_id) is not None):
                 _put_back(file)
         finally:
             if connection.in_transaction:
@@ -246,6 +257,8 @@ def tidy(connection, settings):
         kept = set(row["filename"] for row in connection.execute(
             "SELECT filename FROM reports"))
         for aside in sorted(settings.reports_dir.glob("*" + ASIDE)):
+            if not aside.is_file():
+                continue
             name = aside.name[:-len(ASIDE)]
             try:
                 if name in kept:
