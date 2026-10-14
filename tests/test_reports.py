@@ -595,6 +595,23 @@ def test_a_commit_held_off_by_a_reader_keeps_the_report_and_its_file(
     connection.close()
 
 
+def test_a_failure_inside_the_deletion_keeps_everything_and_names_itself(
+        settings, app):
+    """A write that fails inside the transaction is rolled back by it; the
+    caller sees that error, not a second ROLLBACK's, and nothing changes."""
+    staff, report_id = kept_report(settings)
+    connection = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(connection, report_id))
+    with pytest.raises(sqlite3.IntegrityError):         # no such account
+        reports.delete(connection, settings, report_id, 999999)
+    assert not connection.in_transaction
+    assert file.is_file()
+    assert [r["id"] for r in reports.kept(connection)] == [report_id]
+    assert len(reports.students(connection, report_id)) == 1
+    assert reports.deletions(connection) == []
+    connection.close()
+
+
 def test_a_file_that_cannot_be_removed_after_the_commit_is_reported(
         settings, app, monkeypatch):
     """After the commit the deletion stands; a failure to remove the file,
