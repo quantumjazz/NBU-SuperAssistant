@@ -1,0 +1,20 @@
+# Starts nbu-superassistant-snapshot.service every night at 00:00 Sofia time.
+#
+# Install: see nbu-superassistant-snapshot.service. When it runs next:
+#   systemctl list-timers nbu-superassistant-snapshot.timer
+#
+# The time zone is written here, so the run is at 00:00 in Sofia whatever the
+# laptop's own zone (Europe/Sofia as well), summer time included.
+#
+# Persistent=true: a 00:00 missed while the laptop was off runs once at the
+# next boot, so that day's copy is made and sent then.
+
+[Unit]
+Description=Nightly NBU-SuperAssistant copy at 00:00 Europe/Sofia
+
+[Timer]
+OnCalendar=*-*-* 00:00:00 Europe/Sofia
+Persistent=true
+
+[Install]
+WantedBy=timers.target

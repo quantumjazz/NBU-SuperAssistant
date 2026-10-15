@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ t.BIN_TITLE }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ t.BIN_TITLE }}</h1>
+  <p class="lead">{{ t.BIN_LEAD }}</p>
+</div>
+<div class="card">
+{% if not rows %}
+  <p class="table-empty">{{ t.BIN_EMPTY }}</p>
+{% else %}
+  <div class="table-wrap">
+  <table id="bin">
+    <thead><tr>{% for c in t.BIN_COLUMNS %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr data-id="{{ row.record.id }}">
+        <td><a class="name" href="/staff/application/{{ row.record.id }}">{{ row.name or row.record.email }}</a><span class="sub">{{ row.record.email }}</span></td>
+        <td>{{ row.record.fn }}</td>
+        <td>{{ row.programme }}</td>
+        <td>{{ t.BIN_REASON.get(row.record.bin_reason, row.record.bin_reason) }}{% if row.record.bin_note %}<span class="sub">{{ row.record.bin_note }}</span>{% endif %}</td>
+        <td>{{ t.BIN_BY_AT.format(row.by, row.record.binned_at|datetime) }}</td>
+        <td><div class="actions" style="margin: 0">
+          <form method="post" action="/staff/application/{{ row.record.id }}/restore" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <button type="submit" class="secondary small">{{ t.BIN_RESTORE }}</button>
+          </form>
+          <a class="btn secondary small" href="/staff/application/{{ row.record.id }}/delete">{{ t.BIN_DELETE }}</a>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+{% endif %}
+</div>
+
+{% if deleted %}
+<section id="deletions" class="card"><div class="card-h"><h2>{{ t.BIN_DELETIONS }}</h2></div>
+<div class="table-wrap">
+  <table>
+    <thead><tr>{% for c in t.BIN_DELETIONS_COLUMNS %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for line in deleted %}
+      <tr>
+        <td>{{ t.BIN_NUMBER.format(line.application_id) }}</td>
+        <td>{{ t.BIN_REASON.get(line.reason, line.reason) }}</td>
+        <td>{% if line.removed_by %}{{ t.BIN_BY_AT.format(line.removed_by, line.removed_at|datetime) }}{% endif %}</td>
+        <td>{{ t.BIN_BY_AT.format(line.deleted_by, line.deleted_at|datetime) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+</section>
+{% endif %}
+{% endblock %}

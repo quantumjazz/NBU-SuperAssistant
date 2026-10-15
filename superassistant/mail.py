@@ -49,14 +49,26 @@ def valid_address(address):
     return not any(ch.isspace() for ch in addr)
 
 
-class Message(object):
-    """One message: who it is for, its subject, its text and optional HTML."""
+class Attachment(object):
+    """A file sent with a message: its name, its bytes and its type."""
 
-    def __init__(self, to, subject, text, html=None):
+    def __init__(self, filename, data, maintype, subtype):
+        self.filename = filename
+        self.data = data
+        self.maintype = maintype
+        self.subtype = subtype
+
+
+class Message(object):
+    """One message: who it is for, its subject, its text, optional HTML and
+    optional attachments."""
+
+    def __init__(self, to, subject, text, html=None, attachments=()):
         self.to = (to or "").strip()
         self.subject = subject
         self.text = text
         self.html = html
+        self.attachments = list(attachments)
 
 
 # --- The relay -------------------------------------------------------------
@@ -138,7 +150,7 @@ def set_relay(fn):
 
 # --- Sending ---------------------------------------------------------------
 
-def _envelope(settings, to, subject, text, html):
+def _envelope(settings, to, subject, text, html, attachments=()):
     envelope = EmailMessage()
     envelope["From"] = formataddr((FROM_NAME, settings.mail_from or
                                    "superassistant@localhost"))
@@ -147,6 +159,11 @@ def _envelope(settings, to, subject, text, html):
     envelope.set_content(text)
     if html:
         envelope.add_alternative(html, subtype="html")
+    for attachment in attachments:
+        envelope.add_attachment(attachment.data,
+                                maintype=attachment.maintype,
+                                subtype=attachment.subtype,
+                                filename=attachment.filename)
     return envelope
 
 
@@ -163,6 +180,8 @@ def send(settings, message, out=None):
             "Subject: " + message.subject,
             "",
             message.text,
+        ] + [texts.MAIL_CONSOLE_ATTACHMENT.format(a.filename, len(a.data))
+             for a in message.attachments] + [
             "----- " + texts.MAIL_CONSOLE_FOOTER + " -----",
             "",
         ]))
@@ -171,7 +190,7 @@ def send(settings, message, out=None):
     if mode == "send":
         # To the intended recipient, exactly as written.
         envelope = _envelope(settings, message.to, message.subject,
-                             message.text, message.html)
+                             message.text, message.html, message.attachments)
     else:
         # mode == "owner": to the owner, the intended recipient on top.
         note = texts.MAIL_INTENDED_FOR.format(message.to)
@@ -181,7 +200,7 @@ def send(settings, message, out=None):
             html = "<p><strong>" + texts.escape(note) + "</strong></p>" \
                 + message.html
         envelope = _envelope(settings, settings.owner_email, message.subject,
-                             text, html)
+                             text, html, message.attachments)
     try:
         _relay(settings, envelope)
     except MailFailed:

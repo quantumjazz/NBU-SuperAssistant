@@ -7,7 +7,9 @@ F№ is typed as digits after a fixed „F“. The first tab also carries, for
 both types, the form's declaration that the credits are covered: a tick saved
 with the draft, without which the application is not submitted.
 After submission the page shows where the application stands; the student may
-change only the supervisor, and only after a decline.
+change only the supervisor, and only after a decline. An application staff
+have removed to the bin (constitution 5.15) shows only that it was removed,
+and nothing the student sends changes it.
 """
 
 from flask import Blueprint, flash, redirect, render_template, request
@@ -16,6 +18,13 @@ from superassistant import applications, mail, supervision, texts
 from superassistant import web
 
 blueprint = Blueprint("student", __name__)
+
+
+@blueprint.errorhandler(applications.Removed)
+def _removed(exc):
+    """A change to an application removed or deleted meanwhile: nothing
+    changed; the application page says where it stands."""
+    return redirect("/application")
 
 TAB_FIELDS = {
     1: ("name1", "name2", "name3", "fn", "phone", "programme", "topic",
@@ -69,6 +78,7 @@ def _render(record, tab, values=None, errors=None, status=200, again=None):
     standing = applications.standing(web.connection(), record)
     return render_template(
         "application.html", record=record, values=shown, tab=tab,
+        removed=applications.is_binned(record),
         fn_letter=applications.FN_LETTER,
         errors=errors or {}, lists=lists, standing=standing,
         submitted=record["submitted_at"] is not None,
@@ -122,6 +132,8 @@ def save():
         return _render(record, tab, typed, _messages(refusals), 400)
     applications.save_draft(web.connection(), record, values)
     record = applications.get(web.connection(), record["id"])
+    if record is None:
+        raise applications.Removed()
     action = request.form.get("action", "save")
     if action == "next" and record["grad_type"] == "thesis":
         return redirect("/application?tab=2")

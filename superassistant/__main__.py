@@ -6,6 +6,9 @@
                        (constitution 6.5; no emailed code exists for it)
   mail-test <address>  send one test message for <address> the way every
                        message goes, and say whether the relay accepted it
+  snapshot             write the CSV copy of the applications, email it to
+                       the owner and remove copies 30 days old (the host
+                       runs it nightly on a timer)
 
 Every command first reads the settings file .env.production in the clone, if
 there is one, never overriding a variable already set (settings.py,
@@ -19,6 +22,7 @@ COMMANDS = {
     "remind": "superassistant.reminders:main",
     "owner-password": "superassistant.owner_password:main",
     "mail-test": "superassistant.mail_test:main",
+    "snapshot": "superassistant.snapshot:main",
 }
 
 

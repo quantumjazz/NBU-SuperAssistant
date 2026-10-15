@@ -56,7 +56,14 @@
   {% if not submitted %}<p class="lead">{{ t.DRAFT_LEAD }}</p>{% endif %}
 </div>
 
-{% if submitted %}
+{% if removed %}
+  <section id="status" class="card"><div class="card-h"><h2>{{ t.STATUS_TITLE }}</h2></div><div class="card-b">
+    <div class="status">
+      <span class="chip no" id="removed-chip">{{ t.STATUS_REMOVED_TITLE }}</span>
+      <div><p id="removed">{{ t.STATUS_REMOVED }}</p></div>
+    </div>
+  </div></section>
+{% elif submitted %}
   {% set state = standing.answer if standing.thesis else None %}
   <section id="status" class="card"><div class="card-h"><h2>{{ t.STATUS_TITLE }}</h2></div><div class="card-b">
     <div class="status">

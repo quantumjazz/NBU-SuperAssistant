@@ -2,9 +2,10 @@
 topic-approval reports (NOW.md requirements 4 and 7).
 
 A student downloads only the forms of their own application, and only once
-it is submitted; Приложение 2 only for a thesis. Anything else is "not
-found", so a student learns nothing about other applications. Staff choose a
-programme, generate its report, and download any kept report. Staff may
+it is submitted and not in the bin; Приложение 2 only for a thesis.
+Anything else is "not found", so a student learns nothing about other
+applications. Staff choose a programme, generate its report, and download
+any kept report. Staff may
 delete a kept report, after a second page that names it (constitution 5.14);
 the reports page lists the deletions below the kept reports.
 """
@@ -31,7 +32,8 @@ def _own_submitted_application():
     application = web.connection().execute(
         "SELECT * FROM applications WHERE email_key = ?",
         (web.session_student(),)).fetchone()
-    if application is None or not application["submitted_at"]:
+    if (application is None or not application["submitted_at"]
+            or application["binned_at"] is not None):
         abort(404)
     return application
 

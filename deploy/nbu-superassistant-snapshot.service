@@ -1,0 +1,39 @@
+# The nightly copy: `python -m superassistant snapshot`, once, started by
+# nbu-superassistant-snapshot.timer. It writes every submitted application as
+# a CSV file in the records folder's snapshots/, emails it to the owner's
+# account address and removes the copies 30 days old (docs/deployment.md,
+# "The nightly copy"; constitution 6.7).
+#
+# Install it together with the timer; the timer is what is enabled, not this
+# file:
+#   sudo cp deploy/nbu-superassistant-snapshot.service /etc/systemd/system/
+#   sudo cp deploy/nbu-superassistant-snapshot.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now nbu-superassistant-snapshot.timer
+#
+# Run it once by hand, and read what it did:
+#   sudo systemctl start nbu-superassistant-snapshot.service
+#   sudo journalctl -u nbu-superassistant-snapshot -n 20 --no-pager
+#
+# Paths assume the clone is at /home/victor/apps/nbu-superassistant, as in
+# nbu-superassistant.service; change them together. The run reads the same
+# settings file as the service, so it opens the same records and sends
+# through the same relay.
+#
+# It ends with status 1 when the copy could not be sent (the file is kept),
+# and systemctl then shows this unit as failed until the next run.
+
+[Unit]
+Description=NBU-SuperAssistant nightly copy of the applications
+# The timer's run at boot, after a 00:00 missed while the laptop was off
+# (Persistent=true), must wait for the network, or the copy never reaches
+# the relay.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=victor
+WorkingDirectory=/home/victor/apps/nbu-superassistant
+EnvironmentFile=/home/victor/apps/nbu-superassistant/.env.production
+ExecStart=/home/victor/apps/nbu-superassistant/.venv/bin/python -m superassistant snapshot

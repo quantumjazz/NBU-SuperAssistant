@@ -19,6 +19,17 @@ Refusals name the characters, so the student can find and retype them.
 
 The student's declaration that the credits are covered is a tick, not an
 entry: supervision.submit refuses a submission without it.
+
+Staff may remove a submitted application to the bin, saying why, and from
+there put it back or delete it (constitution 5.15): "Users remove the entry
+(select reason - graduation, else), it goes to a 'bin' and deletion is
+confirmed as a second step" (the owner, 15 October 2026). While it is in the
+bin nothing changes it: every write that would (a check, a correction, a
+supervisor's answer, a reminder, the student's own changes) finds it gone
+inside its own transaction (require_active). Deleting it removes its row and
+every row recorded with it; a row in `bin_events` keeps who did what, when
+and why, by the application's number only. That number is never given to a
+later application, so the log's number names one application only.
 """
 
 import unicodedata
@@ -267,14 +278,22 @@ def get(connection, application_id):
 
 
 def get_or_create(connection, key, email):
-    """The student's one application; made on the first visit."""
+    """The student's one application; made on the first visit.
+
+    A deleted application's number is never given again: SQLite would give
+    the number of a deleted last row to the next one."""
     with db.transaction(connection):
         row = by_email_key(connection, key)
         if row is None:
             stamp = db.now()
+            number = 1 + connection.execute(
+                "SELECT MAX(COALESCE((SELECT MAX(id) FROM applications), 0), "
+                "COALESCE((SELECT MAX(application_id) FROM bin_events), 0))"
+            ).fetchone()[0]
             connection.execute(
-                "INSERT INTO applications (email, email_key, created_at, "
-                "updated_at) VALUES (?, ?, ?, ?)", (email, key, stamp, stamp))
+                "INSERT INTO applications (id, email, email_key, created_at, "
+                "updated_at) VALUES (?, ?, ?, ?, ?)",
+                (number, email, key, stamp, stamp))
     return by_email_key(connection, key)
 
 
@@ -398,9 +417,11 @@ def save_draft(connection, record, values):
 
 
 def record_check(connection, application_id, result, note, account_id):
+    """Raises Removed when the application is in the bin or deleted."""
     if result not in ("passed", "not_passed"):
         raise ValueError(result)
     with db.transaction(connection):
+        require_active(connection, application_id)
         connection.execute(
             "INSERT INTO checks (application_id, result, note, by_account, "
             "at) VALUES (?, ?, ?, ?, ?)",
@@ -426,3 +447,126 @@ def correct(connection, record, values, account_id):
             "WHERE id = ?", (value, db.now(), record["id"]))
         changed.append(field)
     return changed
+
+
+# --- The bin (constitution 5.15) -------------------------------------------
+
+BIN_REASONS = ("graduated", "other")
+
+
+class Removed(PermissionError):
+    """The application is in the bin or deleted: nothing may change it."""
+
+
+def is_binned(record):
+    return record is not None and record["binned_at"] is not None
+
+
+def require_active(connection, application_id):
+    """The application, read inside the caller's transaction, or Removed
+    when it is in the bin or no longer exists. Every write that changes an
+    application calls it under its own write lock, so a removal or a
+    deletion committed a moment earlier is always seen."""
+    record = get(connection, application_id)
+    if record is None or is_binned(record):
+        raise Removed(application_id)
+    return record
+
+
+def _bin_event(connection, application_id, event, reason, account_id):
+    connection.execute(
+        "INSERT INTO bin_events (application_id, event, reason, by_account, "
+        "at) VALUES (?, ?, ?, ?, ?)",
+        (application_id, event, reason, account_id, db.now()))
+
+
+def remove(connection, application_id, reason, note, account_id):
+    """Move a submitted application to the bin, saying why.
+
+    Returns False, changing nothing, when there is no such submitted
+    application or it is already in the bin; raises ValueError for a reason
+    that is not one of BIN_REASONS."""
+    if reason not in BIN_REASONS:
+        raise ValueError(reason)
+    with db.transaction(connection):
+        record = get(connection, application_id)
+        if (record is None or record["submitted_at"] is None
+                or is_binned(record)):
+            return False
+        connection.execute(
+            "UPDATE applications SET binned_at = ?, binned_by = ?, "
+            "bin_reason = ?, bin_note = ? WHERE id = ?",
+            (db.now(), account_id, reason, (note or "").strip(),
+             application_id))
+        _bin_event(connection, application_id, "removed", reason, account_id)
+    return True
+
+
+def restore(connection, application_id, account_id):
+    """Put an application back from the bin, as it was. Returns False when
+    it is not in the bin."""
+    with db.transaction(connection):
+        record = get(connection, application_id)
+        if not is_binned(record):
+            return False
+        _bin_event(connection, application_id, "restored",
+                   record["bin_reason"], account_id)
+        connection.execute(
+            "UPDATE applications SET binned_at = NULL, binned_by = NULL, "
+            "bin_reason = NULL, bin_note = '' WHERE id = ?",
+            (application_id,))
+    return True
+
+
+# Every table holding rows recorded with an application, deleted before it.
+RECORDED_WITH = ("corrections", "checks", "requests", "report_students")
+
+
+def delete(connection, application_id, account_id):
+    """Delete an application in the bin, with every row recorded with it.
+
+    One transaction: the log row, then the supervisors' answers (requests),
+    the checks, the corrections and its rows in kept reports, the student's
+    sign-in records for that address, and the application itself. A kept
+    report's Word file is not touched. Returns False when the application
+    is not in the bin, so only the second step deletes."""
+    with db.transaction(connection):
+        record = get(connection, application_id)
+        if not is_binned(record):
+            return False
+        _bin_event(connection, application_id, "deleted",
+                   record["bin_reason"], account_id)
+        for table in RECORDED_WITH:
+            connection.execute("DELETE FROM " + table
+                               + " WHERE application_id = ?",
+                               (application_id,))
+        connection.execute("DELETE FROM signins WHERE email_key = ?",
+                           (record["email_key"],))
+        connection.execute("DELETE FROM applications WHERE id = ?",
+                           (application_id,))
+    return True
+
+
+def binned(connection):
+    """Every application in the bin, the latest removed first, with the
+    username of who removed it."""
+    return connection.execute(
+        "SELECT applications.*, accounts.username FROM applications JOIN "
+        "accounts ON accounts.id = applications.binned_by WHERE "
+        "applications.binned_at IS NOT NULL ORDER BY applications.binned_at "
+        "DESC, applications.id DESC").fetchall()
+
+
+def deletions(connection):
+    """Every deletion, newest first: the application's number, the reason,
+    who removed it and when, who deleted it and when. No student data."""
+    return connection.execute(
+        "SELECT d.application_id, d.reason, d.at AS deleted_at, "
+        "da.username AS deleted_by, r.at AS removed_at, "
+        "ra.username AS removed_by FROM bin_events d "
+        "JOIN accounts da ON da.id = d.by_account "
+        "LEFT JOIN bin_events r ON r.id = (SELECT MAX(id) FROM bin_events "
+        "WHERE application_id = d.application_id AND event = 'removed' "
+        "AND id < d.id) "
+        "LEFT JOIN accounts ra ON ra.id = r.by_account "
+        "WHERE d.event = 'deleted' ORDER BY d.id DESC").fetchall()

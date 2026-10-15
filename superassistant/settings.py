@@ -247,6 +247,11 @@ class Settings(object):
     def reports_dir(self):
         return self.data_dir / "reports"
 
+    @property
+    def snapshots_dir(self):
+        """The nightly copies of the applications (snapshot.py)."""
+        return self.data_dir / "snapshots"
+
     def is_hosted(self):
         """Whether the base URL is somewhere other than this machine."""
         return not is_local_host(base_url_host(self.base_url))

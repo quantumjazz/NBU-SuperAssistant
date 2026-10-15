@@ -7,10 +7,14 @@ in order, and the number reached is kept in the file itself.
 Nothing people entered is ever deleted or overwritten by the application: a
 correction is a new row in `corrections`, a check a new row in `checks`, a
 changed supervisor a new row in `requests` that marks the earlier one
-replaced. A generated report is not among them: staff may delete one, which
-removes its rows in `reports` and `report_students`, and a row in
-`report_deletions` keeps who deleted which report and when (CLAUDE.md
-"Protect and verify"; constitution 5.14).
+replaced. Two things are not among them (CLAUDE.md "Protect and verify"). A
+generated report: staff may delete one, which removes its rows in `reports`
+and `report_students`, and a row in `report_deletions` keeps who deleted
+which report and when (constitution 5.14). And an application staff remove:
+it waits in the bin (`binned_at`), and a second step deletes it with every
+row recorded with it; rows in `bin_events` keep who removed, put back and
+deleted which application, when and why, without the student's data
+(constitution 5.15).
 """
 
 import fcntl
@@ -171,6 +175,27 @@ MIGRATIONS = [
         deleted_at TEXT NOT NULL
     );
     """,
+    # Version 4: the task of 15 October 2026. An application staff remove
+    # waits in the bin: when, by whom, why ('graduated' or 'other') and an
+    # optional note, all cleared when it is put back. Each removal, putting
+    # back and deletion is a row in `bin_events`, whose application id is a
+    # plain number, not a foreign key, because a deleted application's row
+    # is gone; it holds no student data, so it may outlive the application.
+    """
+    ALTER TABLE applications ADD COLUMN binned_at TEXT;
+    ALTER TABLE applications ADD COLUMN binned_by INTEGER
+        REFERENCES accounts(id);
+    ALTER TABLE applications ADD COLUMN bin_reason TEXT;
+    ALTER TABLE applications ADD COLUMN bin_note TEXT NOT NULL DEFAULT '';
+    CREATE TABLE bin_events (
+        id INTEGER PRIMARY KEY,
+        application_id INTEGER NOT NULL,
+        event TEXT NOT NULL,            -- 'removed', 'restored', 'deleted'
+        reason TEXT NOT NULL,           -- 'graduated' or 'other'
+        by_account INTEGER NOT NULL REFERENCES accounts(id),
+        at TEXT NOT NULL
+    );
+    """,
 ]
 
 APPLICATION_TEXT_FIELDS = (
@@ -263,8 +288,9 @@ def transaction(connection):
 def migrate(path):
     """Bring the file at path up to the latest schema, keeping every row.
 
-    On the host the service and the reminder timer are separate processes
-    that may start together on a database not yet migrated. Each holds an
+    On the host the service, the reminder timer and the nightly copy's timer
+    are separate processes that may start together on a database not yet
+    migrated. Each holds an
     exclusive lock on a file beside the database ("<database>.migrate.lock")
     while it reads the version and applies the steps, so the second waits
     and then finds the schema already at the latest version, instead of

@@ -3,9 +3,11 @@ lists, and the reports kept.
 
 An application belongs in a programme's report when it is a submitted thesis
 application of that programme, the answer to its current request (the latest
-one not replaced) is a confirmation, and its latest check (the highest id)
-passed. Students are listed in alphabetical order of their names as printed,
-then by F№.
+one not replaced) is a confirmation, its latest check (the highest id)
+passed, and it is not in the bin (constitution 5.15). Students are listed
+in alphabetical order of their names as printed, then by F№. An
+application deleted from the bin leaves the kept reports' rows too; their
+files stay as they were generated.
 
 Each report is kept until staff delete it: its .docx in the data directory's
 reports folder, and a row in `reports` with one row per student in
@@ -31,6 +33,7 @@ QUALIFYING = """
     SELECT a.* FROM applications a
     WHERE a.grad_type = 'thesis'
       AND a.submitted_at IS NOT NULL
+      AND a.binned_at IS NULL
       AND (SELECT r.answer FROM requests r
            WHERE r.application_id = a.id AND r.replaced_at IS NULL
            ORDER BY r.id DESC LIMIT 1) = 'confirm'

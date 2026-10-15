@@ -30,8 +30,9 @@ EnvironmentFile=/home/victor/apps/nbu-superassistant/.env.production
 
 # ONE worker. Every gunicorn worker runs the start itself (the checks, the
 # migrations, the lists), so with one worker a single process owns the start,
-# and the daily reminder run (nbu-superassistant-remind.service) is the only
-# other process the host starts on the records by itself. Eight threads serve
+# and the daily reminder run (nbu-superassistant-remind.service) and the
+# nightly copy (nbu-superassistant-snapshot.service) are the only other
+# processes the host starts on the records by itself. Eight threads serve
 # eight requests at once, which is more than the pilot needs.
 #
 # NO access log, deliberately: there is no --access-logfile, and gunicorn

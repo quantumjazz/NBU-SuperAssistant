@@ -2,8 +2,9 @@
 
 NBU-SuperAssistant on the laptop-server is one Python process behind the
 Cloudflare Tunnel that already carries the other apps on this machine,
-CourseBench among them, and one short run every morning that reminds
-supervisors. The records are a SQLite database and a few files in a folder
+CourseBench among them, one short run every morning that reminds
+supervisors, and one every night that emails the owner a copy of the
+applications. The records are a SQLite database and a few files in a folder
 outside the clone. There is nothing to build and no database server to
 install.
 
@@ -27,6 +28,7 @@ The ports CourseBench's notes list as taken are 8000, 8001, 8002, 8003, 8012,
 | Address | `https://nbu-superassistant.visiometrica.com` |
 | Service | `nbu-superassistant` (`deploy/nbu-superassistant.service`) |
 | Timer | `nbu-superassistant-remind.timer`, daily at 09:00 Europe/Sofia, which starts `nbu-superassistant-remind.service` |
+| Timer | `nbu-superassistant-snapshot.timer`, nightly at 00:00 Europe/Sofia, which starts `nbu-superassistant-snapshot.service` |
 | Mail | Resend's relay `smtp.resend.com`, port 587 with STARTTLS, sender `nbu-superassistant@visiometrica.com` |
 | Tunnel | `laptop-server`, live configuration `/etc/cloudflared/config.yml` |
 
@@ -412,6 +414,50 @@ Monday.
 The timer runs the clone's current code each time, so an update needs
 nothing for it, unless the update changed its unit files (see *Updating*).
 
+## The nightly copy
+
+```bash
+cd /home/victor/apps/nbu-superassistant
+sudo cp deploy/nbu-superassistant-snapshot.service deploy/nbu-superassistant-snapshot.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nbu-superassistant-snapshot.timer
+systemctl list-timers nbu-superassistant-snapshot.timer
+```
+
+Enable the timer, not the service. `list-timers` shows the next 00:00.
+
+Run it once by hand, and read what it did:
+
+```bash
+sudo systemctl start nbu-superassistant-snapshot.service
+sudo journalctl -u nbu-superassistant-snapshot -n 20 --no-pager
+```
+
+Every night at 00:00, Sofia time, the run writes every submitted
+application, those in the bin included and marked, to
+`/home/victor/nbu-superassistant-data/snapshots/zaiavlenia-YYYY-MM-DD.csv`,
+readable by `victor` only, and emails it as an attachment to the address of
+the owner's account, the one `SUPERASSISTANT_OWNER_USERNAME` names, through
+the relay like every message: one of Resend's 100 a day. It then removes
+the copies 30 days old or older, so the folder holds the last 30 days. The
+journal says where the file is, how many applications it holds and which
+old copies went.
+
+The copies in the mailbox stay until the owner deletes them. An application
+deleted from the bin is gone from the next night's copy and, 30 days later,
+from every copy on the laptop, but not from the messages already received.
+
+The file opens in Excel on the Mac: semicolons between cells, as Excel
+expects where numbers have a decimal comma, and the UTF-8 mark, so Cyrillic
+reads right. A phone number, a grade or a date shows exactly as typed, and
+nothing typed into an application runs as a formula.
+
+If the laptop was off at 00:00, the timer runs once at the next boot
+(`Persistent=true`). A second run on the same day writes that day's file
+again and sends it again. When the relay refuses the message, the file
+stays, the run ends with status 1, and the unit shows failed until the
+next night.
+
 ## The lists
 
 The owner's lists are four CSV files in
@@ -464,8 +510,8 @@ A list that cannot be read (a changed header, a missing column, a code used
 twice, a title not in `titles.csv`, or an entry an application still uses
 taken out) stops the start, and the journal names the file and the line. Put
 the line right and restart. No answer from the `curl` means it did not start:
-read the journal. The reminder run reads the lists too, so a broken list also
-stops that morning's reminders.
+read the journal. The reminder run and the nightly copy read the lists too,
+so a broken list also stops that morning's reminders and that night's copy.
 
 ## Everyday commands
 
@@ -477,6 +523,8 @@ sudo journalctl -u nbu-superassistant -n 100 --no-pager
 sudo journalctl -u nbu-superassistant -f
 systemctl list-timers nbu-superassistant-remind.timer
 sudo journalctl -u nbu-superassistant-remind -n 50 --no-pager
+systemctl list-timers nbu-superassistant-snapshot.timer
+sudo journalctl -u nbu-superassistant-snapshot -n 50 --no-pager
 ```
 
 After a restart, the start line says what the process actually resolved: the
@@ -484,8 +532,8 @@ records folder, the address, the mail mode and where the visitor's address
 comes from. When something behaves oddly, read it before anything else. It
 is the process's own answer, not what the settings file appears to say.
 
-After editing `.env.production`, restart the service. The timer and the host
-commands read the file each time they run.
+After editing `.env.production`, restart the service. The timers and the
+host commands read the file each time they run.
 
 ### Host commands
 
@@ -494,6 +542,7 @@ cd /home/victor/apps/nbu-superassistant
 .venv/bin/python -m superassistant remind
 .venv/bin/python -m superassistant owner-password
 .venv/bin/python -m superassistant mail-test you@example.com
+.venv/bin/python -m superassistant snapshot
 ```
 
 - `remind` sends the reminders due now, by the same rule as the timer.
@@ -501,6 +550,8 @@ cd /home/victor/apps/nbu-superassistant
   it twice, never takes it on the command line, and signs every browser on
   that account out. No emailed code or link exists for the owner.
 - `mail-test` sends one test message (see *Mail*).
+- `snapshot` writes and sends the copy of the applications now, as the
+  nightly timer does (see *The nightly copy*).
 
 They read `.env.production` from the clone themselves, the same file the
 service is pointed at, so they open the same records; a variable already
@@ -536,23 +587,24 @@ row. The `pip install` line is how a new dependency arrives.
 `/home/victor/nbu-superassistant-data` is the only thing that matters. The
 clone is disposable: it can be deleted and cloned again.
 
-Two programs write the records: the service, and the reminder run, which the
-timer starts at 09:00, or later to catch up a 09:00 it missed (at the next
-boot, or when the timer is started again). A backup and a restore therefore
-stop both. First the timer, so it starts no new run. Then they wait for a run
+Three programs write in the records folder: the service; the reminder run,
+which its timer starts at 09:00; and the nightly copy, which its timer starts
+at 00:00. Each timer also catches up a time it missed, at the next boot or
+when it is started again. A backup and a restore therefore stop all three.
+First the two timers, so they start no new run. Then they wait for a run
 already under way to end, so no reminder is cut off between its mail and its
 record. Then the service.
 
 ### Taking a backup
 
 ```bash
-sudo systemctl stop nbu-superassistant-remind.timer
-while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done
+sudo systemctl stop nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer
+while systemctl show -p ActiveState --value nbu-superassistant-remind.service nbu-superassistant-snapshot.service | grep -qx -e activating -e deactivating; do sleep 2; done
 sudo systemctl stop nbu-superassistant
 backup=/home/victor/nbu-superassistant-backup-$(date +%Y%m%d-%H%M%S).tgz
 (umask 077; set -o noclobber; tar czf - -C /home/victor nbu-superassistant-data > "$backup.partial") && test ! -e "$backup" && mv "$backup.partial" "$backup" && ls -l "$backup"
 sudo systemctl start nbu-superassistant
-sudo systemctl start nbu-superassistant-remind.timer
+sudo systemctl start nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer
 ```
 
 Every backup gets a name of its own, to the second, and `noclobber` refuses
@@ -562,8 +614,8 @@ once `tar` has finished without an error, so a backup cut short never looks
 like a whole one; a `.partial` file left behind is a failed backup, to be
 deleted. `umask 077` makes the archive yours alone from the moment it exists:
 it holds everything people entered and the session key. If 09:00 passed while
-the timer was stopped, starting it again sends that morning's reminders at
-once.
+the timers were stopped, starting them again sends that morning's reminders
+at once, and if 00:00 passed, that night's copy.
 
 Keep a copy off the laptop as well; a backup on the same disk goes with the
 disk. On the Mac:
@@ -579,11 +631,11 @@ itself be undone. Write the name of the backup to restore in the first line:
 
 ```bash
 backup=/home/victor/nbu-superassistant-backup-YYYYMMDD-HHMMSS.tgz
-sudo systemctl stop nbu-superassistant-remind.timer
-while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done
+sudo systemctl stop nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer
+while systemctl show -p ActiveState --value nbu-superassistant-remind.service nbu-superassistant-snapshot.service | grep -qx -e activating -e deactivating; do sleep 2; done
 sudo systemctl stop nbu-superassistant
 kept=/home/victor/nbu-superassistant-data.before-restore-$(date +%Y%m%d-%H%M%S)
-test -f "$backup" && test ! -e "$kept" && staging=$(mktemp -d /home/victor/nbu-superassistant-restore-XXXXXX) && tar xzf "$backup" -C "$staging" nbu-superassistant-data && test -d "$staging/nbu-superassistant-data" && test ! -L "$staging/nbu-superassistant-data" && mv /home/victor/nbu-superassistant-data "$kept" && mv "$staging/nbu-superassistant-data" /home/victor/nbu-superassistant-data && rmdir "$staging" && chmod 700 /home/victor/nbu-superassistant-data && ls -ld "$kept" /home/victor/nbu-superassistant-data && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
+test -f "$backup" && test ! -e "$kept" && staging=$(mktemp -d /home/victor/nbu-superassistant-restore-XXXXXX) && tar xzf "$backup" -C "$staging" nbu-superassistant-data && test -d "$staging/nbu-superassistant-data" && test ! -L "$staging/nbu-superassistant-data" && mv /home/victor/nbu-superassistant-data "$kept" && mv "$staging/nbu-superassistant-data" /home/victor/nbu-superassistant-data && rmdir "$staging" && chmod 700 /home/victor/nbu-superassistant-data && ls -ld "$kept" /home/victor/nbu-superassistant-data && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer
 curl -s http://127.0.0.1:8791/healthz
 ```
 
@@ -596,7 +648,8 @@ starts. So if the backup's name was wrong, or the backup is damaged, the
 current records have not moved: whatever was unpacked stays in the
 `restore-…` folder to be looked at, then deleted (it holds the session key),
 and `sudo systemctl start nbu-superassistant && sudo systemctl start
-nbu-superassistant-remind.timer` brings everything back as it was; or
+nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer` brings
+everything back as it was; or
 correct the first line and run the rest again. Delete the kept folder only
 once the restored records are confirmed.
 
@@ -606,16 +659,16 @@ path:
 
 ```bash
 failed=/home/victor/nbu-superassistant-data.failed-restore-$(date +%Y%m%d-%H%M%S)
-test -n "$kept" && test -d "$kept" && sudo systemctl stop nbu-superassistant-remind.timer && { while systemctl show -p ActiveState --value nbu-superassistant-remind.service | grep -qx -e activating -e deactivating; do sleep 2; done; } && sudo systemctl stop nbu-superassistant && { test ! -e /home/victor/nbu-superassistant-data || { test ! -e "$failed" && mv /home/victor/nbu-superassistant-data "$failed" && chmod 700 "$failed"; }; } && test ! -e /home/victor/nbu-superassistant-data && mv "$kept" /home/victor/nbu-superassistant-data && ls -ld /home/victor/nbu-superassistant-data* && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer
+test -n "$kept" && test -d "$kept" && sudo systemctl stop nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer && { while systemctl show -p ActiveState --value nbu-superassistant-remind.service nbu-superassistant-snapshot.service | grep -qx -e activating -e deactivating; do sleep 2; done; } && sudo systemctl stop nbu-superassistant && { test ! -e /home/victor/nbu-superassistant-data || { test ! -e "$failed" && mv /home/victor/nbu-superassistant-data "$failed" && chmod 700 "$failed"; }; } && test ! -e /home/victor/nbu-superassistant-data && mv "$kept" /home/victor/nbu-superassistant-data && ls -ld /home/victor/nbu-superassistant-data* && sudo systemctl start nbu-superassistant && sudo systemctl start nbu-superassistant-remind.timer nbu-superassistant-snapshot.timer
 ```
 
 It does nothing unless the kept folder is there. Then, like a backup and a
-restore, and before it moves anything, it stops the timer, waits for a
-reminder run under way to end, and stops the service: after a restore that
-succeeded, both are running again. It moves whatever is at the records path
+restore, and before it moves anything, it stops the timers, waits for a
+run under way to end, and stops the service: after a restore that
+succeeded, all are running again. It moves whatever is at the records path
 to a failed-restore name of its own, private (mode 700) like the records,
 where it stays to be looked at, never into another folder. It moves the kept
-records back only to an empty path, and it starts the service and the timer
+records back only to an empty path, and it starts the service and the timers
 only once they are back. Like the restore, it stops at the first step that
 fails, with both still stopped. Run it in the same window as the
 restore; in a new one, first set `kept` to the folder `ls -d
@@ -703,3 +756,9 @@ victor` lists any.
 start refused (a setting, a list). `sudo journalctl -u
 nbu-superassistant-remind -n 50 --no-pager` says which. The timer still runs
 the next morning.
+
+**The nightly copy's unit shows failed**: the copy could not be sent, the
+owner's account is not named, or the start refused. `sudo journalctl -u
+nbu-superassistant-snapshot -n 50 --no-pager` says which; a copy written
+but not sent is in the `snapshots` folder. The timer still runs the next
+night.

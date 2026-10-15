@@ -10,14 +10,28 @@ Staff see the programme's code beside its name, which students never see
 (constitution 5.3), and whether the student ticked the declaration that the
 credits are covered. A correction of F№ takes the digits, with or without
 „F“ or „f“ before them, and stores „F“ and the digits.
+
+Staff may remove an application to the bin, choosing why, and from the bin
+put it back or, after a second page that names it, delete it (constitution
+5.15). An application in the bin leaves the table; its own page shows it
+read-only, and every change to it is refused, also when the removal comes
+between the page and the change (applications.Removed).
 """
 
 from flask import Blueprint, abort, flash, redirect, render_template, request
+from werkzeug.exceptions import NotFound
 
 from superassistant import applications, db, mail, supervision, texts
 from superassistant import web
 
 blueprint = Blueprint("staff", __name__)
+
+
+@blueprint.errorhandler(applications.Removed)
+def _removed(exc):
+    """A change to an application removed or deleted since its page was
+    read: not found, and nothing changed."""
+    return NotFound()
 
 # Thesis entries a state-exam application may still hold, from before staff
 # corrected its type or from the student's draft: shown, never dropped.
@@ -51,14 +65,23 @@ def table():
     lists = web.current_lists()
     records = connection.execute(
         "SELECT * FROM applications WHERE submitted_at IS NOT NULL "
-        "ORDER BY submitted_at DESC, id DESC").fetchall()
+        "AND binned_at IS NULL ORDER BY submitted_at DESC, id DESC").fetchall()
     rows = [_row(connection, record, lists) for record in records]
     return render_template("staff_table.html", rows=rows)
 
 
 def _submitted(application_id):
+    """A submitted application, in the bin or not; else not found."""
     record = applications.get(web.connection(), application_id)
     if record is None or record["submitted_at"] is None:
+        abort(404)
+    return record
+
+
+def _active(application_id):
+    """A submitted application not in the bin, which staff may change."""
+    record = _submitted(application_id)
+    if applications.is_binned(record):
         abort(404)
     return record
 
@@ -77,7 +100,16 @@ def _render(record, errors=None, status=200):
         corrections=applications.corrections_of(connection, record["id"]),
         correctable=CORRECTABLE,
         programme_label=supervision.programme_label(record, lists),
-        fields=texts.FIELD_LABELS), status
+        fields=texts.FIELD_LABELS, binned=applications.is_binned(record),
+        binned_by=_username(connection, record["binned_by"])), status
+
+
+def _username(connection, account_id):
+    if account_id is None:
+        return ""
+    row = connection.execute("SELECT username FROM accounts WHERE id = ?",
+                             (account_id,)).fetchone()
+    return row["username"] if row else ""
 
 
 @blueprint.route("/staff/application/<int:application_id>")
@@ -90,7 +122,7 @@ def application(application_id):
                  methods=["POST"])
 @web.staff_required
 def check(application_id):
-    record = _submitted(application_id)
+    record = _active(application_id)
     result = request.form.get("result", "")
     if result not in ("passed", "not_passed"):
         flash(texts.FIX_BELOW, "error")
@@ -107,7 +139,7 @@ def check(application_id):
 @web.staff_required
 def correct(application_id):
     from superassistant.web.student import _messages
-    record = _submitted(application_id)
+    record = _active(application_id)
     field = request.form.get("field", "")
     if field not in CORRECTABLE:
         abort(400)
@@ -126,6 +158,7 @@ def correct(application_id):
                        400)
     connection = web.connection()
     with db.transaction(connection):
+        record = applications.require_active(connection, record["id"])
         changed = applications.correct(connection, record, values,
                                        web.session_staff()["id"])
     flash(texts.STAFF_CORRECTED if changed else texts.STAFF_NOTHING_CHANGED,
@@ -138,7 +171,7 @@ def correct(application_id):
 @web.staff_required
 def change_supervisor(application_id):
     from superassistant.web.student import _messages
-    record = _submitted(application_id)
+    record = _active(application_id)
     if record["grad_type"] != "thesis":
         abort(400)
     fields = ("professor", "sup_name", "sup_title", "sup_email")
@@ -170,7 +203,7 @@ def change_supervisor(application_id):
 def change_type(application_id):
     """Correct the graduation type: state exam to thesis, or back."""
     from superassistant.web.student import _messages
-    record = _submitted(application_id)
+    record = _active(application_id)
     new_type = request.form.get("grad_type", "")
     fields = ("professor", "sup_name", "sup_title", "sup_email")
     values, refusals = applications.clean(request.form, fields,
@@ -206,3 +239,76 @@ def _type_errors(refusals):
         sentences.insert(0, texts.STAFF_TYPE_MISSING.format(
             ", ".join(missing)))
     return " ".join(sentences)
+
+
+# --- The bin (constitution 5.15) -------------------------------------------
+
+@blueprint.route("/staff/application/<int:application_id>/remove",
+                 methods=["POST"])
+@web.staff_required
+def remove(application_id):
+    """The first step: to the bin, with the reason chosen."""
+    record = _active(application_id)
+    reason = request.form.get("reason", "")
+    if reason not in applications.BIN_REASONS:
+        flash(texts.FIX_BELOW, "error")
+        return _render(record, {"remove": texts.BIN_CHOOSE_REASON}, 400)
+    if not applications.remove(web.connection(), record["id"], reason,
+                               request.form.get("note", ""),
+                               web.session_staff()["id"]):
+        abort(404)
+    flash(texts.BIN_REMOVED, "ok")
+    return redirect("/staff")
+
+
+@blueprint.route("/staff/application/<int:application_id>/restore",
+                 methods=["POST"])
+@web.staff_required
+def restore(application_id):
+    if not applications.restore(web.connection(), application_id,
+                                web.session_staff()["id"]):
+        abort(404)
+    flash(texts.BIN_RESTORED, "ok")
+    return redirect("/staff/application/{}".format(application_id))
+
+
+def _in_bin(application_id):
+    record = _submitted(application_id)
+    if not applications.is_binned(record):
+        abort(404)
+    return record
+
+
+@blueprint.route("/staff/application/<int:application_id>/delete")
+@web.staff_required
+def delete_page(application_id):
+    """The second step: the application named, and the button that
+    deletes it."""
+    record = _in_bin(application_id)
+    connection = web.connection()
+    return render_template(
+        "application_delete.html", record=record,
+        row=_row(connection, record, web.current_lists()),
+        binned=True, binned_by=_username(connection, record["binned_by"]))
+
+
+@blueprint.route("/staff/application/<int:application_id>/delete",
+                 methods=["POST"])
+@web.staff_required
+def delete(application_id):
+    if not applications.delete(web.connection(), application_id,
+                               web.session_staff()["id"]):
+        abort(404)
+    flash(texts.BIN_DELETED, "ok")
+    return redirect("/staff/bin")
+
+
+@blueprint.route("/staff/bin")
+@web.staff_required
+def bin_page():
+    connection = web.connection()
+    lists = web.current_lists()
+    rows = [dict(_row(connection, record, lists), by=record["username"])
+            for record in applications.binned(connection)]
+    return render_template("bin.html", rows=rows,
+                           deleted=applications.deletions(connection))

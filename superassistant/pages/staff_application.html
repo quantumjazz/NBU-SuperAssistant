@@ -3,7 +3,8 @@
 {% set s = row.standing %}
 {% block title %}{{ t.STAFF_APPLICATION_TITLE.format(row.name) }}{% endblock %}
 {% block content %}
-<a class="back" href="/staff"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_STAFF }}</a>
+{% if binned %}<a class="back" href="/staff/bin"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_BIN }}</a>
+{% else %}<a class="back" href="/staff"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_STAFF }}</a>{% endif %}
 <div class="page-head">
   <h1>{{ row.name or r.email }}</h1>
   <p class="lead">{{ r.fn }}{% if row.programme %}, {{ row.programme }}{% endif %}, {{ t.STAFF_SUBMITTED_AT|lower }} {{ r.submitted_at|datetime }}.</p>
@@ -11,9 +12,24 @@
     <span class="chip info plain">{{ t.STAFF_TYPE.get(r.grad_type, "") }}</span>
     {% if r.grad_type == "thesis" %}<span class="chip {{ 'wait' if s.answer == 'awaited' else 'ok' if s.answer == 'confirm' else 'no' if s.answer == 'decline' else '' }}">{{ t.STAFF_ANSWER[s.answer] }}</span>{% endif %}
     <span class="chip {{ 'ok' if s.check == 'passed' else 'no' if s.check == 'not_passed' else '' }}">{{ t.STAFF_CHECK_CHIP[s.check] }}</span>
-    {% if s.waiting_for_report %}<span class="chip wait">{{ t.STAFF_WAITING_REPORT }}</span>{% endif %}
+    {% if s.waiting_for_report and not binned %}<span class="chip wait">{{ t.STAFF_WAITING_REPORT }}</span>{% endif %}
+    {% if binned %}<span class="chip no" id="binned-chip">{{ t.BIN_IN_BIN }}</span>{% endif %}
   </div>
 </div>
+
+{% if binned %}
+<section id="in-bin" class="card"><div class="card-h"><h2>{{ t.BIN_IN_BIN }}</h2></div><div class="card-b">
+  <p>{{ t.BIN_IN_BIN_LINE.format(binned_by, r.binned_at|datetime, t.BIN_REASON.get(r.bin_reason, r.bin_reason)) }}</p>
+  {% if r.bin_note %}<p>{{ t.BIN_NOTE_LINE.format(r.bin_note) }}</p>{% endif %}
+  <div class="actions">
+    <form method="post" action="/staff/application/{{ r.id }}/restore" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button type="submit" id="restore" class="secondary">{{ t.BIN_RESTORE }}</button>
+    </form>
+    <a class="btn secondary" id="to-delete" href="/staff/application/{{ r.id }}/delete">{{ t.BIN_DELETE }}</a>
+  </div>
+</div></section>
+{% endif %}
 
 <div class="card"><div class="card-h"><h2>{{ t.ENTERED_TITLE }}</h2></div><div class="card-b">
 <dl class="fields" id="fields">
@@ -56,12 +72,14 @@
 </div></section>
 {% endif %}
 
+{% if checks or not binned %}
 <section id="checks" class="card"><div class="card-h"><h2>{{ t.STAFF_CHECKS_TITLE }}</h2></div><div class="card-b">
   {% if checks %}<ul class="log" role="list">
   {% for c in checks %}
     <li><span class="chip {{ 'ok' if c.result == 'passed' else 'no' }}">{{ t.STAFF_CHECK[c.result] }}</span> <span class="when">{{ c.username }}, {{ c.at|datetime }}</span>{% if c.note %}<br>{{ c.note }}{% endif %}</li>
   {% endfor %}
   </ul>{% endif %}
+  {% if not binned %}
   <form method="post" action="/staff/application/{{ r.id }}/check">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <fieldset class="{{ 'subsection' if checks }}">
@@ -78,8 +96,11 @@
       <div class="actions"><button type="submit" id="record-check"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>{{ t.STAFF_CHECK_RECORD }}</button></div>
     </fieldset>
   </form>
+  {% endif %}
 </div></section>
+{% endif %}
 
+{% if corrections or not binned %}
 <section id="corrections" class="card"><div class="card-h"><h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2></div><div class="card-b">
   {% if corrections %}<ul class="log" role="list">
   {% for c in corrections %}
@@ -90,6 +111,7 @@
     {% endif %}
   {% endfor %}
   </ul>{% endif %}
+  {% if not binned %}
   <form method="post" action="/staff/application/{{ r.id }}/correct">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <fieldset class="{{ 'subsection' if corrections }}">
@@ -175,5 +197,29 @@
     </fieldset>
   </form>
   {% endif %}
+  {% endif %}
 </div></section>
+{% endif %}
+
+{% if not binned %}
+<section id="remove" class="card"><div class="card-h"><h2>{{ t.BIN_REMOVE_FORM }}</h2></div><div class="card-b">
+  <form method="post" action="/staff/application/{{ r.id }}/remove">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <p class="hint">{{ t.BIN_REMOVE_HINT }}</p>
+    <fieldset>
+      <legend>{{ t.BIN_REASON_LABEL }}</legend>
+      <div class="choices two">
+        <label class="choice"><input type="radio" name="reason" value="graduated"> {{ t.BIN_REASON_GRADUATED }}</label>
+        <label class="choice"><input type="radio" name="reason" value="other"> {{ t.BIN_REASON_OTHER }}</label>
+      </div>
+      {% if errors.remove %}<p class="error" id="remove-error">{{ errors.remove }}</p>{% endif %}
+    </fieldset>
+    <div class="f" style="margin-top: 16px">
+      <label for="bin_note">{{ t.BIN_NOTE }}</label>
+      <input type="text" id="bin_note" name="note">
+    </div>
+    <div class="actions"><button type="submit" id="remove-application" class="secondary">{{ t.BIN_REMOVE }}</button></div>
+  </form>
+</div></section>
+{% endif %}
 {% endblock %}

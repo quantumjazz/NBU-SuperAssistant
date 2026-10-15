@@ -9,7 +9,9 @@ it can be derived again, every reminder carries the same links as the request.
 The links work until an answer is recorded or the request is replaced (by the
 student choosing again after a decline, or by staff changing the supervisor);
 afterwards they only show the answer, if one was recorded. Opening a link
-records nothing: the page it opens has the button that does (8.2).
+records nothing: the page it opens has the button that does (8.2). While the
+application is in the bin (constitution 5.15) its links record nothing and
+its supervisor is not reminded; once it is deleted they are unknown.
 
 Every request and reminder is sent inside the transaction that records it,
 so one the relay refuses leaves nothing recorded as sent. The notice telling
@@ -190,6 +192,8 @@ def submit(connection, settings, lists, application_id):
     """
     with db.transaction(connection):
         record = applications.get(connection, application_id)
+        if record is None:
+            raise applications.Removed(application_id)
         if record["submitted_at"] is not None:
             return []
         missing = applications.missing_for_submission(record)
@@ -224,7 +228,7 @@ def choose_again(connection, settings, lists, application_id, values):
     request cannot be sent; raises PermissionError if no decline stands.
     """
     with db.transaction(connection):
-        record = applications.get(connection, application_id)
+        record = applications.require_active(connection, application_id)
         current = applications.current_request(connection, application_id)
         if (record["submitted_at"] is None or record["grad_type"] != "thesis"
                 or current is None or current["answer"] != "decline"):
@@ -253,7 +257,7 @@ def staff_change(connection, settings, lists, application_id, values,
     (nothing changed) if the new request cannot be sent.
     """
     with db.transaction(connection):
-        record = applications.get(connection, application_id)
+        record = applications.require_active(connection, application_id)
         if record["submitted_at"] is None or record["grad_type"] != "thesis":
             raise PermissionError("not a submitted thesis")
         chosen = supervisor_values(values)
@@ -275,7 +279,8 @@ def answer(connection, token, choice, comment):
 
     Returns (state, request): state is "recorded", "answered" (an answer was
     already recorded; nothing changes), "replaced" (the request is no longer
-    standing; nothing changes) or "unknown".
+    standing, or its application is in the bin; nothing changes) or
+    "unknown".
     """
     if choice not in CHOICES:
         return "unknown", None
@@ -285,7 +290,8 @@ def answer(connection, token, choice, comment):
             return "unknown", None
         if request["answer"] is not None:
             return "answered", request
-        if request["replaced_at"] is not None:
+        if (request["replaced_at"] is not None or applications.is_binned(
+                applications.get(connection, request["application_id"]))):
             return "replaced", request
         connection.execute(
             "UPDATE requests SET answer = ?, comment = ?, answered_at = ? "
@@ -323,6 +329,7 @@ def due(connection, settings):
     so the daily run at 09:00 reminds on Thursday and again on Sunday. A
     reminder sent today makes today the day of the latest mail, so a second
     run on the same Sofia day finds nothing more (the days are at least 1).
+    An application in the bin is never reminded of.
     """
     today = db.local_day(db.now())
     standing = connection.execute(
@@ -330,7 +337,8 @@ def due(connection, settings):
         " = requests.application_id WHERE requests.replaced_at IS NULL AND "
         "requests.answer IS NULL AND requests.sent_at IS NOT NULL AND "
         "requests.reminders_sent < ? AND requests.last_mailed_at IS NOT NULL "
-        "AND applications.submitted_at IS NOT NULL ORDER BY requests.id",
+        "AND applications.submitted_at IS NOT NULL AND applications.binned_at "
+        "IS NULL ORDER BY requests.id",
         (settings.reminder_count,)).fetchall()
     return [request for request in standing
             if (today - db.local_day(request["last_mailed_at"])).days
@@ -355,6 +363,8 @@ def remind(connection, settings, lists):
                         or fresh["reminders_sent"] != request["reminders_sent"]):
                     continue
                 record = applications.get(connection, fresh["application_id"])
+                if applications.is_binned(record):
+                    continue
                 message = _request_message(settings, lists, record,
                                            token_for(settings, fresh),
                                            reminder=True)
@@ -385,7 +395,7 @@ def staff_change_type(connection, settings, lists, application_id, new_type,
     if new_type not in applications.GRAD_TYPES:
         return [applications.Refusal("grad_type", "required")]
     with db.transaction(connection):
-        record = applications.get(connection, application_id)
+        record = applications.require_active(connection, application_id)
         if record["submitted_at"] is None:
             raise PermissionError("not submitted")
         if record["grad_type"] == new_type:

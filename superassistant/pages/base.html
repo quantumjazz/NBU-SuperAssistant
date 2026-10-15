@@ -29,8 +29,9 @@
     <nav class="nav">
       {% if student %}<a href="/application" {% if request.path.startswith('/application') %}aria-current="page"{% endif %}>{{ t.NAV_APPLICATION }}</a>{% endif %}
       {% if staff %}
-        <a href="/staff" {% if request.path == '/staff' or request.path.startswith('/staff/application') %}aria-current="page"{% endif %}>{{ t.NAV_STAFF }}</a>
+        <a href="/staff" {% if (request.path == '/staff' or request.path.startswith('/staff/application')) and not binned %}aria-current="page"{% endif %}>{{ t.NAV_STAFF }}</a>
         <a href="/staff/reports" {% if request.path.startswith('/staff/reports') %}aria-current="page"{% endif %}>{{ t.NAV_REPORTS }}</a>
+        <a href="/staff/bin" {% if request.path == '/staff/bin' or binned %}aria-current="page"{% endif %}>{{ t.NAV_BIN }}</a>
         {% if is_owner %}<a href="/owner" {% if request.path == '/owner' %}aria-current="page"{% endif %}>{{ t.NAV_OWNER }}</a>{% endif %}
       {% endif %}
       <span class="who"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span>{{ staff.username if staff else student }}</span></span>

@@ -3,7 +3,8 @@
 GET only shows a page: mail systems open links to scan them, so opening a
 link records nothing (8.2). The page's own button records the answer, with an
 optional comment that only staff see. After an answer, the links only show
-it; a replaced request's links record nothing.
+it; a replaced request's links record nothing, nor do those of an
+application in the bin (constitution 5.15).
 """
 
 from flask import Blueprint, abort, render_template, request
@@ -37,7 +38,8 @@ def show(token, choice):
         return render_template("answer.html", state="unknown"), 404
     if row["answer"] is not None:
         return _page(row, choice, "answered")
-    if row["replaced_at"] is not None:
+    if row["replaced_at"] is not None or applications.is_binned(
+            applications.get(web.connection(), row["application_id"])):
         return _page(row, choice, "replaced")
     return _page(row, choice, "open")
 

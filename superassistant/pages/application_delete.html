@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ t.BIN_DELETE_TITLE }}{% endblock %}
+{% block content %}
+<a class="back" href="/staff/bin"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_BIN }}</a>
+<div class="page-head">
+  <h1>{{ t.BIN_DELETE_TITLE }}</h1>
+  <p class="lead">{{ t.BIN_DELETE_LEAD }}</p>
+</div>
+<div class="card"><div class="card-b">
+  <dl class="fields" id="application">
+    <dt>{{ t.BIN_COLUMNS[0] }}</dt><dd>{{ row.name or record.email }}</dd>
+    <dt>{{ t.BIN_COLUMNS[1] }}</dt><dd>{{ record.fn }}</dd>
+    <dt>{{ t.BIN_COLUMNS[2] }}</dt><dd>{{ row.programme }}</dd>
+    <dt>{{ t.BIN_COLUMNS[3] }}</dt><dd>{{ t.BIN_REASON.get(record.bin_reason, record.bin_reason) }}{% if record.bin_note %} ({{ record.bin_note }}){% endif %}</dd>
+    <dt>{{ t.BIN_COLUMNS[4] }}</dt><dd>{{ t.BIN_BY_AT.format(binned_by, record.binned_at|datetime) }}</dd>
+  </dl>
+  <form method="post" action="/staff/application/{{ record.id }}/delete">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="actions" style="margin-top: 20px"><button type="submit" id="delete-application" class="danger">{{ t.BIN_DELETE }}</button><a class="btn secondary" href="/staff/bin">{{ t.BACK }}</a></div>
+  </form>
+</div></div>
+{% endblock %}
