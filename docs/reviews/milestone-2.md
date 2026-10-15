@@ -364,3 +364,11 @@
 - **Tests:** the same-second case with another student and supervisor; deletion right after the answer's COMMIT; links and reminders of a request without a nonce; Codex's long cells. 16 cases fail on `fb953f9` on each Python.
 - **Checks:** 321 passed and 8 browser passed on Python 3.9.6 and 3.12.14. Codex's script reproduced C1 and C2 before the fix. After it, the C1 hook finds no read after the COMMIT, and the C2 link gets 404 with nothing sent. In Excel, text import reproduced Codex's conversion; the new cells read back exactly.
 - **Outstanding:** Codex's review of `0e1f001..d253071`; the laptop update; the owner's acceptance.
+
+## 2026-10-15 — The second task: Codex's review of `d253071`; fix `2b5db84` for Codex
+
+- **Codex, on `d253071`** (range `0e1f001..d253071`, record `c600127`), relayed by the owner: CHANGES REQUESTED. "T15-C1 and T15-C2 are resolved", on both Pythons, with links and reminders of schema-3 requests kept. T15-C3 stays open: a one-line cell too long for a formula was written raw when it held a letter, and Excel's Convert turned 8,200 zeros and „1e5“ into 100000.
+- **Fix `2b5db84`** (range `c600127..2b5db84`): every cell is a formula joining only text values and line breaks (`CHAR(10)`, `CHAR(13)`). A cell too long for Excel's 8,192 units gets an apostrophe, whatever it holds. Excel's text import therefore no longer splits multi-line cells into rows either; found while verifying.
+- **Tests:** Codex's case, multi-line cells and the earlier long ones; 9 cases fail on `d253071` on each Python.
+- **Checks:** 326 passed and 8 browser passed on Python 3.9.6 and 3.12.14. In Excel on the owner's Mac, by AppleScript, opened and text-imported as UTF-8, semicolons, General: every value read back exactly, rows intact. Excel's formulas show the too-long cells are text (ISTEXT, LEN 8204) and a CR LF stays two characters. Codex's UI Convert route was not driven here.
+- **Outstanding:** Codex's review of `c600127..2b5db84`; Fable's amendment of `NOW.md` (Fable unavailable for now); the laptop update; the owner's acceptance.
