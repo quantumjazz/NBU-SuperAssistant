@@ -440,3 +440,17 @@
   - the owner's yes to the push and the laptop update (no new units; schema 5 at the restart);
   - Fable's `NOW.md` amendment and both approvals before milestone 3;
   - the owner's acceptance of this task and of the earlier ones.
+
+## 2026-10-15 — The third task: on the laptop; READY FOR OWNER ACCEPTANCE
+
+- **Owner** (verbatim): "push and update the laptop", then "yes" after the restart.
+- **Pushed and pulled:** GitHub and the laptop at `e829476`. A copy of the live database was taken first: `/home/victor/nbu-superassistant-pre-update-20261015-234831.sqlite3`, schema 4, 3 applications, no kept report, 1 report deletion, integrity ok. No unit, settings template or requirement changed.
+- **The owner's sudo step:** the restart, 23:51:08.
+- **Checks:**
+  - `/healthz` ok publicly; gunicorn started with no error;
+  - schema 5: `reports.binned_at` and `binned_by` added, `report_bin_events` empty; all 13 tables of the copy row for row the same in the live file;
+  - timers: the nightly copy at 00:00 on 16 Oct, its first run on the new code; the reminders at 09:00.
+- **The owner's checks:** as staff, generate a topic report, press „Премахни“ and see its students marked „чака доклад“; in „Кошче“ download it and press „Върни“; remove it again, press „Изтрий окончателно“, and read „Изтрити доклади“.
+- **Outstanding:**
+  - this acceptance, and the earlier tasks' acceptances;
+  - Fable's `NOW.md` amendment and both approvals before milestone 3.
