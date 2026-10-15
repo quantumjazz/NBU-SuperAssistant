@@ -14,7 +14,8 @@ which report and when (constitution 5.14). And an application staff remove:
 it waits in the bin (`binned_at`), and a second step deletes it with every
 row recorded with it; rows in `bin_events` keep who removed, put back and
 deleted which application, when and why, without the student's data
-(constitution 5.15).
+(constitution 5.15). Every connection has SQLite's secure_delete on, so what
+a deletion removes is overwritten in the file, not merely set free.
 """
 
 import fcntl
@@ -180,7 +181,9 @@ MIGRATIONS = [
     # optional note, all cleared when it is put back. Each removal, putting
     # back and deletion is a row in `bin_events`, whose application id is a
     # plain number, not a foreign key, because a deleted application's row
-    # is gone; it holds no student data, so it may outlive the application.
+    # is gone. A removal's note is kept there too, so putting back loses
+    # nothing; the deletion blanks the notes, so what outlives the
+    # application holds no student data.
     """
     ALTER TABLE applications ADD COLUMN binned_at TEXT;
     ALTER TABLE applications ADD COLUMN binned_by INTEGER
@@ -192,6 +195,7 @@ MIGRATIONS = [
         application_id INTEGER NOT NULL,
         event TEXT NOT NULL,            -- 'removed', 'restored', 'deleted'
         reason TEXT NOT NULL,           -- 'graduated' or 'other'
+        note TEXT NOT NULL DEFAULT '',  -- a removal's; blanked at deletion
         by_account INTEGER NOT NULL REFERENCES accounts(id),
         at TEXT NOT NULL
     );
@@ -264,11 +268,14 @@ def local_day(stamp):
 
 
 def connect(path):
-    """One connection, rows readable by column name, foreign keys on."""
+    """One connection, rows readable by column name, foreign keys on, and
+    deleted content overwritten in the file (secure_delete): a deleted
+    application must not stay readable in the file or its later backups."""
     connection = sqlite3.connect(str(path), timeout=30,
                                  isolation_level=None)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA secure_delete = ON")
     return connection
 
 

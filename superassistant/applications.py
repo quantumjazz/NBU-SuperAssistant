@@ -473,15 +473,18 @@ def require_active(connection, application_id):
     return record
 
 
-def _bin_event(connection, application_id, event, reason, account_id):
+def _bin_event(connection, application_id, event, reason, account_id,
+               note=""):
     connection.execute(
-        "INSERT INTO bin_events (application_id, event, reason, by_account, "
-        "at) VALUES (?, ?, ?, ?, ?)",
-        (application_id, event, reason, account_id, db.now()))
+        "INSERT INTO bin_events (application_id, event, reason, note, "
+        "by_account, at) VALUES (?, ?, ?, ?, ?, ?)",
+        (application_id, event, reason, note, account_id, db.now()))
 
 
 def remove(connection, application_id, reason, note, account_id):
-    """Move a submitted application to the bin, saying why.
+    """Move a submitted application to the bin, saying why. The note is
+    kept with the removal's log row as well, so putting the application back
+    keeps it.
 
     Returns False, changing nothing, when there is no such submitted
     application or it is already in the bin; raises ValueError for a reason
@@ -493,12 +496,13 @@ def remove(connection, application_id, reason, note, account_id):
         if (record is None or record["submitted_at"] is None
                 or is_binned(record)):
             return False
+        note = (note or "").strip()
         connection.execute(
             "UPDATE applications SET binned_at = ?, binned_by = ?, "
             "bin_reason = ?, bin_note = ? WHERE id = ?",
-            (db.now(), account_id, reason, (note or "").strip(),
-             application_id))
-        _bin_event(connection, application_id, "removed", reason, account_id)
+            (db.now(), account_id, reason, note, application_id))
+        _bin_event(connection, application_id, "removed", reason, account_id,
+                   note)
     return True
 
 
@@ -526,10 +530,13 @@ def delete(connection, application_id, account_id):
     """Delete an application in the bin, with every row recorded with it.
 
     One transaction: the log row, then the supervisors' answers (requests),
-    the checks, the corrections and its rows in kept reports, the student's
-    sign-in records for that address, and the application itself. A kept
-    report's Word file is not touched. Returns False when the application
-    is not in the bin, so only the second step deletes."""
+    the checks, the corrections and its rows in kept reports, and the
+    application itself; the notes of its removals in the log are blanked.
+    The student's sign-in records for that address lose the address and
+    are spent, rather than deleted, so their numbers are never given again:
+    a browser still holding one, unfinished, cannot reach another student's
+    sign-in. A kept report's Word file is not touched. Returns False when
+    the application is not in the bin, so only the second step deletes."""
     with db.transaction(connection):
         record = get(connection, application_id)
         if not is_binned(record):
@@ -540,8 +547,12 @@ def delete(connection, application_id, account_id):
             connection.execute("DELETE FROM " + table
                                + " WHERE application_id = ?",
                                (application_id,))
-        connection.execute("DELETE FROM signins WHERE email_key = ?",
-                           (record["email_key"],))
+        connection.execute(
+            "UPDATE signins SET email = '', email_key = '', used_at = "
+            "COALESCE(used_at, ?), code_hash = NULL, link_hash = NULL WHERE "
+            "email_key = ?", (db.now(), record["email_key"]))
+        connection.execute("UPDATE bin_events SET note = '' WHERE "
+                           "application_id = ?", (application_id,))
         connection.execute("DELETE FROM applications WHERE id = ?",
                            (application_id,))
     return True

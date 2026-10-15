@@ -55,23 +55,20 @@ def any_text(max_size=40):
 @given(any_text(300))
 def test_a_cell_shows_as_typed_and_is_never_a_formula(value):
     written = snapshot.cell(value)
-    letters = any(ch.isalpha() for ch in value)
-    changed = bool(value) and (value.startswith(snapshot._FORMULA_START)
-                               or not letters)
-    if excel_shows(written) != value:
-        # Only a cell Excel would change and its text value cannot hold.
-        assert written == "'" + value and changed
-        assert len(value) > 255 or "\n" in value or "\r" in value
-    # Never a formula Excel would run: a cell beginning with what Excel
-    # reads as a formula is exactly one text value, with every quote in it
-    # doubled, or starts with an apostrophe.
-    if written.startswith("="):
-        inside = written[2:-1]
+    one_line = "\n" not in value and "\r" not in value
+    fits = len(value.encode("utf-16-le")) // 2 <= 255
+    if value and one_line and fits:
+        # Excel's text value: shown exactly as typed, whatever it holds.
         assert written.startswith('="') and written.endswith('"')
-        assert '"' not in inside.replace('""', "")
-        assert len(value) <= 255 and "\n" not in value and "\r" not in value
+        assert '"' not in written[2:-1].replace('""', "")
+        assert excel_shows(written) == value
+    elif value.startswith(snapshot._FORMULA_START):
+        assert written == "'" + value         # shown with the apostrophe
+    else:
+        assert written == value               # long text Excel keeps as text
+    # Never a formula Excel would run.
     assert not written.startswith(("+", "-", "@", "\t", "\r"))
-    assert (written != value) == changed     # only what Excel would change
+    assert not written.startswith("=") or written.startswith('="')
 
 
 def read(data):
@@ -199,7 +196,7 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
             answer = (entry["answer"] or "awaited") if thesis else None
             assert row[column["Отговор на научния ръководител"]] == cell(
                 texts.STAFF_ANSWER[answer])
-            assert row[column["Коментар на научния ръководител"]] == (
+            assert row[column["Коментар на научния ръководител"]] == cell(
                 "коментар" if thesis and entry["answer"] else "")
             assert row[column["Последна проверка"]] == cell(
                 texts.STAFF_CHECK[entry["check"]])
@@ -372,7 +369,8 @@ def test_each_night_writes_its_own_file_and_the_31st_night_removes_the_first(
     for night in range(31):
         assert run(settings)[0] == 0
         clock.advance(days=1)
-    names = sorted(p.name for p in settings.snapshots_dir.iterdir())
+    names = sorted(p.name for p in settings.snapshots_dir.iterdir()
+                   if p.name != snapshot.LOCK)
     assert len(names) == snapshot.KEEP_DAYS
     assert names[0] == "zaiavlenia-2026-10-13.csv"
     assert names[-1] == "zaiavlenia-2026-11-11.csv"
@@ -382,7 +380,8 @@ def test_each_night_writes_its_own_file_and_the_31st_night_removes_the_first(
     clock.advance(days=-1)
     assert run(settings)[0] == 0
     assert len(outbox.messages) == 32
-    assert len(list(settings.snapshots_dir.iterdir())) == snapshot.KEEP_DAYS
+    assert len([p for p in settings.snapshots_dir.iterdir()
+                if p.name != snapshot.LOCK]) == snapshot.KEEP_DAYS
 
 
 def test_the_date_is_sofias(data_dir, records, outbox, clock):
@@ -402,3 +401,36 @@ def test_the_host_command_runs_it(data_dir, records, outbox, monkeypatch):
     assert cli.main(["snapshot"]) == 0
     assert (data_dir / "snapshots" / "zaiavlenia-2026-10-12.csv").is_file()
     assert "snapshot" in cli.__doc__
+
+
+def test_the_command_counts_in_words(data_dir, clock, outbox):
+    settings = owner_settings(data_dir)
+    make_account(settings, OWNER, OWNER_ADDRESS)
+    insert_application(settings, "one@example.org", name1="Една")
+    status, out, err = run(settings)
+    assert status == 0, err
+    size = (settings.snapshots_dir / "zaiavlenia-2026-10-12.csv").stat(
+        ).st_size
+    assert "(1 заявление, {} байта)".format(size) in out
+
+
+def test_two_runs_at_once_take_turns(data_dir, records, outbox):
+    """While one run holds the folder's lock, another waits for it."""
+    import fcntl
+    import threading
+    settings = owner_settings(data_dir)
+    settings.snapshots_dir.mkdir(mode=0o700, exist_ok=True)
+    lock = os.open(str(settings.snapshots_dir / snapshot.LOCK),
+                   os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    results = []
+    other = threading.Thread(target=lambda: results.append(run(settings)))
+    other.start()
+    other.join(1.0)
+    assert other.is_alive()          # waiting for the lock
+    assert not (settings.snapshots_dir / "zaiavlenia-2026-10-12.csv"
+                ).exists()
+    os.close(lock)
+    other.join(30)
+    assert results and results[0][0] == 0
+    assert (settings.snapshots_dir / "zaiavlenia-2026-10-12.csv").is_file()

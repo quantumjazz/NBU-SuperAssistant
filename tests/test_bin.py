@@ -19,8 +19,9 @@ import sqlite3
 import pytest
 from hypothesis import given, strategies as st
 
-from superassistant import applications, db, lists, reports, supervision
-from superassistant import texts
+from superassistant import applications, db, lists, mail, reports, signin
+from superassistant import supervision, texts
+from superassistant.web import student as student_pages
 from superassistant.web import staff as staff_pages
 from tests.conftest import (Client, connect, insert_application, insert_check,
                             insert_request, make_account)
@@ -67,6 +68,13 @@ def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
             assert all(number > earlier for earlier in made)   # never again
             made.append(number)
             model[number] = None
+            # A sign-in of the student's address, as signing in leaves.
+            address = applications.get(connection, number)["email_key"]
+            connection.execute(
+                "INSERT INTO signins (email, email_key, code_salt, code_hash, "
+                "link_hash, created_at, expires_at) VALUES (?,?,?,?,?,?,?)",
+                (address, address, "salt", "code", "link" + address,
+                 db.now(), db.now()))
             request = applications.current_request(connection, number)
             connection.execute("UPDATE requests SET answer = 'confirm' "
                                "WHERE id = ?", (request["id"],))
@@ -91,29 +99,43 @@ def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
                 except reports.NothingToReport:
                     pass
             elif kind == "remove" and target is not None:
+                note = "бележка {}".format(len(log))
                 done = applications.remove(connection, target, reason,
-                                           "бележка", staff["id"])
+                                           note, staff["id"])
                 assert done == (model[target] is None)
                 if done:
                     model[target] = reason
-                    log.append((target, "removed", reason))
+                    log.append((target, "removed", reason, note))
             elif kind == "restore" and target is not None:
                 done = applications.restore(connection, target, staff["id"])
                 assert done == (model[target] is not None)
                 if done:
-                    log.append((target, "restored", model[target]))
+                    log.append((target, "restored", model[target], ""))
                     model[target] = None
             elif kind == "delete" and target is not None:
                 was = applications.get(connection, target)
+                signins = connection.execute(
+                    "SELECT id FROM signins WHERE email_key = ?",
+                    (was["email_key"],)).fetchall()
                 done = applications.delete(connection, target, staff["id"])
                 assert done == (model[target] is not None)
                 if done:
-                    log.append((target, "deleted", model.pop(target)))
+                    log.append((target, "deleted", model.pop(target), ""))
+                    # Its notes in the log are blanked.
+                    log = [entry[:3] + ("",) if entry[0] == target
+                           else entry for entry in log]
                     for table in applications.RECORDED_WITH:
                         assert count(connection, table, target) == 0
-                    assert connection.execute(
-                        "SELECT COUNT(*) FROM signins WHERE email_key = ?",
-                        (was["email_key"],)).fetchone()[0] == 0
+                    # The sign-ins stay, spent and without the address.
+                    assert signins
+                    for row in signins:
+                        kept = connection.execute(
+                            "SELECT * FROM signins WHERE id = ?",
+                            (row["id"],)).fetchone()
+                        assert (kept["email"], kept["email_key"],
+                                kept["code_hash"], kept["link_hash"]) \
+                            == ("", "", None, None)
+                        assert kept["used_at"] is not None
                     assert applications.get(connection, target) is None
 
         binned = sorted(n for n, reason in model.items() if reason)
@@ -127,22 +149,26 @@ def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
         qualifying = [r["id"] for r in reports.qualifying(connection,
                                                           "BSNADM01")]
         assert sorted(qualifying) == active
-        # Every application not in the bin keeps its own rows.
+        # Every application not deleted keeps its own rows and sign-ins.
         for number in active + binned:
             for table in ("corrections", "checks", "requests"):
                 assert count(connection, table, number) >= 1
+            key = applications.get(connection, number)["email_key"]
+            assert connection.execute(
+                "SELECT COUNT(*) FROM signins WHERE email_key = ? AND "
+                "code_hash IS NOT NULL", (key,)).fetchone()[0] == 1
         # The log: every event in order, by number only.
-        assert [(r["application_id"], r["event"], r["reason"])
+        assert [(r["application_id"], r["event"], r["reason"], r["note"])
                 for r in connection.execute(
                     "SELECT * FROM bin_events ORDER BY id")] == log
         assert [(r["application_id"], r["reason"])
                 for r in applications.deletions(connection)] == [
-            (n, reason) for n, event, reason in reversed(log)
+            (n, reason) for n, event, reason, _ in reversed(log)
             if event == "deleted"]
         columns = [r[1] for r in connection.execute(
             "PRAGMA table_info(bin_events)")]
         assert columns == ["id", "application_id", "event", "reason",
-                           "by_account", "at"]
+                           "note", "by_account", "at"]
         # Nothing points at an application that is gone.
         assert connection.execute("PRAGMA foreign_key_check").fetchall() \
             == []
@@ -277,13 +303,18 @@ def test_staff_remove_put_back_and_delete_in_two_steps(settings, app, clock):
         assert 'action="{}{}"'.format(url, form) not in page, form
     assert reports.qualifying(connection, "BSNADM01") == []
 
-    # Nothing changes it while it is in the bin.
+    # Nothing changes it while it is in the bin: staff are taken to the bin
+    # and told so.
     for path, data in (("/check", {"result": "passed"}),
                        ("/correct", {"field": "topic", "value": "Друга"}),
                        ("/supervisor", {"professor": "georgieva"}),
                        ("/type", {"grad_type": "exam"}),
                        ("/remove", {"reason": "other"})):
-        assert client.post(url + path, data).status_code == 404, path
+        reply = client.post(url + path, data)
+        assert reply.status_code == 302, path
+        assert reply.headers["Location"].endswith("/staff/bin"), path
+        assert texts.BIN_REMOVED_MEANWHILE in client.get(
+            "/staff/bin").get_data(as_text=True), path
     assert count(connection, "checks", number) == 1
     assert count(connection, "corrections", number) == 1
     assert count(connection, "requests", number) == 1
@@ -296,11 +327,16 @@ def test_staff_remove_put_back_and_delete_in_two_steps(settings, app, clock):
     record = applications.get(connection, number)
     assert (record["binned_at"], record["bin_reason"], record["bin_note"]) \
         == (None, None, "")
-    assert client.post(url + "/restore").status_code == 404
+    # The note stays with the removal in the log.
+    assert [(r["event"], r["note"]) for r in connection.execute(
+        "SELECT * FROM bin_events ORDER BY id")] == [
+        ("removed", "сесия 26.09"), ("restored", "")]
+    reply = client.post(url + "/restore", follow_redirects=True)
+    assert texts.BIN_NOT_IN_BIN in reply.get_data(as_text=True)
 
     # The second step exists only for an application in the bin.
-    assert client.get(url + "/delete").status_code == 404
-    assert client.post(url + "/delete").status_code == 404
+    for reply in (client.get(url + "/delete"), client.post(url + "/delete")):
+        assert reply.headers["Location"].endswith("/staff/bin")
     assert applications.get(connection, number) is not None
 
     client.post(url + "/remove", {"reason": "other", "note": ""})
@@ -314,6 +350,8 @@ def test_staff_remove_put_back_and_delete_in_two_steps(settings, app, clock):
     reply = client.post(url + "/delete", follow_redirects=True)
     page = reply.get_data(as_text=True)
     assert texts.BIN_DELETED in page
+    assert [r["note"] for r in connection.execute(
+        "SELECT * FROM bin_events")] == ["", "", "", ""]
     assert applications.get(connection, number) is None
     for table in applications.RECORDED_WITH:
         assert count(connection, table, number) == 0
@@ -327,9 +365,15 @@ def test_staff_remove_put_back_and_delete_in_two_steps(settings, app, clock):
                                   db.local_datetime(db.now()))):
         assert shown in log, shown
     assert "Вълчева" not in page and "F300001" not in page
-    for reply in (client.get(url), client.get(url + "/delete"),
-                  client.post(url + "/delete"), client.post(url + "/restore")):
-        assert reply.status_code == 404
+    assert client.get(url).status_code == 404
+    # A second press, or a stale page: the bin, a sentence, nothing else.
+    for reply in (client.get(url + "/delete"), client.post(url + "/delete"),
+                  client.post(url + "/restore")):
+        assert reply.status_code == 302
+        assert reply.headers["Location"].endswith("/staff/bin")
+    page = client.get("/staff/bin").get_data(as_text=True)
+    assert texts.BIN_NOT_IN_BIN in page
+    assert len(applications.deletions(connection)) == 1
     connection.close()
 
 
@@ -484,8 +528,9 @@ def test_a_page_read_before_the_removal_changes_nothing(
     rows = {table: count(connection, table, number)
             for table in ("checks", "corrections", "requests")}
     outbox.clear()
-    assert client.post("/staff/application/{}{}".format(number, path),
-                       data).status_code == 404
+    reply = client.post("/staff/application/{}{}".format(number, path), data)
+    assert reply.status_code == 302
+    assert reply.headers["Location"].endswith("/staff/bin")
     assert {table: count(connection, table, number) for table in rows} \
         == rows
     assert applications.get(connection, number)["topic"] == "Тема на тезата"
@@ -543,3 +588,177 @@ def test_the_bin_is_in_the_staff_navigation(settings, app):
     page = client.get("/staff/application/{}".format(number)).get_data(
         as_text=True)
     assert 'id="checks"' not in page and 'id="corrections"' not in page
+
+
+# --- After the verification of 5f536ea ---------------------------------------
+
+def test_a_deleted_application_leaves_no_readable_trace_in_the_file(
+        client, new_client, settings, outbox):
+    """secure_delete: the deleted row's bytes are overwritten in the
+    database file, not merely set free, so later backups do not hold them."""
+    student = as_student(client, "ksantipa@example.org")
+    submit_thesis(student, {"name1": "Ксантипа",
+                            "topic": "Неповторима тема Зюмбюл"})
+    record = record_for(settings, "ksantipa@example.org")
+    office = as_staff(new_client(), make_account(settings))
+    url = "/staff/application/{}".format(record["id"])
+    office.post(url + "/remove", {"reason": "other", "note": "Бележка Шипка"})
+    office.post(url + "/delete")
+    data = settings.db_path.read_bytes()
+    for gone in ("Ксантипа", "Неповторима тема Зюмбюл", "Бележка Шипка",
+                 "ksantipa@example.org"):
+        assert gone.encode("utf-8") not in data, gone
+
+
+def test_a_stale_unfinished_sign_in_cannot_reach_another_students(
+        client, new_client, settings, outbox):
+    """The deleted address's sign-ins keep their numbers, spent: a browser
+    still holding one cannot spend another student's code."""
+    connection = connect(settings)
+    laptop, _, _ = signin.begin(connection, "a@example.org")
+    number = insert_application(settings, "a@example.org", name1="Ана")
+    staff = make_account(settings)
+    applications.remove(connection, number, "other", "", staff["id"])
+    applications.delete(connection, number, staff["id"])
+    other, _, code = signin.begin(connection, "b@example.org")
+    assert other > laptop
+    stale = new_client()
+    with stale.raw.session_transaction() as session:
+        session["signin"] = laptop
+        session["signin_email"] = "a@example.org"
+    for _ in range(signin.CODE_ATTEMPTS):
+        assert stale.post("/sign-in/code", {"code": "000000"}).status_code \
+            == 400
+    assert stale.post("/sign-in/code", {"code": code}).status_code == 400
+    assert signin.check_code(connection, other, code) is not None
+    connection.close()
+
+
+def test_no_reminder_goes_and_nothing_breaks_when_deleted_in_between(
+        monkeypatch):
+    with world() as (settings, connection, loaded, clock, box, staff):
+        first = new_thesis(connection, settings, loaded, 1)
+        second = new_thesis(connection, settings, loaded, 2)
+        clock.advance(days=3)
+        stale = supervision.due(connection, settings)
+        applications.remove(connection, first, "other", "", staff["id"])
+        applications.delete(connection, first, staff["id"])
+        monkeypatch.setattr(supervision, "due", lambda c, s: stale)
+        box.clear()
+        sent, failed = supervision.remind(connection, settings, loaded)
+        assert failed == [] and len(sent) == 1
+        assert [m.intended for m in box.messages] == ["p.ivanov@example.org"]
+        assert applications.current_request(connection, second)[
+            "reminders_sent"] == 1
+
+
+def test_a_supervisor_page_says_unknown_once_the_application_is_deleted(
+        client, new_client, settings, outbox, monkeypatch):
+    student = as_student(client, "petar@example.org")
+    submit_thesis(student)
+    record = record_for(settings, "petar@example.org")
+    link = link_from(outbox.to("p.ivanov@example.org")[-1], "confirm")
+    staff = make_account(settings)
+
+    def delete_now():
+        other = connect(settings)
+        applications.remove(other, record["id"], "other", "", staff["id"])
+        applications.delete(other, record["id"], staff["id"])
+        other.close()
+
+    # Deleted while the student's notice is on its way.
+    real = mail.send
+
+    def sending(settings_, message, out=None):
+        delete_now()
+        return real(settings_, message, out)
+    monkeypatch.setattr(mail, "send", sending)
+    reply = new_client().post(link, {"comment": ""})
+    assert reply.status_code == 404
+    assert texts.ANSWER_UNKNOWN in reply.get_data(as_text=True)
+
+
+def test_a_supervisor_link_read_just_before_the_deletion_says_unknown(
+        client, new_client, settings, outbox, monkeypatch):
+    student = as_student(client, "petar@example.org")
+    submit_thesis(student)
+    record = record_for(settings, "petar@example.org")
+    link = link_from(outbox.to("p.ivanov@example.org")[-1], "confirm")
+    staff = make_account(settings)
+    real = supervision.find
+
+    def find_then_delete(connection, token):
+        row = real(connection, token)
+        applications.remove(connection, record["id"], "other", "",
+                            staff["id"])
+        applications.delete(connection, record["id"], staff["id"])
+        return row
+    monkeypatch.setattr(supervision, "find", find_then_delete)
+    reply = new_client().get(link)
+    assert reply.status_code == 404
+    assert texts.ANSWER_UNKNOWN in reply.get_data(as_text=True)
+
+
+def test_a_decline_in_the_bin_lets_no_one_choose_again():
+    with world() as (settings, connection, loaded, clock, box, staff):
+        number = new_thesis(connection, settings, loaded, 1)
+        token = supervision.token_for(settings, applications.current_request(
+            connection, number))
+        assert supervision.answer(connection, token, "decline", "")[0] \
+            == "recorded"
+        applications.remove(connection, number, "other", "", staff["id"])
+        box.clear()
+        with pytest.raises(applications.Removed):
+            supervision.choose_again(connection, settings, loaded, number,
+                                     {"professor": "georgieva"})
+        assert count(connection, "requests", number) == 1
+        assert box.messages == []
+
+
+def test_a_student_change_meeting_a_removal_changes_nothing(
+        client, settings, outbox, monkeypatch):
+    """The student pages' answer to Removed: back to the application page,
+    which says where it stands."""
+    student = as_student(client, "maria@example.org")
+
+    def removed(*args, **kwargs):
+        raise applications.Removed()
+    monkeypatch.setattr(supervision, "submit", removed)
+    reply = submit_thesis(student)
+    assert reply.status_code == 302
+    assert reply.headers["Location"].endswith("/application")
+
+
+def test_pressing_remove_twice_says_so_in_bulgarian(settings, app):
+    staff = make_account(settings)
+    client = as_staff(Client(app.test_client()), staff)
+    number = insert_application(settings, "c@example.org", name1="Цвета")
+    url = "/staff/application/{}/remove".format(number)
+    assert client.post(url, {"reason": "other"}).status_code == 302
+    reply = client.post(url, {"reason": "graduated"}, follow_redirects=True)
+    assert texts.BIN_REMOVED_MEANWHILE in reply.get_data(as_text=True)
+    connection = connect(settings)
+    assert [r["reason"] for r in connection.execute(
+        "SELECT * FROM bin_events")] == ["other"]
+    connection.close()
+
+
+def test_who_must_not_see_an_application_in_the_bin(
+        client, new_client, settings, app):
+    staff = make_account(settings)
+    student = as_student(client, "maria@example.org")
+    submit_thesis(student)
+    record = record_for(settings, "maria@example.org")
+    office = as_staff(new_client(), staff)
+    url = "/staff/application/{}".format(record["id"])
+    office.post(url + "/remove", {"reason": "other", "note": "Бележка Рила"})
+    page = student.get("/application").get_data(as_text=True)
+    for hidden in ("Бележка Рила", staff["username"], texts.BIN_REASON["other"]):
+        assert hidden not in page, hidden
+    waiting = make_account(settings, username="waiting", approved=False)
+    for visitor in (new_client(), as_student(new_client(), "maria@example.org"),
+                    as_staff(new_client(), waiting)):
+        for reply in (visitor.get(url), visitor.get(url + "/delete")):
+            assert reply.status_code == 302
+            assert reply.headers["Location"].endswith("/staff/sign-in")
+            assert "Мария" not in reply.get_data(as_text=True)

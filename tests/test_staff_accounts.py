@@ -176,7 +176,8 @@ def test_an_unknown_login_is_refused_with_the_same_sentence(client,
 # --- An account not yet approved sees nothing ------------------------------
 
 STAFF_PAGES = ["/staff", "/staff/application/1", "/owner", "/staff/reports",
-               "/staff/reports/1/delete"]
+               "/staff/reports/1/delete", "/staff/bin",
+               "/staff/application/1/delete"]
 
 
 def assert_sees_nothing(client):

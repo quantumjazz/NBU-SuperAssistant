@@ -301,8 +301,11 @@ def answer(connection, token, choice, comment):
 
 
 def tell_student_of_decline(connection, settings, lists, request):
-    """The decline notice. Raises mail.MailFailed; the answer stays recorded."""
+    """The decline notice. Raises mail.MailFailed; the answer stays recorded.
+    Nothing is sent once the application has been deleted."""
     record = applications.get(connection, request["application_id"])
+    if record is None:
+        return
     message = _decline_message(settings, lists, record, request)
     _throttle(connection, "notice", message.to, in_transaction=False)
     mail.send(settings, message)
@@ -310,8 +313,10 @@ def tell_student_of_decline(connection, settings, lists, request):
 
 def tell_student_of_confirm(connection, settings, lists, request):
     """The confirmation notice. Raises mail.MailFailed; the answer stays
-    recorded."""
+    recorded. Nothing is sent once the application has been deleted."""
     record = applications.get(connection, request["application_id"])
+    if record is None:
+        return
     message = _confirm_message(settings, lists, record, request)
     _throttle(connection, "notice", message.to, in_transaction=False)
     mail.send(settings, message)
@@ -358,12 +363,12 @@ def remind(connection, settings, lists):
                 fresh = connection.execute(
                     "SELECT * FROM requests WHERE id = ?",
                     (request["id"],)).fetchone()
-                if (fresh["answer"] is not None
+                if (fresh is None or fresh["answer"] is not None
                         or fresh["replaced_at"] is not None
                         or fresh["reminders_sent"] != request["reminders_sent"]):
                     continue
                 record = applications.get(connection, fresh["application_id"])
-                if applications.is_binned(record):
+                if record is None or applications.is_binned(record):
                     continue
                 message = _request_message(settings, lists, record,
                                            token_for(settings, fresh),

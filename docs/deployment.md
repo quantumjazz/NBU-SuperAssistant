@@ -443,9 +443,17 @@ the copies 30 days old or older, so the folder holds the last 30 days. The
 journal says where the file is, how many applications it holds and which
 old copies went.
 
-The copies in the mailbox stay until the owner deletes them. An application
-deleted from the bin is gone from the next night's copy and, 30 days later,
-from every copy on the laptop, but not from the messages already received.
+An application deleted from the bin is gone from the database file at once
+and from the next night's copy. It stays in the nightly copies of the
+previous 30 days in the `snapshots` folder (fewer if nights were missed, as
+a run removes old copies only when it runs), in the messages already
+received until the owner deletes them, in the Word files of kept reports,
+and in every backup taken before the deletion.
+
+Resend refuses a message above its size limit (its documentation gives the
+current figure; an attachment grows by about a third on the way). The
+journal says the size of each night's file; a refused copy fails the unit,
+and deleting old applications from the bin makes the file smaller.
 
 The file opens in Excel on the Mac: semicolons between cells, as Excel
 expects where numbers have a decimal comma, and the UTF-8 mark, so Cyrillic
@@ -575,8 +583,11 @@ curl -s https://nbu-superassistant.visiometrica.com/healthz
 The `git diff` line shows, before anything changes, whether the update
 touches the unit files or the settings template. If a unit file changed,
 copy it again (the `sudo cp` lines above) and run `sudo systemctl
-daemon-reload` before the restart. If the template changed, compare it with
-your `.env.production`.
+daemon-reload` before the restart. If the update adds a unit, install it as
+its own section says, timer enabled, before the restart: the update of 15
+October 2026 adds the nightly copy's two units (*The nightly copy*), and the
+backup and restore lines below expect both timers installed. If the
+template changed, compare it with your `.env.production`.
 
 The records are untouched by this, which is why they sit outside the clone.
 A version that changes the database migrates it at its start, keeping every

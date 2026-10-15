@@ -21,6 +21,9 @@ NOTICES = {"confirm": supervision.tell_student_of_confirm,
 
 def _page(request_row, choice, state, notice_failed=False, status=200):
     record = applications.get(web.connection(), request_row["application_id"])
+    if record is None:
+        # Deleted from the bin since the request was read.
+        return render_template("answer.html", state="unknown"), 404
     lists = web.current_lists()
     return render_template(
         "answer.html", state=state, choice=choice, request_row=request_row,

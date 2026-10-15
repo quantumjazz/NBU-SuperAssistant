@@ -15,11 +15,12 @@ Staff may remove an application to the bin, choosing why, and from the bin
 put it back or, after a second page that names it, delete it (constitution
 5.15). An application in the bin leaves the table; its own page shows it
 read-only, and every change to it is refused, also when the removal comes
-between the page and the change (applications.Removed).
+between the page and the change (applications.Removed): staff are taken to
+the bin with a sentence saying nothing changed, as they are after pressing
+a bin button twice, or after another member of staff acted first.
 """
 
 from flask import Blueprint, abort, flash, redirect, render_template, request
-from werkzeug.exceptions import NotFound
 
 from superassistant import applications, db, mail, supervision, texts
 from superassistant import web
@@ -30,8 +31,16 @@ blueprint = Blueprint("staff", __name__)
 @blueprint.errorhandler(applications.Removed)
 def _removed(exc):
     """A change to an application removed or deleted since its page was
-    read: not found, and nothing changed."""
-    return NotFound()
+    read: nothing changed, and staff are told so in the bin."""
+    flash(texts.BIN_REMOVED_MEANWHILE, "error")
+    return redirect("/staff/bin")
+
+
+def _not_in_bin():
+    """A bin button for an application no longer in the bin (put back or
+    deleted, by this press's twin or by someone else): nothing changed."""
+    flash(texts.BIN_NOT_IN_BIN, "error")
+    return redirect("/staff/bin")
 
 # Thesis entries a state-exam application may still hold, from before staff
 # corrected its type or from the student's draft: shown, never dropped.
@@ -82,7 +91,7 @@ def _active(application_id):
     """A submitted application not in the bin, which staff may change."""
     record = _submitted(application_id)
     if applications.is_binned(record):
-        abort(404)
+        raise applications.Removed(application_id)
     return record
 
 
@@ -256,7 +265,7 @@ def remove(application_id):
     if not applications.remove(web.connection(), record["id"], reason,
                                request.form.get("note", ""),
                                web.session_staff()["id"]):
-        abort(404)
+        raise applications.Removed(record["id"])
     flash(texts.BIN_REMOVED, "ok")
     return redirect("/staff")
 
@@ -267,16 +276,9 @@ def remove(application_id):
 def restore(application_id):
     if not applications.restore(web.connection(), application_id,
                                 web.session_staff()["id"]):
-        abort(404)
+        return _not_in_bin()
     flash(texts.BIN_RESTORED, "ok")
     return redirect("/staff/application/{}".format(application_id))
-
-
-def _in_bin(application_id):
-    record = _submitted(application_id)
-    if not applications.is_binned(record):
-        abort(404)
-    return record
 
 
 @blueprint.route("/staff/application/<int:application_id>/delete")
@@ -284,8 +286,10 @@ def _in_bin(application_id):
 def delete_page(application_id):
     """The second step: the application named, and the button that
     deletes it."""
-    record = _in_bin(application_id)
     connection = web.connection()
+    record = applications.get(connection, application_id)
+    if not applications.is_binned(record):
+        return _not_in_bin()
     return render_template(
         "application_delete.html", record=record,
         row=_row(connection, record, web.current_lists()),
@@ -298,7 +302,7 @@ def delete_page(application_id):
 def delete(application_id):
     if not applications.delete(web.connection(), application_id,
                                web.session_staff()["id"]):
-        abort(404)
+        return _not_in_bin()
     flash(texts.BIN_DELETED, "ok")
     return redirect("/staff/bin")
 

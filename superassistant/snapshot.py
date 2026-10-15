@@ -13,14 +13,18 @@ The file is made for Excel on the owner's Mac, whose numbers use a decimal
 comma. Excel there separates cells by semicolons, so the file does too, and
 it reads Cyrillic only from a file that starts with the UTF-8 byte order
 mark, so the file does. Excel also changes what it reads: it runs a cell
-beginning with "=" as a formula, and turns a cell without letters into a
-number or a date, so „0888123456“ loses its first zero and „5,50“ becomes
-5,5. A cell Excel would change is therefore written as Excel's own text
-value, ="…", which Excel shows exactly as typed and never runs, whatever it
-holds (checked in Excel on the owner's Mac on 15 October 2026). Excel's text
-values hold at most 255 characters and one line; a longer cell or one with
-line breaks that Excel would change gets an apostrophe before it instead,
-which Excel shows.
+beginning with "=" as a formula, and turns what looks like a number, a date
+or a time into one, so „0888123456“ loses its first zero, „5,50“ becomes 5,5
+and „1e5“ 100000. Every cell of one line is therefore written as Excel's own
+text value, ="…", which Excel shows exactly as typed and never runs, whatever
+it holds (checked in Excel on the owner's Mac on 15 October 2026). Excel's
+text values hold at most 255 characters, counted as Excel counts them (UTF-16
+units), and one line. A longer cell or one with line breaks is written as it
+is, which Excel keeps as text, unless it begins with what Excel runs as a
+formula: then it gets an apostrophe before it, which Excel shows.
+
+Two runs at once (the timer's and one by hand) take turns: each holds a lock
+on the snapshots folder while it writes its file and removes old ones.
 
 What the file holds is what staff see of each application: its entries, the
 current supervisor's answer and comment, the latest check, whether a kept
@@ -37,11 +41,11 @@ failed until the next run.
 """
 
 import csv
+import fcntl
 import io
 import os
 import re
 import sys
-import unicodedata
 
 from superassistant import accounts, applications, db, mail, supervision
 from superassistant import texts
@@ -55,12 +59,13 @@ DELIMITER = ";"
 
 # What Excel runs as a formula when a cell begins with it.
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
-# The longest text Excel's ="…" holds.
+# The longest text Excel's ="…" holds, in UTF-16 units.
 _EXCEL_TEXT_MAX = 255
+LOCK = ".lock"
 
 
-def _has_letter(value):
-    return any(unicodedata.category(ch).startswith("L") for ch in value)
+def _excel_length(value):
+    return len(value.encode("utf-16-le")) // 2
 
 
 def cell(value):
@@ -68,12 +73,12 @@ def cell(value):
     value = "" if value is None else str(value)
     if not value:
         return value
-    if not value.startswith(_FORMULA_START) and _has_letter(value):
-        return value
-    if len(value) <= _EXCEL_TEXT_MAX and "\n" not in value \
-            and "\r" not in value:
+    if (_excel_length(value) <= _EXCEL_TEXT_MAX and "\n" not in value
+            and "\r" not in value):
         return '="' + value.replace('"', '""') + '"'
-    return "'" + value
+    if value.startswith(_FORMULA_START):
+        return "'" + value
+    return value
 
 
 def _supervisor_email(record, lists):
@@ -204,9 +209,19 @@ def run(settings, out=None, err=None):
     moment = db.now()
     today = db.local_day(moment)
     data = to_bytes(rows)
-    path = write(settings, data, today)
-    out.write(texts.CLI_SNAPSHOT_WRITTEN.format(path, len(rows) - 1) + "\n")
-    removed = prune(settings, today)
+    settings.snapshots_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor = os.open(str(settings.snapshots_dir / LOCK),
+                         os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        path = write(settings, data, today)
+        removed = prune(settings, today)
+    finally:
+        os.close(descriptor)        # closing releases the lock
+    count = len(rows) - 1
+    out.write(texts.CLI_SNAPSHOT_WRITTEN.format(
+        path=path, count=count, size=len(data),
+        word=texts.CLI_SNAPSHOT_WORD[0 if count == 1 else 1]) + "\n")
     if removed:
         out.write(texts.CLI_SNAPSHOT_PRUNED.format(", ".join(removed))
                   + "\n")
