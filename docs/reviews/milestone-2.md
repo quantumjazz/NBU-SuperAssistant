@@ -424,3 +424,19 @@
 - **Known limit:** code from before `890adf7` lists reports in the bin as kept.
 - **Not pushed.** The update needs no new units or settings.
 - **Outstanding:** Codex's review of `51b1c2d..d39ce3c`; Fable's amendment; the laptop update; the owner's acceptance.
+
+## 2026-10-15 — The third task: `d39ce3c` approved
+
+- **Approvals of `d39ce3c`** (range `51b1c2d..d39ce3c`, record `d95cbfe`):
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED: d39ce3c, range 51b1c2d..d39ce3c, record d95cbfe. No changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, as Codex reported them:
+  - 340 passed and 9 browser passed on Python 3.9.6 and 3.12.14, the browser tests "after rerunning outside the execution sandbox";
+  - the regression checks of T13-C1 to C3 and T15-C1 to C3 pass;
+  - an actual `51b1c2d` data folder upgraded from schema 4 to 5, "preserving every existing row across 13 tables and all five non-database files"; earlier deletions stayed deleted;
+  - the governance hashes match: `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `bdb5fe14…`, `NOW.md` `5bd1f853…`.
+- **Not pushed:** GitHub and the laptop are at `51b1c2d`.
+- **Outstanding:**
+  - the owner's yes to the push and the laptop update (no new units; schema 5 at the restart);
+  - Fable's `NOW.md` amendment and both approvals before milestone 3;
+  - the owner's acceptance of this task and of the earlier ones.
