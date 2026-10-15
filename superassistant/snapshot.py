@@ -15,22 +15,19 @@ it reads Cyrillic only from a file that starts with the UTF-8 byte order
 mark, so the file does. Excel also changes what it reads: it runs a cell
 beginning with "=" as a formula, and turns what looks like a number, a date
 or a time into one, so „0888123456“ loses its first zero, „5,50“ becomes 5,5
-and „1e5“ 100000, also when it is long: 256 ones become 1,11E+255 (Codex
-T15-C3). Every cell of one line is therefore written as Excel's own text
-value, ="…", which Excel shows exactly as typed and never runs or converts,
-whatever it holds (checked in Excel on the owner's Mac, 15 October 2026).
-One text value holds at most 255 characters, counted as Excel counts them
-(UTF-16 units, a quote written twice counting twice), so a longer cell is
-written as several joined with "&", ="…"&"…", as long as the whole formula
-fits in Excel's 8,192: all 256 ones, 5,000 digits or a 302-character cell
-beginning with "=" came back exactly, opened or imported as UTF-8 with
-semicolons, General format. A cell with line breaks is written as it is:
-Excel keeps it as text. So is a cell of one line too long for a formula
-that holds a letter; one that holds none, and any cell beginning with what
-Excel runs as a formula, gets an apostrophe before it, which Excel shows.
+and „1e5“ 100000, however long the cell: 256 ones become 1,11E+255, and
+8,200 zeros and „1e5“ 100000 (Codex T15-C3). Its text import, File > Open,
+also splits a cell with line breaks into rows.
 
-Two runs at once (the timer's and one by hand) take turns: each holds a lock
-on the snapshots folder while it writes its file and removes old ones.
+So every cell is written as an Excel formula that only joins text: ="…",
+or ="…"&CHAR(10)&"…" for a line break, pieces of at most 255 UTF-16 units
+(a quote, written twice, counting twice), as Excel's text values hold. Excel
+shows it exactly as typed and never runs, converts or splits it, opened or
+imported (checked in Excel on the owner's Mac, 15 October 2026). A cell too
+long for Excel's formula of 8,192 units is written with an apostrophe before
+it, which keeps it text, the apostrophe shown; its line breaks, if any, are
+then written as they are, which opening the file keeps but the text import
+splits.
 
 What the file holds is what staff see of each application: its entries, the
 current supervisor's answer and comment, the latest check, whether a kept
@@ -52,7 +49,6 @@ import io
 import os
 import re
 import sys
-import unicodedata
 
 from superassistant import accounts, applications, db, mail, supervision
 from superassistant import texts
@@ -64,12 +60,12 @@ NAME = "zaiavlenia-{}.csv"
 _NAME = re.compile(r"zaiavlenia-(\d{4})-(\d{2})-(\d{2})\.csv(\.tmp)?")
 DELIMITER = ";"
 
-# What Excel runs as a formula when a cell begins with it.
-_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 # The longest text one of Excel's text values holds, and the longest
 # formula, in UTF-16 units.
 _EXCEL_TEXT_MAX = 255
 _EXCEL_FORMULA_MAX = 8192
+# A line break as a term of the formula.
+_LINE_BREAKS = {"\n": "CHAR(10)", "\r": "CHAR(13)"}
 LOCK = ".lock"
 
 
@@ -77,15 +73,11 @@ def _excel_length(value):
     return len(value.encode("utf-16-le")) // 2
 
 
-def _has_letter(value):
-    return any(unicodedata.category(ch).startswith("L") for ch in value)
-
-
-def _pieces(value):
-    """value in pieces of at most _EXCEL_TEXT_MAX units as written, a quote
-    counting twice; a character is never split."""
+def _literals(text):
+    """text as Excel text values, "…", each holding at most _EXCEL_TEXT_MAX
+    units as written, a quote counting twice; a character is never split."""
     pieces, current, size = [], [], 0
-    for ch in value:
+    for ch in text:
         width = _excel_length(ch) * (2 if ch == '"' else 1)
         if current and size + width > _EXCEL_TEXT_MAX:
             pieces.append("".join(current))
@@ -93,7 +85,23 @@ def _pieces(value):
         current.append(ch)
         size += width
     pieces.append("".join(current))
-    return pieces
+    return ['"' + piece.replace('"', '""') + '"' for piece in pieces]
+
+
+def _terms(value):
+    """The formula's terms: text values and line breaks, in order."""
+    terms, run = [], []
+    for ch in value:
+        if ch in _LINE_BREAKS:
+            if run:
+                terms.extend(_literals("".join(run)))
+                run = []
+            terms.append(_LINE_BREAKS[ch])
+        else:
+            run.append(ch)
+    if run:
+        terms.extend(_literals("".join(run)))
+    return terms
 
 
 def cell(value):
@@ -101,16 +109,10 @@ def cell(value):
     value = "" if value is None else str(value)
     if not value:
         return value
-    if "\n" not in value and "\r" not in value:
-        formula = "=" + "&".join('"' + piece.replace('"', '""') + '"'
-                                 for piece in _pieces(value))
-        if _excel_length(formula) <= _EXCEL_FORMULA_MAX:
-            return formula
-        if not _has_letter(value):
-            return "'" + value
-    if value.startswith(_FORMULA_START):
-        return "'" + value
-    return value
+    formula = "=" + "&".join(_terms(value))
+    if _excel_length(formula) <= _EXCEL_FORMULA_MAX:
+        return formula
+    return "'" + value
 
 
 def _supervisor_email(record, lists):

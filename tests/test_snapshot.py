@@ -35,37 +35,52 @@ OWNER = "owner"
 OWNER_ADDRESS = "owner-account@example.org"
 
 
+LINE_BREAKS = {"CHAR(10)": "\n", "CHAR(13)": "\r"}
+
+
 def text_formula(written):
-    """The pieces of Excel text values a cell joins, ="a"&"b", as Excel
-    reads them, or None when the cell is not one."""
-    if not written.startswith('="'):
+    """The terms of a cell that only joins text, ="a"&CHAR(10)&"b", as
+    Excel reads them: text values and line breaks; None when the cell is
+    not such a formula."""
+    if not written.startswith("="):
         return None
-    pieces, current, i = [], [], 2
-    while i < len(written):
-        ch = written[i]
-        if ch != '"':
-            current.append(ch)
-            i += 1
-        elif written[i + 1:i + 2] == '"':
-            current.append('"')
-            i += 2
-        elif written[i + 1:i + 3] == '&"':
-            pieces.append("".join(current))
-            current, i = [], i + 3
-        elif i == len(written) - 1:
-            pieces.append("".join(current))
-            return pieces
+    terms, i = [], 1
+    while True:
+        for name, ch in LINE_BREAKS.items():
+            if written.startswith(name, i):
+                terms.append(("break", ch))
+                i += len(name)
+                break
         else:
+            if written[i:i + 1] != '"':
+                return None
+            current, i = [], i + 1
+            while True:
+                if i >= len(written):
+                    return None
+                if written[i] != '"':
+                    current.append(written[i])
+                    i += 1
+                elif written[i + 1:i + 2] == '"':
+                    current.append('"')
+                    i += 2
+                else:
+                    i += 1
+                    break
+            terms.append(("text", "".join(current)))
+        if i == len(written):
+            return terms
+        if written[i] != "&":
             return None
-    return None
+        i += 1
 
 
 def excel_shows(written):
-    """What Excel shows for a cell as the file writes it: its text values
-    joined; any other cell as it is, an apostrophe before it included (seen
-    in Excel on the owner's Mac, 15 October 2026)."""
-    pieces = text_formula(written)
-    return "".join(pieces) if pieces is not None else written
+    """What Excel shows for a cell as the file writes it: its terms joined;
+    any other cell as it is, an apostrophe before it included (seen in Excel
+    on the owner's Mac, 15 October 2026)."""
+    terms = text_formula(written)
+    return "".join(t for _, t in terms) if terms is not None else written
 
 
 def any_text(max_size=40):
@@ -81,30 +96,26 @@ def excel_units(text):
 
 def check_cell(value):
     written = snapshot.cell(value)
-    one_line = "\n" not in value and "\r" not in value
-    pieces = text_formula(written)
-    if value and one_line and pieces is not None:
-        # Excel's text values, shown exactly as typed whatever they hold.
-        assert "".join(pieces) == value
-        assert all(excel_units(piece) + piece.count('"') <= 255
-                   for piece in pieces)
+    terms = text_formula(written)
+    if not value:
+        assert written == ""
+    elif terms is not None:
+        # Only text and line breaks, shown exactly as typed.
+        assert excel_shows(written) == value
+        assert all(excel_units(t) + t.count('"') <= 255
+                   for kind, t in terms if kind == "text")
         assert excel_units(written) <= 8192
-    elif value and one_line:
-        # Too long for one formula: kept as text by a letter, or shown with
-        # an apostrophe.
-        joined = "=" + "&".join('"' + piece.replace('"', '""') + '"'
-                                for piece in snapshot._pieces(value))
-        assert excel_units(joined) > 8192
-        assert written == ("'" + value if not any(ch.isalpha() for ch in value)
-                           or value.startswith(snapshot._FORMULA_START)
-                           else value)
-    elif value.startswith(snapshot._FORMULA_START):
-        assert written == "'" + value         # shown with the apostrophe
     else:
-        assert written == value               # Excel keeps lines as text
-    # Never a formula Excel would run: only joined text values.
+        # Too long for one formula: kept text by an apostrophe, shown.
+        assert written == "'" + value
+        joined = "=" + "&".join(snapshot._terms(value))
+        assert excel_units(joined) > 8192
+    # Never a formula that does anything but join text, nothing Excel
+    # converts, and no line break Excel's text import would split on,
+    # unless too long for that.
     assert not written.startswith(("+", "-", "@", "\t", "\r"))
-    assert not written.startswith("=") or pieces is not None
+    assert not written.startswith("=") or terms is not None
+    assert terms is not None or not value or written.startswith("'")
     return written
 
 
@@ -117,18 +128,23 @@ def test_a_cell_shows_as_typed_and_is_never_a_formula(value):
 @pytest.mark.parametrize("value", [
     "1" * 256, "0" * 256, "0." + "1" * 254, "1" * 309, "1." + "0" * 255,
     '"' * 255, '"' * 300, "1" * 5000, "😀" * 200, "=x" + "y" * 300,
-    "x" * 255 + '"', "1" * 9000, "a" * 9000, "0888123456\n0999",
+    "x" * 255 + '"', "1" * 9000, "a" * 9000, "0" * 8200 + "1e5",
+    "0888123456\n0999", "- първо\n- второ", "a\n\nb", "x\r\ny",
+    ("ред " * 300 + "\n") * 3 + "край",
 ])
 def test_long_cells_excel_would_convert_stay_as_typed(value):
-    """Codex T15-C3: in Excel, 256 ones became 1,11E+255 and 256 zeros 0.
-    Each of these was read back exactly in Excel on 15 October 2026, opened
-    and imported, apart from the 9,000 digits, too long for a formula, which
-    keep their digits behind an apostrophe."""
+    """Codex T15-C3: in Excel, 256 ones became 1,11E+255, 256 zeros 0, and
+    8,200 zeros and „1e5“ 100000; its text import split cells with line
+    breaks into rows. Each of these was read back in Excel on 15 October
+    2026, opened and imported as UTF-8 with semicolons, General format:
+    exactly, rows intact, apart from those too long for a formula, which
+    keep every character behind an apostrophe."""
     written = check_cell(value)
-    if value == "1" * 9000:
+    if len(value) >= 8200:
         assert written == "'" + value
-    elif "\n" not in value and value != "a" * 9000:
+    else:
         assert excel_shows(written) == value
+        assert "\n" not in written and "\r" not in written
 
 
 def read(data):
