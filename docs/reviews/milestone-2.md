@@ -454,3 +454,25 @@
 - **Outstanding:**
   - this acceptance, and the earlier tasks' acceptances;
   - Fable's `NOW.md` amendment and both approvals before milestone 3.
+
+## 2026-10-16 — Four tasks COMPLETE: accepted by the owner
+
+- **Owner acceptance** (verbatim): "I accept all the tasks; tests will be done tomorrow".
+- **Accepted:**
+  - the confirmation notice and the ФДЕНО address line: code `0641e0f`, docstring `14e8580`;
+  - the task before milestone 3, `b756685..f37fcf4`: the answer page, the declaration tick, the F№ digits, the 17 programmes, and deleting a report, which the bin for reports has since replaced;
+  - the bin for applications and the nightly copy, `f07aa5a..2b5db84`;
+  - the bin for reports, `51b1c2d..d39ce3c`.
+- **Not seen before acceptance:**
+  - the owner's own checks on the live site, which the owner will do later ("tests will be done tomorrow");
+  - a live confirmation reaching the test student.
+  
+  Their results, and any fault they find, go in a new entry.
+- **Seen since the update:** the nightly copy ran at 00:00 on 16 October on the new code: `zaiavlenia-2026-10-16.csv`, 3 applications, sent to the owner's account address; the unit succeeded.
+- **Live:** GitHub and the laptop at `cebfa27`, schema 5.
+- **Status:** COMPLETE, all four.
+- **Before milestone 3:**
+  - Fable's `NOW.md` amendment for both bins, and Fable's and Opus 5.5's approval of the same version;
+  - the owner's authorization.
+
+  The governance changes stay uncommitted until then: `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `bdb5fe14…`.
