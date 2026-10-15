@@ -386,13 +386,13 @@ def test_only_approved_staff_reach_reports(settings, app):
 
 # --- The bin for reports (constitution 5.14) --------------------------------
 # The task of 13 October 2026 made deletion "the report disappears": its file
-# and its rows. Since the report bin of 15 October 2026 ("Can the deleted
-# reports go first to the bin now and then be deleted?") a report staff
-# remove waits in the bin with its file and its rows, not a kept report, its
-# students waiting for a report again at once ("Yes, right away"); it can be
-# put back as it was, and only a report in the bin is deleted. Who removed,
-# put back and deleted which report and when is kept; a deleted report's
-# number is never given again.
+# and its rows. Since the report bin of 15 October 2026,
+# "Can the deleted  reports go first to the bin now and then be deleted?",
+# a report staff remove waits in the bin with its file and its rows, not a
+# kept report, its students waiting for a report again at once ("Yes, right
+# away"); it can be put back as it was, and only a report in the bin is
+# deleted. Who removed, put back and deleted which report and when is kept;
+# a deleted report's number is never given again.
 
 @hsettings(max_examples=40, deadline=None)
 @given(st.lists(st.one_of(
@@ -458,6 +458,12 @@ def test_the_report_bin_over_any_sequence(operations, applications):
             sorted(kept)
         assert sorted(r["id"] for r in reports.binned(d.connection)) == \
             sorted(binned)
+        for report_id in kept:
+            report = reports.get(d.connection, report_id)
+            assert (report["binned_at"], report["binned_by"]) == (None, None)
+        for report_id in binned:
+            assert reports.get(d.connection, report_id)["binned_by"] == \
+                d.account
         for report_id, (programme, listed) in list(kept.items()) + list(
                 binned.items()):
             assert [r["application_id"] for r in reports.students(
@@ -523,7 +529,7 @@ def test_staff_remove_put_back_and_delete_a_report_in_two_steps(
     reply = client.post("/staff/reports/1/remove", follow_redirects=True)
     page = reply.get_data(as_text=True)
     assert reply.request.path == "/staff/reports"
-    assert texts.REPORTS_REMOVED in page
+    assert texts.REPORTS_REMOVED in page and 'class="flash ok"' in page
     assert texts.REPORTS_NONE_KEPT in page and "/staff/reports/1." not in page
     assert file.read_bytes() == content
     assert reports_count(settings) == 1
@@ -552,7 +558,9 @@ def test_staff_remove_put_back_and_delete_a_report_in_two_steps(
     assert reply.request.path == "/staff/reports"
     page = reply.get_data(as_text=True)
     assert texts.REPORTS_RESTORED in page and "/staff/reports/1.docx" in page
-    assert reports.get(connection, 1)["binned_at"] is None
+    restored = reports.get(connection, 1)
+    assert (restored["binned_at"], restored["binned_by"]) == (None, None)
+    assert dict(restored) == dict(report)                # as it was
     assert "чака доклад" not in client.get("/staff").get_data(as_text=True)
     assert texts.BIN_EMPTY in client.get("/staff/bin").get_data(as_text=True)
 
@@ -567,9 +575,13 @@ def test_staff_remove_put_back_and_delete_a_report_in_two_steps(
                   "<dd>1</dd>", texts.REPORTS_DELETE_TITLE,
                   texts.REPORTS_DELETE_LEAD, texts.BIN_DELETE,
                   "other, {}".format(db.local_datetime(removed_at)),
-                  'aria-current="page">{}'.format(texts.NAV_BIN)):
+                  'aria-current="page">{}'.format(texts.NAV_BIN),
+                  'class="back" href="/staff/bin"',
+                  'class="btn secondary" href="/staff/bin"'):
         assert shown in page, shown
     assert 'aria-current="page">{}'.format(texts.NAV_REPORTS) not in page
+    # The reports page is reached only from the navigation.
+    assert page.count('href="/staff/reports"') == 1
     assert reports.get(connection, 1) is not None       # nothing deleted yet
 
     clock.advance(hours=2)
@@ -605,6 +617,9 @@ def test_staff_remove_put_back_and_delete_a_report_in_two_steps(
     assert 'id="report-deletions"' not in client.get(
         "/staff/reports").get_data(as_text=True)
     assert client.get("/staff/reports/1.docx").status_code == 404
+    reply = client.get("/staff/reports/1/delete", follow_redirects=True)
+    assert reply.request.path == "/staff/bin"
+    assert texts.REPORTS_NOT_IN_BIN in reply.get_data(as_text=True)
 
     # The student waits for a report again, and the next report lists them
     # under a new number.
@@ -667,7 +682,8 @@ def test_pressing_a_report_bin_button_twice_says_so_in_bulgarian(settings,
         client.post(url)
         reply = client.post(url, follow_redirects=True)
         assert reply.request.path == "/staff/bin"
-        assert said in reply.get_data(as_text=True)
+        page = reply.get_data(as_text=True)
+        assert said in page and 'class="flash error"' in page
     twice("/staff/reports/1/remove", texts.REPORTS_REMOVED_MEANWHILE)
     twice("/staff/reports/1/restore", texts.REPORTS_NOT_IN_BIN)
     client.post("/staff/reports/1/remove")
@@ -676,12 +692,86 @@ def test_pressing_a_report_bin_button_twice_says_so_in_bulgarian(settings,
                 "/staff/reports/9/remove", "/staff/reports/9/restore",
                 "/staff/reports/9/delete"):
         assert client.post(url).headers["Location"].endswith("/staff/bin")
+    for url in ("/staff/reports/1/delete", "/staff/reports/9/delete"):
+        reply = client.get(url, follow_redirects=True)
+        assert reply.request.path == "/staff/bin"
+        assert texts.REPORTS_NOT_IN_BIN in reply.get_data(as_text=True)
     # One row for each press that did something, and nothing else.
     assert [r["event"] for r in connection.execute(
         "SELECT event FROM report_bin_events ORDER BY id")] == [
         "removed", "restored", "removed"]
     assert len(reports.deletions(connection)) == 1
     connection.close()
+
+
+@pytest.mark.parametrize("step, meanwhile, events", [
+    ("delete", "restore", ["removed", "restored"]),
+    ("remove", "remove", ["removed"]),
+    ("restore", "restore", ["removed", "restored"]),
+])
+def test_each_step_reads_the_bin_under_its_own_write_lock(settings, app,
+                                                          step, meanwhile,
+                                                          events):
+    """Another member of staff acts in the moment before this step takes
+    the write lock. Each step reads whether the report is in the bin only
+    once it holds the lock, so it sees that and changes nothing: a report
+    put back just then is never deleted in one step, and nothing is logged
+    twice."""
+    staff, report_id = binned_report(settings)
+    if step == "remove":
+        connection = db.connect(settings.db_path)
+        assert reports.restore(connection, report_id, staff["id"])
+        connection.close()
+        events = ["removed", "restored", "removed"]
+    first = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(first, report_id))
+    fired = []
+
+    def other_first(sql):
+        if sql == "BEGIN IMMEDIATE" and not fired:
+            fired.append(sql)               # before this lock is taken
+            other = db.connect(settings.db_path)
+            try:
+                assert getattr(reports, meanwhile)(other, report_id,
+                                                   staff["id"])
+            finally:
+                other.close()
+    first.set_trace_callback(other_first)
+    arguments = ((first, settings) if step == "delete" else (first,)) + (
+        report_id, staff["id"])
+    assert getattr(reports, step)(*arguments) is False
+    first.set_trace_callback(None)
+    assert fired and not first.in_transaction
+    assert file.is_file() and reports.deletions(first) == []
+    assert [r["event"] for r in first.execute(
+        "SELECT event FROM report_bin_events ORDER BY id")] == events
+    in_bin = events[-1] == "removed"
+    assert [r["id"] for r in (reports.binned(first) if in_bin
+                              else reports.kept(first))] == [report_id]
+    first.close()
+
+
+def test_the_bin_lists_the_latest_removed_report_first(settings, app,
+                                                       clock):
+    staff = make_account(settings)
+    client = staff_client(app, staff)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="BSNADM01",
+                                name1="Ана", fn="F1", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+    client.post("/staff/reports", {"programme": "BSNADM01"})
+    client.post("/staff/reports", {"programme": "BSNADM01"})
+    client.post("/staff/reports/2/remove")
+    clock.advance(hours=1)
+    client.post("/staff/reports/1/remove")
+    connection = db.connect(settings.db_path)
+    assert [r["id"] for r in reports.binned(connection)] == [1, 2]
+    connection.close()
+    page = client.get("/staff/bin").get_data(as_text=True)
+    table = page.split('id="bin-reports"')[1]
+    assert table.index('data-id="1"') < table.index('data-id="2"')
+    assert texts.BIN_NO_APPLICATIONS in page and texts.BIN_EMPTY not in page
 
 
 def test_a_report_in_the_bin_keeps_its_number(settings, app):
@@ -759,8 +849,16 @@ def test_a_download_that_meets_the_deletion_is_not_found(settings, app,
         raise FileNotFoundError(2, "No such file or directory")
     monkeypatch.setattr(path_type, "read_bytes", gone)
     app.config.update(TESTING=False, PROPAGATE_EXCEPTIONS=False)
-    assert client.get("/staff/reports/{}.docx".format(report_id)
-                      ).status_code == 404
+    url = "/staff/reports/{}.docx".format(report_id)
+    assert client.get(url).status_code == 404
+    monkeypatch.undo()
+    # Nor is a folder where the file should be.
+    connection = db.connect(settings.db_path)
+    file = reports.path(settings, reports.get(connection, report_id))
+    connection.close()
+    file.unlink()
+    file.mkdir()
+    assert client.get(url).status_code == 404
 
 
 def test_schema_4_with_reports_upgrades_keeping_them(tmp_path):
@@ -1171,7 +1269,8 @@ def test_the_file_is_aside_at_the_commit_and_back_before_the_rollback(
 def test_a_start_finishes_what_a_stopped_deletion_left(settings, app,
                                                        monkeypatch):
     """A process stopped between setting the file aside and the COMMIT
-    leaves a kept report's file aside; one stopped after the COMMIT leaves
+    leaves the file of a report still there aside; one stopped after the
+    COMMIT leaves
     the file of a deleted report. The next start puts back the first and
     removes the second."""
     from superassistant.web import create_app

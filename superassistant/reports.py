@@ -17,8 +17,8 @@ DEFERRED (NOW.md): leaving students already reported out of a later report;
 until then a later report lists them again.
 
 Staff may remove a report to the bin, and from there put it back or delete
-it (constitution 5.14): "Can the deleted reports go first to the bin now and
-then be deleted?" (the owner, 15 October 2026). A report in the bin keeps
+it (constitution 5.14): "Can the deleted  reports go first to the bin now
+and then be deleted?" (the owner, 15 October 2026). A report in the bin keeps
 its row, its students' rows and its file, under its own name, and can still
 be downloaded; it is not a kept report, so the students it lists wait for a
 report again at once ("Yes, right away"), until it is put back. Removing

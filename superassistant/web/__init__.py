@@ -43,7 +43,7 @@ def _rename_programmes(settings, connection):
     The owner's list of 13 October 2026 gave each programme a new code
     (lists.RENAMED_PROGRAMMES). The first start after that update moves each
     application still holding an old code, as a correction under the owner's
-    account, and the kept reports with them. Like the starting lists, it is
+    account, and the reports with them, kept or in the bin. Like the starting lists, it is
     recorded in the database in the same transaction that reads whether it
     was done, so the service and the reminder run, starting together, do it
     once between them. Without the owner's account nothing is moved; an old

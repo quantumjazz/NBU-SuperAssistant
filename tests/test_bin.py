@@ -297,6 +297,7 @@ def test_staff_remove_put_back_and_delete_in_two_steps(settings, app, clock):
                   "сесия 26.09", staff["username"],
                   db.local_datetime(db.now())):
         assert shown in bin_page, shown
+    assert texts.BIN_NO_REPORTS in bin_page and texts.BIN_EMPTY not in bin_page
     page = client.get(url).get_data(as_text=True)
     assert 'id="in-bin"' in page and 'id="restore"' in page
     assert 'href="{}/delete"'.format(url) in page

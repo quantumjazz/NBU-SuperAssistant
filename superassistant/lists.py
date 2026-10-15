@@ -284,8 +284,9 @@ def rename_programmes(connection, account_id):
     """Move every application holding an old starter code to its new code.
 
     Drafts included, since check_used reads every application. Each move is a
-    correction under account_id (the owner's), keeping the old code; a kept
-    report's programme is moved too, since nothing else records it. Runs
+    correction under account_id (the owner's), keeping the old code; every
+    report's programme, kept or in the bin, is moved too, since nothing else
+    records it. Runs
     inside the caller's transaction. Returns how many applications moved.
     """
     from superassistant import applications

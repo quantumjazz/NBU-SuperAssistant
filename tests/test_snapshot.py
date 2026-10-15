@@ -290,6 +290,41 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
             assert address not in text
 
 
+def test_in_a_report_follows_the_report_bin(settings):
+    """„В доклад“: a student whose only report is in the bin is not in a
+    report; a later report, or that report put back, makes it so again
+    (constitution 5.14)."""
+    from superassistant import reports
+    staff = make_account(settings)
+    number = insert_application(settings, "a@example.org",
+                                grad_type="thesis", programme="BSNADM01",
+                                name1="Ана", fn="F1", professor="ivanov")
+    insert_request(settings, number, answer="confirm")
+    insert_check(settings, number, "passed", staff["id"])
+    connection = connect(settings)
+    loaded = lists.load(settings.lists_dir)
+    column = texts.SNAPSHOT_COLUMNS.index("В доклад")
+
+    def in_a_report():
+        rows, _ = snapshot.table(connection, loaded)
+        (row,) = rows[1:]
+        return row[column]
+    assert in_a_report() == "не"
+    first = reports.generate(connection, settings, loaded, "BSNADM01",
+                             staff["id"])
+    assert in_a_report() == "да"
+    assert reports.remove(connection, first, staff["id"])
+    assert in_a_report() == "не"
+    second = reports.generate(connection, settings, loaded, "BSNADM01",
+                              staff["id"])
+    assert in_a_report() == "да"
+    assert reports.remove(connection, second, staff["id"])
+    assert in_a_report() == "не"
+    assert reports.restore(connection, first, staff["id"])
+    assert in_a_report() == "да"
+    connection.close()
+
+
 @hsettings(max_examples=60, deadline=None)
 @given(st.lists(st.integers(-3, 400), unique=True, max_size=12))
 def test_copies_30_days_old_or_older_go_and_the_others_stay(ages):
