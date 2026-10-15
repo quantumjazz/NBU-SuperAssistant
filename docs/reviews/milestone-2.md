@@ -348,3 +348,19 @@
 - **Code** `f07aa5a..fb953f9`: `5f536ea` the bin, `snapshot` and its 00:00 timer; `fb953f9` fixes from a four-reviewer read-only verification: two crash windows, sign-in numbers, secure_delete, the note kept, Bulgarian redirects, Excel cells, the guide.
 - **Checks:** 304 passed and 8 browser passed on Python 3.9.6 and 3.12.14; 11 of the new and changed tests fail on `5f536ea`, and on 3.12 the secure_delete test too; mutations: 18 of 20 caught at `5f536ea`, both survivors now tested; the CSV read back in Excel on the owner's Mac.
 - **Not pushed.** Outstanding: Codex's review of `f07aa5a..fb953f9`; the laptop update with the new units; the owner's acceptance.
+
+## 2026-10-15 — The second task: Codex's review of `fb953f9`; fix `d253071` for Codex
+
+- **Codex, on `fb953f9`** (range `f07aa5a..fb953f9`, record `0e1f001`), relayed by the owner: CHANGES REQUESTED.
+  - T15-C2 [P1]: a deletion let a request's number be given again; a link made from the number and the second alone reached a later student's request.
+  - T15-C1 [P2]: the answer's read-back after its COMMIT could find the request deleted, and the page crashed.
+  - T15-C3 [P2]: Excel turned a raw cell of 256 ones into 1,11E+255.
+  
+  Codex also verified 304 passed and 8 browser passed on both Pythons.
+- **Fix `d253071`** (range `0e1f001..d253071`):
+  - a random nonce in each new request's link, `requests.nonce` in schema 4, which no installation has yet; older requests keep their links;
+  - the answer's read-back under its own lock;
+  - one-line cells as joined Excel text values.
+- **Tests:** the same-second case with another student and supervisor; deletion right after the answer's COMMIT; links and reminders of a request without a nonce; Codex's long cells. 16 cases fail on `fb953f9` on each Python.
+- **Checks:** 321 passed and 8 browser passed on Python 3.9.6 and 3.12.14. Codex's script reproduced C1 and C2 before the fix. After it, the C1 hook finds no read after the COMMIT, and the C2 link gets 404 with nothing sent. In Excel, text import reproduced Codex's conversion; the new cells read back exactly.
+- **Outstanding:** Codex's review of `0e1f001..d253071`; the laptop update; the owner's acceptance.
