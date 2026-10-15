@@ -310,9 +310,14 @@ def delete(application_id):
 @blueprint.route("/staff/bin")
 @web.staff_required
 def bin_page():
+    """The applications and the reports in the bin (constitution 5.14 and
+    5.15), and the log of each kind's deletions."""
+    from superassistant.web import documents as report_pages
     connection = web.connection()
     lists = web.current_lists()
     rows = [dict(_row(connection, record, lists), by=record["username"])
             for record in applications.binned(connection)]
-    return render_template("bin.html", rows=rows,
-                           deleted=applications.deletions(connection))
+    return render_template(
+        "bin.html", rows=rows, deleted=applications.deletions(connection),
+        reports=report_pages.binned(connection, lists),
+        deleted_reports=report_pages.deleted(connection, lists))

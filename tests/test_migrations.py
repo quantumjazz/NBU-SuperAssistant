@@ -104,6 +104,57 @@ def test_processes_upgrading_schema_1_together_record_it_once(
         connection.close()
 
 
+@pytest.mark.parametrize("round_number", range(2))
+def test_processes_upgrading_schema_4_together_keep_the_reports(
+        tmp_path, round_number):
+    """The live pilot's version when the report bin came (the application
+    bin of 15 October 2026): a kept report with its student and an earlier
+    deletion upgrade once, from several processes, the report still kept."""
+    path = tmp_path / "superassistant.sqlite3"
+    connection = sqlite3.connect(str(path))
+    connection.executescript(";".join(db.MIGRATIONS[:4])
+                             + ";PRAGMA user_version = 4;")
+    connection.executescript("""
+        INSERT INTO accounts (username, username_key, email, email_key,
+            algorithm, salt, iterations, dklen, hash, session_tag,
+            created_at, approved_at) VALUES ('staff', 'staff',
+            's@example.org', 's@example.org', 'none', '00', 1, 1, '00',
+            'tag', 't', 't');
+        INSERT INTO applications (email, email_key, created_at, updated_at,
+            submitted_at, name1) VALUES ('old@example.org',
+            'old@example.org', 'x', 'x', 'x', 'Старо');
+        INSERT INTO reports (id, programme, faculty, generated_at,
+            generated_by, filename) VALUES (2, 'BSNADM01', 'ФДЕНО', 'x', 1,
+            'doklad.docx');
+        INSERT INTO report_students (report_id, position, application_id,
+            fn, name, topic, supervisor) VALUES (2, 1, 1, 'F1', 'Старо',
+            'Тема', 'проф. Иванов');
+        INSERT INTO report_deletions (report_id, programme, generated_at,
+            students, filename, deleted_by, deleted_at) VALUES (1,
+            'BSNADM01', 'x', 1, 'old.docx', 1, 'x');
+    """)
+    connection.commit()
+    connection.close()
+    outcomes, exits = _migrate_together(path)
+    assert outcomes == ["ok"] * PROCESSES, "\n".join(
+        o for o in outcomes if o != "ok")
+    assert exits == [0] * PROCESSES
+    assert _version(path) == len(db.MIGRATIONS)
+    connection = db.connect(path)
+    try:
+        assert [tuple(r) for r in connection.execute(
+            "SELECT id, filename, binned_at, binned_by FROM reports")] == [
+            (2, "doklad.docx", None, None)]
+        assert connection.execute(
+            "SELECT COUNT(*) FROM report_students").fetchone()[0] == 1
+        assert connection.execute(
+            "SELECT COUNT(*) FROM report_deletions").fetchone()[0] == 1
+        assert connection.execute(
+            "SELECT COUNT(*) FROM report_bin_events").fetchone()[0] == 0
+    finally:
+        connection.close()
+
+
 def test_the_lock_file_lies_beside_the_database(tmp_path):
     path = tmp_path / "superassistant.sqlite3"
     db.migrate(path)

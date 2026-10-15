@@ -229,7 +229,8 @@ def test_schema_3_with_rows_upgrades_keeping_them(tmp_path):
     assert (row["name1"], row["credits_declared"], row["binned_at"],
             row["binned_by"], row["bin_reason"], row["bin_note"]) == (
         "Ана", 1, None, None, None, "")
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == len(
+        db.MIGRATIONS)
     assert connection.execute("SELECT COUNT(*) FROM bin_events").fetchone()[
         0] == 0
     connection.close()

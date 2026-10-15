@@ -447,8 +447,8 @@ An application deleted from the bin is gone from the database file at once
 and from the next night's copy. It stays in the nightly copies of the
 previous 30 days in the `snapshots` folder (fewer if nights were missed, as
 a run removes old copies only when it runs), in the messages already
-received until the owner deletes them, in the Word files of kept reports,
-and in every backup taken before the deletion.
+received until the owner deletes them, in the Word files of reports, kept
+or in the bin, and in every backup taken before the deletion.
 
 Resend refuses a message above its size limit (its documentation gives the
 current figure; an attachment grows by about a third on the way). The

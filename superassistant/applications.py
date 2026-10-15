@@ -332,9 +332,13 @@ def corrections_of(connection, application_id):
 
 
 def in_a_report(connection, application_id):
+    """Whether a kept report lists the application. A report in the bin
+    does not count: its students wait for a report again at once (the
+    owner, 15 October 2026: "Yes, right away"; constitution 5.14)."""
     return connection.execute(
-        "SELECT 1 FROM report_students WHERE application_id = ? LIMIT 1",
-        (application_id,)).fetchone() is not None
+        "SELECT 1 FROM report_students s JOIN reports r ON r.id = "
+        "s.report_id WHERE s.application_id = ? AND r.binned_at IS NULL "
+        "LIMIT 1", (application_id,)).fetchone() is not None
 
 
 class Standing(object):
@@ -530,12 +534,13 @@ def delete(connection, application_id, account_id):
     """Delete an application in the bin, with every row recorded with it.
 
     One transaction: the log row, then the supervisors' answers (requests),
-    the checks, the corrections and its rows in kept reports, and the
-    application itself; the notes of its removals in the log are blanked.
+    the checks, the corrections and its rows in every report, kept or in
+    the bin, and the application itself; the notes of its removals in the
+    log are blanked.
     The student's sign-in records for that address lose the address and
     are spent, rather than deleted, so their numbers are never given again:
     a browser still holding one, unfinished, cannot reach another student's
-    sign-in. A kept report's Word file is not touched. Returns False when
+    sign-in. A report's Word file is not touched. Returns False when
     the application is not in the bin, so only the second step deletes."""
     with db.transaction(connection):
         record = get(connection, application_id)

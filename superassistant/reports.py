@@ -6,23 +6,31 @@ application of that programme, the answer to its current request (the latest
 one not replaced) is a confirmation, its latest check (the highest id)
 passed, and it is not in the bin (constitution 5.15). Students are listed
 in alphabetical order of their names as printed, then by F№. An
-application deleted from the bin leaves the kept reports' rows too; their
-files stay as they were generated.
+application deleted from the bin leaves its rows in every report too, kept
+or in the bin; the reports' files stay as they were generated.
 
-Each report is kept until staff delete it: its .docx in the data directory's
+Each report is kept until staff remove it: its .docx in the data directory's
 reports folder, and a row in `reports` with one row per student in
 `report_students`, so a report can be read again with the students it listed
 when it was made. A later report never removes or overwrites an earlier one.
 DEFERRED (NOW.md): leaving students already reported out of a later report;
 until then a later report lists them again.
 
-Staff may delete a report: "the report disappears", with its file and its
-rows (the owner, 13 October 2026; constitution 5.14). The students it listed
-then wait for a report again, and the next report of their programme lists
-them. A row in `report_deletions` keeps who deleted which report and when.
-A deleted report's number is never given to a later report, so the log's
-number names one report only. A deletion happens whole or not at all: until
-it has committed its file is only set aside, and goes back if it fails.
+Staff may remove a report to the bin, and from there put it back or delete
+it (constitution 5.14): "Can the deleted reports go first to the bin now and
+then be deleted?" (the owner, 15 October 2026). A report in the bin keeps
+its row, its students' rows and its file, under its own name, and can still
+be downloaded; it is not a kept report, so the students it lists wait for a
+report again at once ("Yes, right away"), until it is put back. Removing
+and putting back write rows only. The second step is the deletion: "the
+report disappears", with its file and its rows (the owner, 13 October 2026),
+and only a report in the bin is deleted. Rows in `report_bin_events` keep
+who removed and put back which report and when, and a row in
+`report_deletions` who deleted it and when. A deleted report's number is
+never given to a later report, so the log's number names one report only. A
+deletion happens whole or not at all: until it has committed its file is
+only set aside, and goes back if it fails. Everything that settles a file
+asks only whether the report's row is still there, in the bin or not.
 """
 
 import secrets
@@ -125,20 +133,38 @@ def generate(connection, settings, lists, programme, account_id):
 
 
 def kept(connection):
-    """Every kept report, newest first, with how many students it lists."""
+    """Every kept report, newest first, with how many students it lists.
+    A report in the bin is not kept."""
     return connection.execute(
         "SELECT r.*, COUNT(s.position) AS students FROM reports r "
         "LEFT JOIN report_students s ON s.report_id = r.id "
+        "WHERE r.binned_at IS NULL "
         "GROUP BY r.id ORDER BY r.id DESC").fetchall()
 
 
+def binned(connection):
+    """Every report in the bin, the latest removed first, with how many
+    students it lists and the username of who removed it."""
+    return connection.execute(
+        "SELECT r.*, COUNT(s.position) AS students, a.username "
+        "FROM reports r JOIN accounts a ON a.id = r.binned_by "
+        "LEFT JOIN report_students s ON s.report_id = r.id "
+        "WHERE r.binned_at IS NOT NULL "
+        "GROUP BY r.id ORDER BY r.binned_at DESC, r.id DESC").fetchall()
+
+
 def get(connection, report_id):
+    """The report's row, kept or in the bin, or None once it is deleted."""
     return connection.execute("SELECT * FROM reports WHERE id = ?",
                               (report_id,)).fetchone()
 
 
+def is_binned(report):
+    return report is not None and report["binned_at"] is not None
+
+
 def students(connection, report_id):
-    """The students a kept report lists, in its order."""
+    """The students a report lists, kept or in the bin, in its order."""
     return connection.execute(
         "SELECT * FROM report_students WHERE report_id = ? "
         "ORDER BY position", (report_id,)).fetchall()
@@ -185,9 +211,10 @@ def _remove_aside(file):
 
 
 def _settle(file, kept):
-    """A file set aside goes back while its report is kept, and goes once
-    it is not. The caller holds the write lock, so no deletion of that
-    report can commit between its look at the records and this."""
+    """A file set aside goes back while its report is kept, its row still
+    there (in the bin or not), and goes once it is not. The caller holds
+    the write lock, so no deletion of that report can commit between its
+    look at the records and this."""
     if kept:
         _put_back(file)
     else:
@@ -207,8 +234,45 @@ def _settle_under_lock(connection, report_id, file):
         connection.execute("ROLLBACK")
 
 
+def _bin_event(connection, report_id, event, account_id):
+    connection.execute(
+        "INSERT INTO report_bin_events (report_id, event, by_account, at) "
+        "VALUES (?, ?, ?, ?)", (report_id, event, account_id, db.now()))
+
+
+def remove(connection, report_id, account_id):
+    """Move a kept report to the bin: its rows and its file stay as they
+    are. Returns False, changing nothing, when there is no such report or
+    it is already in the bin."""
+    with db.transaction(connection):
+        report = get(connection, report_id)
+        if report is None or is_binned(report):
+            return False
+        connection.execute(
+            "UPDATE reports SET binned_at = ?, binned_by = ? WHERE id = ?",
+            (db.now(), account_id, report_id))
+        _bin_event(connection, report_id, "removed", account_id)
+    return True
+
+
+def restore(connection, report_id, account_id):
+    """Put a report back from the bin, as it was. Returns False when it is
+    not in the bin."""
+    with db.transaction(connection):
+        if not is_binned(get(connection, report_id)):
+            return False
+        _bin_event(connection, report_id, "restored", account_id)
+        connection.execute(
+            "UPDATE reports SET binned_at = NULL, binned_by = NULL "
+            "WHERE id = ?", (report_id,))
+    return True
+
+
 def delete(connection, settings, report_id, account_id):
-    """Delete a kept report: its rows and its file, logging who and when.
+    """Delete a report in the bin: its rows and its file, logging who and
+    when. A report not in the bin is never deleted: only the second step
+    deletes, also when a page from before the bin, or one read before
+    another member of staff put the report back, asks.
 
     All or nothing. One transaction writes the log row and removes the rows
     of `report_students` and then `reports`; before its COMMIT the file is
@@ -220,15 +284,16 @@ def delete(connection, settings, report_id, account_id):
     back, so the report, its rows and its file stay, nothing is logged, and
     the deletion can be tried again. The file goes back while this
     connection still holds the write lock, so tidy, waiting for that lock,
-    never finds it aside for a kept report. When the transaction has ended
-    without this connection's ROLLBACK (SQLite rolled it back by itself
-    after an interrupt or an I/O error, or an error came after its COMMIT),
-    the lock is taken again, and the records, read under it, decide: the
-    file goes back while the report is kept, and is removed once it is not
-    (T13-C3). After the COMMIT the file set aside is removed; should that
-    fail, or the process stop first, the next start removes it (tidy). A
-    file already missing does not stop the deletion. Returns False when no
-    such report is kept.
+    never finds it aside for a report not deleted. When the transaction
+    has ended without this connection's ROLLBACK (SQLite rolled it back by
+    itself after an interrupt or an I/O error, or an error came after its
+    COMMIT), the lock is taken again, and the records, read under it,
+    decide: the file goes back while the report's row is there, and is
+    removed once it is not (T13-C3). After the COMMIT the file set aside is
+    removed; should that fail, or the process stop first, the next start
+    removes it (tidy). A
+    file already missing does not stop the deletion. Returns False, changing
+    nothing, when no such report is in the bin.
 
     The transaction is written out here rather than through db.transaction,
     because the file must go back before the ROLLBACK, a failed COMMIT
@@ -238,7 +303,7 @@ def delete(connection, settings, report_id, account_id):
     connection.execute("BEGIN IMMEDIATE")
     try:
         report = get(connection, report_id)
-        if report is None:
+        if not is_binned(report):
             connection.execute("ROLLBACK")
             return False
         count = connection.execute(
@@ -282,7 +347,8 @@ def tidy(connection, settings):
     """Finish what a stopped process left half-done in the reports folder.
 
     A file set aside for a deletion that never committed goes back under its
-    name, its report being still kept; one whose report is gone is removed.
+    name, its report's row being still there, in the bin or not; one whose
+    report is gone is removed.
     It holds the write lock while it looks, so a deletion running in another
     process is waited for and found finished either way. It writes no row,
     so it ends with ROLLBACK, which no other connection can hold off.
@@ -302,7 +368,15 @@ def tidy(connection, settings):
 
 
 def deletions(connection):
-    """Every deletion, newest first, with the username of who deleted."""
+    """Every deletion, newest first, with the username of who deleted, and
+    who last removed the report to the bin and when; a report deleted
+    before the bin existed has no removal."""
     return connection.execute(
-        "SELECT d.*, a.username FROM report_deletions d JOIN accounts a ON "
-        "a.id = d.deleted_by ORDER BY d.id DESC").fetchall()
+        "SELECT d.*, a.username, r.at AS removed_at, "
+        "ra.username AS removed_by FROM report_deletions d "
+        "JOIN accounts a ON a.id = d.deleted_by "
+        "LEFT JOIN report_bin_events r ON r.id = (SELECT MAX(id) FROM "
+        "report_bin_events WHERE report_id = d.report_id AND "
+        "event = 'removed') "
+        "LEFT JOIN accounts ra ON ra.id = r.by_account "
+        "ORDER BY d.id DESC").fetchall()

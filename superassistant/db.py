@@ -8,9 +8,11 @@ Nothing people entered is ever deleted or overwritten by the application: a
 correction is a new row in `corrections`, a check a new row in `checks`, a
 changed supervisor a new row in `requests` that marks the earlier one
 replaced. Two things are not among them (CLAUDE.md "Protect and verify"). A
-generated report: staff may delete one, which removes its rows in `reports`
-and `report_students`, and a row in `report_deletions` keeps who deleted
-which report and when (constitution 5.14). And an application staff remove:
+generated report staff remove: it waits in the bin (`reports.binned_at`),
+and a second step deletes its rows in `reports` and `report_students`; rows
+in `report_bin_events` keep who removed and put back which report and when,
+and a row in `report_deletions` who deleted it and when (constitution
+5.14). And an application staff remove:
 it waits in the bin (`binned_at`), and a second step deletes it with every
 row recorded with it; rows in `bin_events` keep who removed, put back and
 deleted which application, when and why, without the student's data
@@ -200,6 +202,24 @@ MIGRATIONS = [
         event TEXT NOT NULL,            -- 'removed', 'restored', 'deleted'
         reason TEXT NOT NULL,           -- 'graduated' or 'other'
         note TEXT NOT NULL DEFAULT '',  -- a removal's; blanked at deletion
+        by_account INTEGER NOT NULL REFERENCES accounts(id),
+        at TEXT NOT NULL
+    );
+    """,
+    # Version 5: the report bin (15 October 2026). A report staff remove
+    # waits in the bin, with its file and its rows: when and by whom, both
+    # cleared when it is put back. Each removal and putting back is a row in
+    # `report_bin_events`, whose report id is a plain number, not a foreign
+    # key, because a deleted report's row is gone; the deletion itself is
+    # logged in `report_deletions`, as before. A report kept before this
+    # version is not in the bin.
+    """
+    ALTER TABLE reports ADD COLUMN binned_at TEXT;
+    ALTER TABLE reports ADD COLUMN binned_by INTEGER REFERENCES accounts(id);
+    CREATE TABLE report_bin_events (
+        id INTEGER PRIMARY KEY,
+        report_id INTEGER NOT NULL,
+        event TEXT NOT NULL,            -- 'removed' or 'restored'
         by_account INTEGER NOT NULL REFERENCES accounts(id),
         at TEXT NOT NULL
     );

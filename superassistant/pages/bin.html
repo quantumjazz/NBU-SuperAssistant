@@ -5,9 +5,14 @@
   <h1>{{ t.BIN_TITLE }}</h1>
   <p class="lead">{{ t.BIN_LEAD }}</p>
 </div>
+{% if not rows and not reports %}
 <div class="card">
-{% if not rows %}
   <p class="table-empty">{{ t.BIN_EMPTY }}</p>
+</div>
+{% else %}
+<section class="card"><div class="card-h"><h2>{{ t.BIN_APPLICATIONS }}</h2></div>
+{% if not rows %}
+  <p class="table-empty">{{ t.BIN_NO_APPLICATIONS }}</p>
 {% else %}
   <div class="table-wrap">
   <table id="bin">
@@ -33,7 +38,47 @@
   </table>
   </div>
 {% endif %}
-</div>
+</section>
+
+<section class="card"><div class="card-h"><h2>{{ t.BIN_REPORTS }}</h2></div>
+{% if not reports %}
+  <p class="table-empty">{{ t.BIN_NO_REPORTS }}</p>
+{% else %}
+  <div class="table-wrap">
+  <table id="bin-reports">
+    <thead>
+      <tr>
+        <th>{{ t.REPORTS_COL_DATE }}</th>
+        <th>{{ t.REPORTS_COL_PROGRAMME }}</th>
+        <th>{{ t.REPORTS_COL_STUDENTS }}</th>
+        <th>{{ t.REPORTS_COL_FILE }}</th>
+        <th>{{ t.REPORTS_COL_REMOVED }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for report in reports %}
+      <tr data-id="{{ report.id }}">
+        <td>{{ report.date }}</td>
+        <td>{{ report.programme }}</td>
+        <td>{{ report.students }}</td>
+        <td><a href="/staff/reports/{{ report.id }}.docx">{{ report.name }}</a></td>
+        <td>{{ t.BIN_BY_AT.format(report.binned_by, report.binned_at|datetime) }}</td>
+        <td><div class="actions" style="margin: 0">
+          <form method="post" action="/staff/reports/{{ report.id }}/restore" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <button type="submit" class="secondary small">{{ t.BIN_RESTORE }}</button>
+          </form>
+          <a class="btn secondary small" href="/staff/reports/{{ report.id }}/delete">{{ t.BIN_DELETE }}</a>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+{% endif %}
+</section>
+{% endif %}
 
 {% if deleted %}
 <section id="deletions" class="card"><div class="card-h"><h2>{{ t.BIN_DELETIONS }}</h2></div>
@@ -47,6 +92,37 @@
         <td>{{ t.BIN_REASON.get(line.reason, line.reason) }}</td>
         <td>{% if line.removed_by %}{{ t.BIN_BY_AT.format(line.removed_by, line.removed_at|datetime) }}{% endif %}</td>
         <td>{{ t.BIN_BY_AT.format(line.deleted_by, line.deleted_at|datetime) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+</section>
+{% endif %}
+
+{% if deleted_reports %}
+<section id="report-deletions" class="card"><div class="card-h"><h2>{{ t.REPORTS_DELETIONS }}</h2></div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t.REPORTS_COL_DATE }}</th>
+        <th>{{ t.REPORTS_COL_PROGRAMME }}</th>
+        <th>{{ t.REPORTS_COL_STUDENTS }}</th>
+        <th>{{ t.REPORTS_COL_FILE }}</th>
+        <th>{{ t.REPORTS_COL_REMOVED }}</th>
+        <th>{{ t.REPORTS_COL_DELETED }}</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for line in deleted_reports %}
+      <tr>
+        <td>{{ line.date }}</td>
+        <td>{{ line.programme }}</td>
+        <td>{{ line.students }}</td>
+        <td>{{ line.name }}</td>
+        <td>{% if line.removed_by %}{{ t.BIN_BY_AT.format(line.removed_by, line.removed_at|datetime) }}{% endif %}</td>
+        <td>{{ t.BIN_BY_AT.format(line.by, line.at|datetime) }}</td>
       </tr>
     {% endfor %}
     </tbody>
