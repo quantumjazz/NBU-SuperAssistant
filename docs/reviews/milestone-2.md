@@ -338,3 +338,13 @@
   Automatic rollback is simulated in the concurrency test; its competing thread uses a real connection.
 - **Not pushed:** GitHub and the laptop are at `b756685`.
 - **Outstanding:** the owner's yes to replacing the laptop's `programmes.csv`; the push and the laptop update in the recorded order; the owner's acceptance, with the new wording and the 17 programmes (entry for `4e83744`).
+
+## 2026-10-15 — A second task before milestone 3: the bin and the nightly copy
+
+- **Owner's request** to Opus 5.5 (verbatim): "Users remove the entry (select reason - graduation, else), it goes to a 'bin' and deletion is confirmed as a second step." and "every day, say 00.00 hours the app outputs a csv with all students entries data and uploads to a cloud somewhere."
+- **Conflicts reported first:** `CLAUDE.md` "Never delete … students' applications"; constitution 6.2 and 6.7.
+- **Owner's answers** (verbatim): final deletion "Any staff member (Recommended)"; "Email it to you"; "30 days (Recommended)"; "change now".
+- **Rules changed** by Opus 5.5 on "change now", uncommitted: `CLAUDE_1.md` `e8530f68…`; `CONSTITUTION.md` `8fe9b6ab…` (4.3, 5.15, 6.7, amendment row). `NOW.md` unchanged at `5bd1f853…`; the approved constitution `44380e66…` no longer stands, so Fable amends `NOW.md` and both approve again before milestone 3 is authorized.
+- **Code** `f07aa5a..fb953f9`: `5f536ea` the bin, `snapshot` and its 00:00 timer; `fb953f9` fixes from a four-reviewer read-only verification: two crash windows, sign-in numbers, secure_delete, the note kept, Bulgarian redirects, Excel cells, the guide.
+- **Checks:** 304 passed and 8 browser passed on Python 3.9.6 and 3.12.14; 11 of the new and changed tests fail on `5f536ea`, and on 3.12 the secure_delete test too; mutations: 18 of 20 caught at `5f536ea`, both survivors now tested; the CSV read back in Excel on the owner's Mac.
+- **Not pushed.** Outstanding: Codex's review of `f07aa5a..fb953f9`; the laptop update with the new units; the owner's acceptance.
