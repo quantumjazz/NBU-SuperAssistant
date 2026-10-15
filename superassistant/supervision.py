@@ -5,6 +5,11 @@ from one token. The token is not stored: it is derived from the session key
 and the request (an HMAC), and only its SHA-256 is kept, so the records alone
 are not a list of live links (CLAUDE.md: links "stored hashed"); and because
 it can be derived again, every reminder carries the same links as the request.
+A request's number and its moment, to the second, are not enough to tell it
+apart: deleting an application from the bin deletes its requests, and SQLite
+may give a deleted last number to the next request, made in the same second
+(Codex T15-C2). So each request made since then also has a random nonce in
+the derivation; a request made before has none and keeps its links.
 
 The links work until an answer is recorded or the request is replaced (by the
 student choosing again after a decline, or by staff changing the supervisor);
@@ -23,6 +28,7 @@ and the supervisor's page says the student was not told by mail.
 import base64
 import hashlib
 import hmac
+import secrets
 
 from superassistant import accounts, applications, db, limits, mail, texts
 
@@ -31,9 +37,11 @@ CHOICES = ("confirm", "decline")
 
 # --- Tokens ----------------------------------------------------------------
 
-def _token(settings, request_id, created_at):
+def _token(settings, request_id, created_at, nonce=""):
     key = settings.ensure_secret_key().encode("utf-8")
     message = "supervisor-request|{}|{}".format(request_id, created_at)
+    if nonce:
+        message += "|" + nonce
     digest = hmac.new(key, message.encode("utf-8"), hashlib.sha256).digest()
     return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 
@@ -43,7 +51,8 @@ def token_hash(token):
 
 
 def token_for(settings, request):
-    return _token(settings, request["id"], request["created_at"])
+    return _token(settings, request["id"], request["created_at"],
+                  request["nonce"])
 
 
 def find(connection, token):
@@ -156,16 +165,17 @@ def _send_new_request(connection, settings, lists, application_id):
     """
     record = applications.get(connection, application_id)
     stamp = db.now()
-    placeholder = "pending:" + token_hash(str(application_id) + stamp
-                                          + str(id(record)))
+    nonce = secrets.token_hex(16)
+    placeholder = "pending:" + nonce
     cursor = connection.execute(
         "INSERT INTO requests (application_id, created_at, professor, "
-        "sup_name, sup_title, sup_email, token_hash) VALUES (?,?,?,?,?,?,?)",
+        "sup_name, sup_title, sup_email, token_hash, nonce) VALUES "
+        "(?,?,?,?,?,?,?,?)",
         (application_id, stamp, record["professor"], record["sup_name"],
          record["sup_title"], applications.supervisor_email(record, lists),
-         placeholder))
+         placeholder, nonce))
     request_id = cursor.lastrowid
-    token = _token(settings, request_id, stamp)
+    token = _token(settings, request_id, stamp, nonce)
     connection.execute("UPDATE requests SET token_hash = ? WHERE id = ?",
                        (token_hash(token), request_id))
     message = _request_message(settings, lists, record, token,
@@ -280,7 +290,9 @@ def answer(connection, token, choice, comment):
     Returns (state, request): state is "recorded", "answered" (an answer was
     already recorded; nothing changes), "replaced" (the request is no longer
     standing, or its application is in the bin; nothing changes) or
-    "unknown".
+    "unknown". The request returned is as recorded, read in the answer's own
+    transaction; the application may be deleted as soon as it ends, which
+    the notices and the page allow for.
     """
     if choice not in CHOICES:
         return "unknown", None
@@ -297,7 +309,10 @@ def answer(connection, token, choice, comment):
             "UPDATE requests SET answer = ?, comment = ?, answered_at = ? "
             "WHERE id = ? AND answer IS NULL AND replaced_at IS NULL",
             (choice, (comment or "").strip(), db.now(), request["id"]))
-    return "recorded", find(connection, token)
+        # Read back under the same lock: once it is released the
+        # application may be deleted, its request with it (Codex T15-C1).
+        recorded = find(connection, token)
+    return "recorded", recorded
 
 
 def tell_student_of_decline(connection, settings, lists, request):

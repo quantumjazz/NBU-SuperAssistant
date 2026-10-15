@@ -762,3 +762,104 @@ def test_who_must_not_see_an_application_in_the_bin(
             assert reply.status_code == 302
             assert reply.headers["Location"].endswith("/staff/sign-in")
             assert "Мария" not in reply.get_data(as_text=True)
+
+
+# --- After Codex's review of fb953f9 -----------------------------------------
+
+def test_an_answer_reads_its_request_back_before_its_commit(
+        client, new_client, settings, outbox, monkeypatch):
+    """Codex T15-C1: an application deleted as soon as the answer's
+    transaction ends. The answer's own read-back is under its lock, and the
+    page then says the link is unknown: no crash, no notice."""
+    student = as_student(client, "petar@example.org")
+    submit_thesis(student)
+    record = record_for(settings, "petar@example.org")
+    link = link_from(outbox.to("p.ivanov@example.org")[-1], "confirm")
+    staff = make_account(settings)
+    reads = []
+    real_find = supervision.find
+
+    def find(connection, token):
+        reads.append(connection.in_transaction)
+        return real_find(connection, token)
+    real_answer = supervision.answer
+
+    def answer_then_delete(connection, token, choice, comment):
+        result = real_answer(connection, token, choice, comment)
+        assert not connection.in_transaction
+        other = connect(settings)
+        applications.remove(other, record["id"], "other", "", staff["id"])
+        applications.delete(other, record["id"], staff["id"])
+        other.close()
+        return result
+    monkeypatch.setattr(supervision, "find", find)
+    monkeypatch.setattr(supervision, "answer", answer_then_delete)
+    outbox.clear()
+    reply = new_client().post(link, {"comment": ""})
+    assert reply.status_code == 404
+    assert texts.ANSWER_UNKNOWN in reply.get_data(as_text=True)
+    assert reads == [True, True]          # both reads under the lock
+    assert outbox.messages == []
+
+
+def test_a_deleted_link_never_reaches_a_later_request(monkeypatch):
+    """Codex T15-C2: a deleted application's request number given again,
+    to another student and supervisor, within the same stored second. The
+    old link stays unknown: it shows, changes and sends nothing."""
+    with world() as (settings, connection, loaded, clock, box, staff):
+        from superassistant.web import create_app
+        first = new_thesis(connection, settings, loaded, 1,
+                           professor="ivanov")
+        old = applications.current_request(connection, first)
+        token = supervision.token_for(settings, old)
+        applications.remove(connection, first, "other", "", staff["id"])
+        applications.delete(connection, first, staff["id"])
+        second = new_thesis(connection, settings, loaded, 2,
+                            professor="georgieva")
+        new = applications.current_request(connection, second)
+        assert (new["id"], new["created_at"]) == (old["id"],
+                                                  old["created_at"])
+        assert supervision.token_for(settings, new) != token
+        app = create_app(settings)
+        app.config["TESTING"] = True
+        visitor = Client(app.test_client())
+        box.clear()
+        for path in ("confirm", "decline"):
+            link = "/answer/{}/{}".format(token, path)
+            for reply in (visitor.get(link), visitor.post(link,
+                                                          {"comment": "x"})):
+                assert reply.status_code == 404
+                page = reply.get_data(as_text=True)
+                assert texts.ANSWER_UNKNOWN in page
+                assert "Фамилия2" not in page
+        assert supervision.answer(connection, token, "confirm", "")[0] \
+            == "unknown"
+        assert applications.current_request(connection, second)[
+            "answer"] is None
+        assert box.messages == []
+
+
+def test_a_request_made_before_the_nonce_keeps_its_links():
+    """Requests made before 15 October 2026 have no nonce; their links and
+    reminders stay what they were, and still record an answer."""
+    with world() as (settings, connection, loaded, clock, box, staff):
+        number = new_thesis(connection, settings, loaded, 1)
+        request = applications.current_request(connection, number)
+        assert len(request["nonce"]) == 32
+        old_style = supervision._token(settings, request["id"],
+                                       request["created_at"])
+        connection.execute(
+            "UPDATE requests SET nonce = '', token_hash = ? WHERE id = ?",
+            (supervision.token_hash(old_style), request["id"]))
+        before = applications.current_request(connection, number)
+        assert supervision.token_for(settings, before) == old_style
+        clock.advance(days=3)
+        box.clear()
+        sent, failed = supervision.remind(connection, settings, loaded)
+        assert len(sent) == 1 and old_style in box.messages[0].text
+        assert supervision.answer(connection, old_style, "confirm", "")[0] \
+            == "recorded"
+        # Every new request has a nonce of its own.
+        other = new_thesis(connection, settings, loaded, 2)
+        assert applications.current_request(connection, other)["nonce"] \
+            not in ("", before["nonce"])

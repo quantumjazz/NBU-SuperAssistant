@@ -35,13 +35,37 @@ OWNER = "owner"
 OWNER_ADDRESS = "owner-account@example.org"
 
 
+def text_formula(written):
+    """The pieces of Excel text values a cell joins, ="a"&"b", as Excel
+    reads them, or None when the cell is not one."""
+    if not written.startswith('="'):
+        return None
+    pieces, current, i = [], [], 2
+    while i < len(written):
+        ch = written[i]
+        if ch != '"':
+            current.append(ch)
+            i += 1
+        elif written[i + 1:i + 2] == '"':
+            current.append('"')
+            i += 2
+        elif written[i + 1:i + 3] == '&"':
+            pieces.append("".join(current))
+            current, i = [], i + 3
+        elif i == len(written) - 1:
+            pieces.append("".join(current))
+            return pieces
+        else:
+            return None
+    return None
+
+
 def excel_shows(written):
-    """What Excel shows for a cell as the file writes it: its text value
-    ="…" as the text inside; any other cell as it is, an apostrophe before
-    it included (seen in Excel on the owner's Mac, 15 October 2026)."""
-    if written.startswith('="') and written.endswith('"') and len(written) > 2:
-        return written[2:-1].replace('""', '"')
-    return written
+    """What Excel shows for a cell as the file writes it: its text values
+    joined; any other cell as it is, an apostrophe before it included (seen
+    in Excel on the owner's Mac, 15 October 2026)."""
+    pieces = text_formula(written)
+    return "".join(pieces) if pieces is not None else written
 
 
 def any_text(max_size=40):
@@ -51,24 +75,60 @@ def any_text(max_size=40):
         max_size=max_size)
 
 
-@hsettings(max_examples=400, deadline=None)
-@given(any_text(300))
-def test_a_cell_shows_as_typed_and_is_never_a_formula(value):
+def excel_units(text):
+    return len(text.encode("utf-16-le")) // 2
+
+
+def check_cell(value):
     written = snapshot.cell(value)
     one_line = "\n" not in value and "\r" not in value
-    fits = len(value.encode("utf-16-le")) // 2 <= 255
-    if value and one_line and fits:
-        # Excel's text value: shown exactly as typed, whatever it holds.
-        assert written.startswith('="') and written.endswith('"')
-        assert '"' not in written[2:-1].replace('""', "")
-        assert excel_shows(written) == value
+    pieces = text_formula(written)
+    if value and one_line and pieces is not None:
+        # Excel's text values, shown exactly as typed whatever they hold.
+        assert "".join(pieces) == value
+        assert all(excel_units(piece) + piece.count('"') <= 255
+                   for piece in pieces)
+        assert excel_units(written) <= 8192
+    elif value and one_line:
+        # Too long for one formula: kept as text by a letter, or shown with
+        # an apostrophe.
+        joined = "=" + "&".join('"' + piece.replace('"', '""') + '"'
+                                for piece in snapshot._pieces(value))
+        assert excel_units(joined) > 8192
+        assert written == ("'" + value if not any(ch.isalpha() for ch in value)
+                           or value.startswith(snapshot._FORMULA_START)
+                           else value)
     elif value.startswith(snapshot._FORMULA_START):
         assert written == "'" + value         # shown with the apostrophe
     else:
-        assert written == value               # long text Excel keeps as text
-    # Never a formula Excel would run.
+        assert written == value               # Excel keeps lines as text
+    # Never a formula Excel would run: only joined text values.
     assert not written.startswith(("+", "-", "@", "\t", "\r"))
-    assert not written.startswith("=") or written.startswith('="')
+    assert not written.startswith("=") or pieces is not None
+    return written
+
+
+@hsettings(max_examples=400, deadline=None)
+@given(any_text(300))
+def test_a_cell_shows_as_typed_and_is_never_a_formula(value):
+    check_cell(value)
+
+
+@pytest.mark.parametrize("value", [
+    "1" * 256, "0" * 256, "0." + "1" * 254, "1" * 309, "1." + "0" * 255,
+    '"' * 255, '"' * 300, "1" * 5000, "😀" * 200, "=x" + "y" * 300,
+    "x" * 255 + '"', "1" * 9000, "a" * 9000, "0888123456\n0999",
+])
+def test_long_cells_excel_would_convert_stay_as_typed(value):
+    """Codex T15-C3: in Excel, 256 ones became 1,11E+255 and 256 zeros 0.
+    Each of these was read back exactly in Excel on 15 October 2026, opened
+    and imported, apart from the 9,000 digits, too long for a formula, which
+    keep their digits behind an apostrophe."""
+    written = check_cell(value)
+    if value == "1" * 9000:
+        assert written == "'" + value
+    elif "\n" not in value and value != "a" * 9000:
+        assert excel_shows(written) == value
 
 
 def read(data):

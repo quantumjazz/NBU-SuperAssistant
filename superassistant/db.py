@@ -190,6 +190,10 @@ MIGRATIONS = [
         REFERENCES accounts(id);
     ALTER TABLE applications ADD COLUMN bin_reason TEXT;
     ALTER TABLE applications ADD COLUMN bin_note TEXT NOT NULL DEFAULT '';
+    -- A random part of each new request's link (supervision._token), since
+    -- a deleted request's number may be given again (Codex T15-C2); ''
+    -- for the requests made before, whose links stay as they were.
+    ALTER TABLE requests ADD COLUMN nonce TEXT NOT NULL DEFAULT '';
     CREATE TABLE bin_events (
         id INTEGER PRIMARY KEY,
         application_id INTEGER NOT NULL,

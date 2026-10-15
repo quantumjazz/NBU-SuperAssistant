@@ -15,13 +15,19 @@ it reads Cyrillic only from a file that starts with the UTF-8 byte order
 mark, so the file does. Excel also changes what it reads: it runs a cell
 beginning with "=" as a formula, and turns what looks like a number, a date
 or a time into one, so „0888123456“ loses its first zero, „5,50“ becomes 5,5
-and „1e5“ 100000. Every cell of one line is therefore written as Excel's own
-text value, ="…", which Excel shows exactly as typed and never runs, whatever
-it holds (checked in Excel on the owner's Mac on 15 October 2026). Excel's
-text values hold at most 255 characters, counted as Excel counts them (UTF-16
-units), and one line. A longer cell or one with line breaks is written as it
-is, which Excel keeps as text, unless it begins with what Excel runs as a
-formula: then it gets an apostrophe before it, which Excel shows.
+and „1e5“ 100000, also when it is long: 256 ones become 1,11E+255 (Codex
+T15-C3). Every cell of one line is therefore written as Excel's own text
+value, ="…", which Excel shows exactly as typed and never runs or converts,
+whatever it holds (checked in Excel on the owner's Mac, 15 October 2026).
+One text value holds at most 255 characters, counted as Excel counts them
+(UTF-16 units, a quote written twice counting twice), so a longer cell is
+written as several joined with "&", ="…"&"…", as long as the whole formula
+fits in Excel's 8,192: all 256 ones, 5,000 digits or a 302-character cell
+beginning with "=" came back exactly, opened or imported as UTF-8 with
+semicolons, General format. A cell with line breaks is written as it is:
+Excel keeps it as text. So is a cell of one line too long for a formula
+that holds a letter; one that holds none, and any cell beginning with what
+Excel runs as a formula, gets an apostrophe before it, which Excel shows.
 
 Two runs at once (the timer's and one by hand) take turns: each holds a lock
 on the snapshots folder while it writes its file and removes old ones.
@@ -46,6 +52,7 @@ import io
 import os
 import re
 import sys
+import unicodedata
 
 from superassistant import accounts, applications, db, mail, supervision
 from superassistant import texts
@@ -59,8 +66,10 @@ DELIMITER = ";"
 
 # What Excel runs as a formula when a cell begins with it.
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
-# The longest text Excel's ="…" holds, in UTF-16 units.
+# The longest text one of Excel's text values holds, and the longest
+# formula, in UTF-16 units.
 _EXCEL_TEXT_MAX = 255
+_EXCEL_FORMULA_MAX = 8192
 LOCK = ".lock"
 
 
@@ -68,14 +77,37 @@ def _excel_length(value):
     return len(value.encode("utf-16-le")) // 2
 
 
+def _has_letter(value):
+    return any(unicodedata.category(ch).startswith("L") for ch in value)
+
+
+def _pieces(value):
+    """value in pieces of at most _EXCEL_TEXT_MAX units as written, a quote
+    counting twice; a character is never split."""
+    pieces, current, size = [], [], 0
+    for ch in value:
+        width = _excel_length(ch) * (2 if ch == '"' else 1)
+        if current and size + width > _EXCEL_TEXT_MAX:
+            pieces.append("".join(current))
+            current, size = [], 0
+        current.append(ch)
+        size += width
+    pieces.append("".join(current))
+    return pieces
+
+
 def cell(value):
     """One value as the file writes it, so Excel shows it as typed."""
     value = "" if value is None else str(value)
     if not value:
         return value
-    if (_excel_length(value) <= _EXCEL_TEXT_MAX and "\n" not in value
-            and "\r" not in value):
-        return '="' + value.replace('"', '""') + '"'
+    if "\n" not in value and "\r" not in value:
+        formula = "=" + "&".join('"' + piece.replace('"', '""') + '"'
+                                 for piece in _pieces(value))
+        if _excel_length(formula) <= _EXCEL_FORMULA_MAX:
+            return formula
+        if not _has_letter(value):
+            return "'" + value
     if value.startswith(_FORMULA_START):
         return "'" + value
     return value
