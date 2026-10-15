@@ -372,3 +372,23 @@
 - **Tests:** Codex's case, multi-line cells and the earlier long ones; 9 cases fail on `d253071` on each Python.
 - **Checks:** 326 passed and 8 browser passed on Python 3.9.6 and 3.12.14. In Excel on the owner's Mac, by AppleScript, opened and text-imported as UTF-8, semicolons, General: every value read back exactly, rows intact. Excel's formulas show the too-long cells are text (ISTEXT, LEN 8204) and a CR LF stays two characters. Codex's UI Convert route was not driven here.
 - **Outstanding:** Codex's review of `c600127..2b5db84`; Fable's amendment of `NOW.md` (Fable unavailable for now); the laptop update; the owner's acceptance.
+
+## 2026-10-15 — The second task: `2b5db84` approved
+
+- **Approvals of `2b5db84`** (range `c600127..2b5db84`, record `c2713e1`):
+  - Codex APPROVED, relayed by the owner (verbatim): "APPROVED — `2b5db84`, range `c600127..2b5db84`, record `c2713e1`. T15-C3 is resolved. T15-C1 and T15-C2 remain resolved. No further changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **The task's code**, `f07aa5a..2b5db84`:
+  - `5f536ea`, the bin, the nightly copy and its timer;
+  - `fb953f9`, fixes from the read-only verification;
+  - `d253071` (T15-C1, T15-C2, T15-C3) and `2b5db84` (T15-C3), Codex's findings.
+- **Codex's checks:**
+  - 326 passed and 8 browser passed on Python 3.9.6 and 3.12.14, fake mail only.
+  - A fresh `snapshot.to_bytes()` file opened in Excel through File > Open, UTF-8, semicolon, General: no conversion prompt; the scientific value stayed text, length 8,204 with its apostrophe; multi-line cells, CR LF and the next row intact.
+  - Governance hashes match.
+- **Known limits**, as Codex recorded them: "oversized values show an apostrophe; oversized multiline values can still split under Excel text import".
+- **Not pushed:** GitHub and the laptop do not have this task.
+- **Outstanding:**
+  - the owner's yes to the push and the laptop update, which still includes the earlier task's `programmes.csv` replacement and now installing the nightly copy's units;
+  - Fable's amendment of `NOW.md` and both approvals before milestone 3;
+  - the owner's acceptance.
