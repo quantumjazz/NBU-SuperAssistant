@@ -392,3 +392,26 @@
   - the owner's yes to the push and the laptop update, which still includes the earlier task's `programmes.csv` replacement and now installing the nightly copy's units;
   - Fable's amendment of `NOW.md` and both approvals before milestone 3;
   - the owner's acceptance.
+
+## 2026-10-15 — The second task: on the laptop; READY FOR OWNER ACCEPTANCE
+
+- **Owner** (verbatim, to Opus 5.5's question): "Push and update now (Recommended)".
+- **Pushed and pulled:** GitHub `main` is at `581bb74`. The laptop pulled it after a private copy of the live database was taken: `/home/victor/nbu-superassistant-pre-update-20261015-193832.sqlite3`, schema 3.
+- **Found on the laptop; no entry here recorded it:** it was already at `f07aa5a`. Its `programmes.csv` has been the 17-row list (SHA-256 `556aa980…`) since 14 Oct 16:31, the old list kept as `programmes.csv.2026-10-14`. The service restarted at 16:33, and the code mapping was recorded ("programme codes", 13:33 UTC). This is the update outstanding in the entries for the task of 13 October.
+- **The owner's sudo step:**
+  - the service unit and the nightly copy's two units copied;
+  - `daemon-reload`;
+  - the service restarted at 19:40:22;
+  - the snapshot timer enabled.
+- **Checks on the laptop:**
+  - `/healthz` ok at the public address, and the start line is as before;
+  - schema 4, with 3 applications kept, none in the bin;
+  - 3 requests without a nonce, their links unchanged;
+  - timers: the copy at 00:00 on 16 Oct, the reminders at 09:00.
+- **Phase:** READY FOR OWNER ACCEPTANCE of this task. The owner's checks:
+  - on the live site, as staff, remove a test entry („Друго“), find it in „Кошче“, put it back, remove and delete it, then read the deletions list;
+  - after 00:00, receive „Копие на заявленията към 16.10.2026“ at the owner's account address and open the attached CSV in Excel.
+- **Outstanding:**
+  - this acceptance;
+  - Fable's amendment of `NOW.md` and both approvals before milestone 3;
+  - the acceptances of the earlier tasks.
