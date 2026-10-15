@@ -411,3 +411,16 @@
   - this acceptance;
   - Fable's `NOW.md` amendment and both approvals before milestone 3;
   - the earlier tasks' acceptances.
+
+## 2026-10-15 — A third task before milestone 3: the bin for reports
+
+- **Owner's request** to Opus 5.5 (verbatim): "Another small matter. Can the deleted  reports go first to the bin now and then be deleted?"
+- **Owner's answers** to Opus 5.5's proposal (verbatim): a report's students wait again while it is in the bin, "Yes, right away (Recommended)"; "Change now (Recommended)".
+- **Rules changed** by Opus 5.5, uncommitted: `CLAUDE_1.md` `a125c54e…`; `CONSTITUTION.md` `bdb5fe14…` (3.3, 4.3, 5 introduction, 5.7, 5.14, 5.15, a 15.10 row). They supersede in part the 13 October answer 5 and reading answer 4 in `milestone-3.md`: the report now disappears at the second step. `NOW.md` unchanged at `5bd1f853…`; Fable's pending amendment takes its report-deletion lines too.
+- **Code** `51b1c2d..d39ce3c`:
+  - `890adf7`: schema 5, adding only; removing and putting back write rows; only a report in the bin is deleted; a report in the bin is not kept; the bin lists reports and their deletions;
+  - `d39ce3c`: test gaps and wording from a four-agent read-only verification (no blocker).
+- **Checks:** 340 passed and 9 browser passed on Python 3.9.6 and 3.12.14; 14 faults re-applied in a scratch copy, each caught; a schema-4 folder made by `51b1c2d` upgraded, every row and file kept; pages screenshotted in Chromium (WebKit not installed).
+- **Known limit:** code from before `890adf7` lists reports in the bin as kept.
+- **Not pushed.** The update needs no new units or settings.
+- **Outstanding:** Codex's review of `51b1c2d..d39ce3c`; Fable's amendment; the laptop update; the owner's acceptance.
