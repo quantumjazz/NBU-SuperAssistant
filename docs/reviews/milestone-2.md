@@ -517,3 +517,13 @@
 - **The owner's checks:** as a student, the card „Попълнени документи“ and its line, in Safari on a phone; as staff, „Документи на студента“ on an application's page, both files downloaded and opened in Word.
 - **Status:** accepted by the owner ("I accept.") and live: COMPLETE. The owner's live checks, and any fault they find, go in a new entry.
 - **Outstanding:** DEFERRED, who signs the printed заявление (5.3's quote); before milestone 3, Fable's `NOW.md` amendment naming this task with both bins, both approvals and the owner's authorization. The governance changes stay uncommitted until then.
+
+## 2026-10-16 — Sixth task: the schedule of sessions; for Codex's review
+
+- **Owner** (verbatim): "can we quickly build the timetable thing - it is very important"; to Opus 5.5's question, build all of requirement 4 of the milestone-3 `NOW.md` (`5bd1f853…`) now: "Yes, all of it (Recommended)".
+- **Rules:** none changed. Constitution 5.13 (`66b60bd9…`, uncommitted) already states it; `CLAUDE_1.md` `a125c54e…` unchanged. Fable's `NOW.md` amendment should mark requirement 4 as built before the milestone.
+- **Code** `e37ee7a..1267b47`:
+  - `46fb451`: `sessions.csv`, a fifth list (the four 2026/2027 sessions, checked at start, written once at the first start after the update); on tab 1 the schedule, a choice among sessions dated today or later in Sofia, and the tick, both needed to submit; the student's page, the staff table and page show both, „—“ before; staff correct the session; the nightly copy holds both; schema 6;
+  - `1267b47`: fixes from a four-agent read-only verification (staff table fits at 1280 px, „г.“ kept with its year, test gaps from 45 mutations).
+- **Checks:** 396 passed and 11 browser tests on Python 3.9.6 and 3.12.14 (after `1267b47`'s last assertion, `tests/test_sessions.py` again on both); the pilot's first start reproduced 10 times with the reminder and the nightly copy starting together: the list written once. Pages in Chromium only (WebKit not installed).
+- **Not pushed. Outstanding:** Codex's review; the owner's look at the wording; the push and laptop update; acceptance.
