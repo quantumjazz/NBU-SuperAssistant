@@ -169,9 +169,7 @@ def zaiavlenie(application, lists):
         "grad_type": _or_dots(grad_type_label(application, lists),
                               DOTS["grad_type"]),
         "exam_date": _or_dots(submitted if exam else "", DOTS["date"]),
-        "topic": _or_dots(topic, DOTS["topic"]),
-        "topic_line2": _Text("" if topic else DOTS["topic"]),
-        "topic_line3": _Text("" if topic else DOTS["topic"]),
+        "topic": _or_dots(topic, "\n".join([DOTS["topic"]] * 3)),
         "supervisor": _or_dots(
             supervisor_label(application, lists) if thesis else "",
             DOTS["supervisor"]),

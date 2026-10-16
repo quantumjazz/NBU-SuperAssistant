@@ -4,8 +4,13 @@ topic-approval reports (NOW.md requirements 4 and 7).
 A student downloads only the forms of their own application, and only once
 it is submitted and not in the bin; Приложение 2 only for a thesis.
 Anything else is "not found", so a student learns nothing about other
-applications. Staff choose a programme, generate its report, and download
-any kept report. Staff may remove a kept report to the bin with one press,
+applications. Staff download and print the forms of any submitted
+application, also while it is in the bin, until it is deleted (constitution
+5.5); each file is built from the record as it stands, corrections
+included, and its name carries the application's number and F№.
+
+Staff choose a programme, generate its report, and download any kept
+report. Staff may remove a kept report to the bin with one press,
 and there download it, put it back, or, after a second page that names it,
 delete it (constitution 5.14); the bin lists the deletions. A button for a
 report no longer where its page showed it (pressed twice, or another member
@@ -18,7 +23,7 @@ import io
 from flask import (Blueprint, abort, flash, redirect, render_template,
                    request, send_file)
 
-from superassistant import documents, reports, texts
+from superassistant import applications, documents, reports, texts
 from superassistant import web
 
 blueprint = Blueprint("documents", __name__)
@@ -57,6 +62,44 @@ def prilozhenie2():
         abort(404)
     return _send(documents.prilozhenie2(application, web.current_lists()),
                  "prilozhenie-2.docx")
+
+
+def _staff_record(application_id):
+    """A submitted application, in the bin or not, for staff; else not
+    found."""
+    record = applications.get(web.connection(), application_id)
+    if record is None or record["submitted_at"] is None:
+        abort(404)
+    return record
+
+
+def _staff_name(form, record):
+    """The form's file name for staff: its application's number, then the
+    F№ when it is „F“ and digits (an F№ stored before that rule is left
+    out, so the name stays ASCII)."""
+    name = "{}-{}".format(form, record["id"])
+    digits = applications.fn_digits(record["fn"])
+    if digits and digits != record["fn"]:
+        name += "-" + applications.FN_LETTER + digits
+    return name + ".docx"
+
+
+@blueprint.route("/staff/application/<int:application_id>/zaiavlenie.docx")
+@web.staff_required
+def staff_zaiavlenie(application_id):
+    record = _staff_record(application_id)
+    return _send(documents.zaiavlenie(record, web.current_lists()),
+                 _staff_name("zaiavlenie-deklaracia", record))
+
+
+@blueprint.route("/staff/application/<int:application_id>/prilozhenie2.docx")
+@web.staff_required
+def staff_prilozhenie2(application_id):
+    record = _staff_record(application_id)
+    if record["grad_type"] != "thesis":
+        abort(404)
+    return _send(documents.prilozhenie2(record, web.current_lists()),
+                 _staff_name("prilozhenie-2", record))
 
 
 def _choices(lists, counts):

@@ -543,7 +543,9 @@ def test_a_student_reaches_only_their_own_application(
     page = other.get("/application").get_data(as_text=True)
     assert "Мария" not in page and "Управление на риска" not in page
     for url in ("/staff", "/staff/application/1", "/owner", "/staff/reports",
-                "/staff/reports/1/delete"):
+                "/staff/reports/1/delete",
+                "/staff/application/1/zaiavlenie.docx",
+                "/staff/application/1/prilozhenie2.docx"):
         response = other.get(url)
         assert response.status_code in (302, 403, 404)
         assert "Мария" not in response.get_data(as_text=True)

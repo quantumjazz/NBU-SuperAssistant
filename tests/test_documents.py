@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 import docx
 import pytest
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from hypothesis import given, settings as hsettings, strategies as st
 
@@ -190,7 +191,8 @@ def test_thesis_zaiavlenie_holds_what_the_records_hold(data):
     assert at("grad_type") == ("Моля да бъда допуснат(а) до дипломиране "
                                "чрез " + adjective + " теза")
     assert at("topic") == record["topic"]
-    assert at("topic_line2") == "" and at("topic_line3") == ""
+    # No empty lines under a filled topic: the supervisor's line follows it.
+    assert tags["supervisor"] == tags["topic"] + 1
     assert at("supervisor") == ("С научен (художествен) ръководител: "
                                 + supervisor(record, the_lists))
     assert at("average_grade") == ("среден успех от следването: "
@@ -226,8 +228,9 @@ def test_state_exam_zaiavlenie_fills_names_fn_and_date_only(data):
                                "чрез държавен изпит")
     assert at("exam_date") == ("Дата на подаване на заявлението: "
                                + submitted + SIGNATURE)
-    assert at("topic") == dots["topic"]
-    assert at("topic_line2") == dots["topic"] == at("topic_line3")
+    # A blank topic keeps the sample's three dotted lines, in one paragraph.
+    assert at("topic") == "\n".join([dots["topic"]] * 3)
+    assert len(paragraphs[tags["topic"]]._p.findall(".//" + qn("w:br"))) == 2
     assert at("supervisor") == ("С научен (художествен) ръководител: "
                                 + dots["supervisor"])
     assert at("average_grade") == ("среден успех от следването: "
@@ -235,6 +238,26 @@ def test_state_exam_zaiavlenie_fills_names_fn_and_date_only(data):
     assert at("thesis_date") == ("Дата на подаване на заявлението: "
                                  + dots["date"] + SIGNATURE)
     assert_untouched(documents.ZAIAVLENIE, document)
+
+
+def test_zaiavlenie_thesis_box_goes_with_its_heading():
+    """The thesis box may not split across pages (the sample's own layout):
+    when it does not fit on page 1, its heading goes with it, rather than
+    staying alone at the foot of the page, and the topic is one paragraph,
+    with no empty lines after it (seen in Word on 16 October 2026)."""
+    template = docx.Document(str(documents.TEMPLATES / documents.ZAIAVLENIE))
+    body = list(template.element.body.iterchildren())
+    (heading,) = [el for el in body if el.tag == qn("w:p") and "".join(
+        t.text or "" for t in el.iter(qn("w:t"))).startswith(
+            "2.Попълва се при завършване с бакалавърска")]
+    assert heading.find(qn("w:pPr")).find(qn("w:keepNext")) is not None
+    box = body[body.index(heading) + 1]
+    assert box.tag == qn("w:tbl")
+    (row,) = box.findall(qn("w:tr"))
+    assert row.find(qn("w:trPr")).find(qn("w:cantSplit")) is not None
+    cell = [p.text for p in template.tables[1].cell(0, 0).paragraphs]
+    topic = cell.index("{{ topic }}")
+    assert cell[topic + 1].startswith("С научен (художествен) ръководител:")
 
 
 # --- Приложение 2 ----------------------------------------------------------
@@ -268,6 +291,23 @@ def test_prilozhenie2_keeps_line_breaks_and_leaves_dates_blank(data):
                  if p.text.startswith("Дата на предаване:")]
     assert len(handed_in) == 1
     assert not re.search(r"\d", handed_in[0].split("\t")[0])
+
+
+def test_prilozhenie2_does_not_stretch_a_line_ending_in_a_line_break():
+    """The sections are justified, as in the sample; Word's option "Don't
+    expand character spaces on a line ending with SHIFT+RETURN" keeps a line
+    the student ended with Enter at its own width („Глава 1“ was printed as
+    „Глава … 1“ across the page, 16 October 2026)."""
+    template = docx.Document(str(documents.TEMPLATES
+                                 / documents.PRILOZHENIE2))
+    compat = template.settings.element.find(qn("w:compat"))
+    assert compat is not None
+    assert compat.find(qn("w:doNotExpandShiftReturn")) is not None
+    tags, _ = slots(documents.PRILOZHENIE2)
+    paragraphs = template_paragraphs(documents.PRILOZHENIE2)
+    for field in ("rationale", "aims", "object_subject", "methodology",
+                  "information_base", "plan", "schedule"):
+        assert paragraphs[tags[field]].alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
 # Advance widths in Times New Roman, in thousandths of an em, regular and

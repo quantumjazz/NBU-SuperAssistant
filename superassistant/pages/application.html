@@ -95,9 +95,10 @@
   {% endif %}
 
   <section id="forms" class="card"><div class="card-h"><h2>{{ t.FORMS_TITLE }}</h2></div><div class="card-b">
+    <p id="forms-lead">{{ t.FORMS_LEAD }}</p>
     <ul class="downloads" role="list">
-      <li><a class="btn secondary" href="/application/forms/zaiavlenie.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Заявление-декларация (.docx)</a></li>
-      {% if standing.thesis %}<li><a class="btn secondary" href="/application/forms/prilozhenie2.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Приложение 2 (.docx)</a></li>{% endif %}
+      <li><a class="btn secondary" href="/application/forms/zaiavlenie.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.FORMS_ZAIAVLENIE }}</a></li>
+      {% if standing.thesis %}<li><a class="btn secondary" href="/application/forms/prilozhenie2.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.FORMS_PRILOZHENIE2 }}</a></li>{% endif %}
     </ul>
   </div></section>
 

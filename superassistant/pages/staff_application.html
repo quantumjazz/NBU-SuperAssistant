@@ -31,6 +31,13 @@
 </div></section>
 {% endif %}
 
+<section id="staff-forms" class="card"><div class="card-h"><h2>{{ t.STAFF_FORMS_TITLE }}</h2></div><div class="card-b">
+  <ul class="downloads" role="list">
+    <li><a class="btn secondary" id="staff-zaiavlenie" href="/staff/application/{{ r.id }}/zaiavlenie.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.FORMS_ZAIAVLENIE }}</a></li>
+    {% if r.grad_type == "thesis" %}<li><a class="btn secondary" id="staff-prilozhenie2" href="/staff/application/{{ r.id }}/prilozhenie2.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.FORMS_PRILOZHENIE2 }}</a></li>{% endif %}
+  </ul>
+</div></section>
+
 <div class="card"><div class="card-h"><h2>{{ t.ENTERED_TITLE }}</h2></div><div class="card-b">
 <dl class="fields" id="fields">
   <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at|datetime }}</dd>

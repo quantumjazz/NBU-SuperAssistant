@@ -166,7 +166,14 @@ STATUS_REMOVED_TITLE = "Заявлението е премахнато"
 STATUS_REMOVED = ("Администрацията премахна заявлението ви и то вече не "
                   "може да бъде променяно. Ако смятате, че това е грешка, "
                   "свържете се с администрацията на департамента.")
-FORMS_TITLE = "Документи за печат и подпис"
+# The heading and the line, verbatim, "visible in each case" (the owner,
+# 16 October 2026): the student prints and hands in nothing.
+FORMS_TITLE = "Попълнени документи"
+FORMS_LEAD = ("Не е нужно да отпечатвате и представяте документите: "
+              "администрацията на департамента вече разполага с тях. "
+              "Можете да ги изтеглите за справка.")
+FORMS_ZAIAVLENIE = "Заявление-декларация (.docx)"
+FORMS_PRILOZHENIE2 = "Приложение 2 (.docx)"
 CHOOSE_AGAIN_TITLE = "Изберете друг научен ръководител"
 CHOOSE_AGAIN = "Изпрати молбата"
 CHOSEN_AGAIN = "Молбата е изпратена на новия научен ръководител."
@@ -346,6 +353,7 @@ STAFF_CHECK_CHIP = {"passed": "проверено", "not_passed": "неуспе�
 STAFF_APPLICATION_TITLE = "Заявление на {}"
 STAFF_SUBMITTED_AT = "Подадено на"
 STAFF_STUDENT_EMAIL = "Електронна поща на студента"
+STAFF_FORMS_TITLE = "Документи на студента"
 STAFF_REQUESTS_TITLE = "Молби до научен ръководител"
 STAFF_REQUEST_LINE = "{} ({}), изпратена на {}"
 STAFF_REQUEST_ANSWER = "Отговор: {} на {}"

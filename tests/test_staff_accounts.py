@@ -177,7 +177,9 @@ def test_an_unknown_login_is_refused_with_the_same_sentence(client,
 
 STAFF_PAGES = ["/staff", "/staff/application/1", "/owner", "/staff/reports",
                "/staff/reports/1/delete", "/staff/bin",
-               "/staff/application/1/delete"]
+               "/staff/application/1/delete",
+               "/staff/application/1/zaiavlenie.docx",
+               "/staff/application/1/prilozhenie2.docx"]
 
 
 def assert_sees_nothing(client):

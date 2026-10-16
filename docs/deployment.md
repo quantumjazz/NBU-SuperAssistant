@@ -702,8 +702,8 @@ restore.
 - `/static/`: the stylesheet.
 
 Everything else requires signing in: a student's application and forms
-(`/application`), the staff pages and reports (`/staff`) and the owner's page
-(`/owner`).
+(`/application`), the staff pages, each applicant's forms and the reports
+(`/staff`) and the owner's page (`/owner`).
 
 The sign-in links and the answer pages carry their tokens in the address.
 That is why the service writes no access log (see the comment in

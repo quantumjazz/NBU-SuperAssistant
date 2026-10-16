@@ -35,6 +35,7 @@ import zipfile
 from pathlib import Path
 
 import docx
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.text.paragraph import Paragraph
@@ -148,9 +149,18 @@ def build_zaiavlenie(path):
     lines = [p for p in thesis if p.text.startswith("……")]
     if len(lines) != 3:
         raise BuildError("expected three dotted topic lines")
-    for paragraph, tag in zip(lines, ("topic", "topic_line2",
-                                      "topic_line3")):
-        set_runs(paragraph, {0: "{{ " + tag + " }}"})
+    # The topic takes the first of the sample's three dotted lines; the other
+    # two go, and a blank topic prints three dotted lines in that one
+    # paragraph (documents.py). Two empty lines under a filled topic pushed
+    # the whole box, which may not split, to page 2 in Word (16 October
+    # 2026).
+    set_runs(lines[0], {0: "{{ topic }}"})
+    for paragraph in lines[1:]:
+        paragraph._p.getparent().remove(paragraph._p)
+    # When the box does not fit on page 1, its heading goes with it rather
+    # than staying alone at the foot of the page.
+    find(paragraphs, "2.\tПопълва се при завършване с бакалавърска"
+         ).paragraph_format.keep_with_next = True
     set_runs(find(thesis, "С научен (художествен) ръководител:"),
              {0: "С научен (художествен) ръководител: {{ supervisor }}"})
     set_runs(find(thesis, "среден успех от следването:"),
@@ -226,6 +236,15 @@ def build_prilozhenie(path):
     # them, it gets that style's 5 pt before it, like the other headings.
     find(paragraphs, "МЕТОДОЛОГИЧНА БАЗА").paragraph_format.space_before = \
         Pt(5)
+    # The sections are justified, and Word stretched every line that ends
+    # where the student pressed Enter across the full width ("Глава … 1",
+    # 16 October 2026). Word's own option "Don't expand character spaces on
+    # a line ending with SHIFT+RETURN" stops that; it is first in w:compat,
+    # as the schema orders it.
+    compat = document.settings.element.find(qn("w:compat"))
+    if compat is None:
+        raise BuildError("the sample has no compatibility settings")
+    compat.insert(0, OxmlElement("w:doNotExpandShiftReturn"))
 
     handed_in = find(paragraphs, "Дата на предаване:")
     texts = {i: r.text for i, r in enumerate(handed_in.runs)}
