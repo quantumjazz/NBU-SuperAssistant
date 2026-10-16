@@ -504,3 +504,16 @@
   - the owner's yes to the push and the laptop update, then the owner's look at the student page in Safari;
   - DEFERRED: who signs the printed заявление (5.3's quote);
   - before milestone 3: Fable's `NOW.md` amendment naming this task with both bins, Fable's and Opus 5.5's approval of the same version, and the owner's authorization. The governance changes stay uncommitted until then.
+
+## 2026-10-16 — Fifth task: live on the laptop
+
+- **Owner** (verbatim): "Yes, push and update the laptop.", then "Done, I restarted the service."
+- **Pushed and pulled:** GitHub and the laptop at `b49ec6b` (code `1845492`). A copy of the live database was taken first: `/home/victor/nbu-superassistant-pre-update-20261016-163949.sqlite3`, schema 5, 3 applications, 0 reports, integrity ok. No unit, setting, requirement or schema changed.
+- **The owner's sudo step:** the restart, 16:41:38 EEST, after the pull.
+- **Checks:**
+  - `/healthz` ok on the laptop and publicly; no error in the service log;
+  - signed out, `/staff/application/1/zaiavlenie.docx` and `/prilozhenie2.docx` lead to `/staff/sign-in`, so the new routes are served; the student's form address still leads to `/`;
+  - schema 5 and 3 applications, as in the copy.
+- **The owner's checks:** as a student, the card „Попълнени документи“ and its line, in Safari on a phone; as staff, „Документи на студента“ on an application's page, both files downloaded and opened in Word.
+- **Status:** accepted by the owner ("I accept.") and live: COMPLETE. The owner's live checks, and any fault they find, go in a new entry.
+- **Outstanding:** DEFERRED, who signs the printed заявление (5.3's quote); before milestone 3, Fable's `NOW.md` amendment naming this task with both bins, both approvals and the owner's authorization. The governance changes stay uncommitted until then.
