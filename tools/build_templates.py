@@ -15,9 +15,12 @@ text of the runs it fills, and writes:
   its header row, one templated row between docxtpl's two {%tr %} control
   rows, and every student row removed.
 
-Each dotted placeholder the records fill becomes one docxtpl tag; the text
-behind each tag is worked out in superassistant/documents.py, so the
-templates hold no logic (CLAUDE.md "Documents"). The years the samples print
+Each dotted placeholder the records fill becomes one docxtpl tag, except
+the заявление's three topic lines, which become one; the text behind each
+tag is worked out in superassistant/documents.py, so the templates hold no
+logic (CLAUDE.md "Documents"). Two layout settings are added for Word: the
+заявление's thesis heading keeps with its box, and Приложение 2 does not
+stretch a line ending in a line break. The years the samples print
 are removed, so a date left blank is blank in full (NOW.md requirement 4),
 and the core properties (author, last modified by, comments, dates) are
 cleared to neutral values.
@@ -240,10 +243,12 @@ def build_prilozhenie(path):
     # where the student pressed Enter across the full width ("Глава … 1",
     # 16 October 2026). Word's own option "Don't expand character spaces on
     # a line ending with SHIFT+RETURN" stops that; it is first in w:compat,
-    # as the schema orders it.
+    # as the schema orders it, which holds while w:compat holds only
+    # w:compatSetting entries, which come last.
     compat = document.settings.element.find(qn("w:compat"))
-    if compat is None:
-        raise BuildError("the sample has no compatibility settings")
+    if compat is None or any(child.tag != qn("w:compatSetting")
+                             for child in compat):
+        raise BuildError("the sample's compatibility settings have changed")
     compat.insert(0, OxmlElement("w:doNotExpandShiftReturn"))
 
     handed_in = find(paragraphs, "Дата на предаване:")

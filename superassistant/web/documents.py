@@ -7,7 +7,8 @@ Anything else is "not found", so a student learns nothing about other
 applications. Staff download and print the forms of any submitted
 application, also while it is in the bin, until it is deleted (constitution
 5.5); each file is built from the record as it stands, corrections
-included, and its name carries the application's number and F№.
+included, and its name carries the application's number, and the F№
+when it is „F“ and digits.
 
 Staff choose a programme, generate its report, and download any kept
 report. Staff may remove a kept report to the bin with one press,

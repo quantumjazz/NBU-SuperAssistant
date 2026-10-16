@@ -302,7 +302,8 @@ def test_prilozhenie2_does_not_stretch_a_line_ending_in_a_line_break():
                                  / documents.PRILOZHENIE2))
     compat = template.settings.element.find(qn("w:compat"))
     assert compat is not None
-    assert compat.find(qn("w:doNotExpandShiftReturn")) is not None
+    # First, where the schema orders it before every w:compatSetting.
+    assert compat[0].tag == qn("w:doNotExpandShiftReturn")
     tags, _ = slots(documents.PRILOZHENIE2)
     paragraphs = template_paragraphs(documents.PRILOZHENIE2)
     for field in ("rationale", "aims", "object_subject", "methodology",
