@@ -487,3 +487,20 @@
 - **Checks:** 352 passed and 10 browser on Python 3.9.6 and 3.12.14; 15 mutations, each caught; templates rebuilt identical from the samples; Word renders before and after; pages in Chromium (WebKit not installed).
 - **DEFERRED:** 5.3 quotes the tick as signing "the same sentence on paper"; who signs the printed заявление is the owner's question.
 - **Not pushed. Outstanding:** Codex's review; the push and laptop update; the owner's acceptance.
+
+## 2026-10-16 — Fifth task: `1845492` approved; accepted by the owner
+
+- **Approvals of `1845492`** (range `7cc6abe..1845492`, record `fa8d551`):
+  - Codex APPROVED, relayed by the owner (verbatim): "Codex APPROVED `1845492`, range `7cc6abe..1845492`, record `fa8d551`. No changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, as Codex reported them:
+  - 352 passed and 10 Chromium browser tests passed on Python 3.9.6 and 3.12.14, the browser tests outside the sandbox with fake mail;
+  - staff access, the bin, drafts, missing ids, non-thesis Приложение 2, corrected content, file names and both student cards as decided;
+  - all three templates rebuilt, every ZIP part matching; no sample student text or year; `doklad_temi.docx` unchanged;
+  - governance hashes match: `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `66b60bd9…`, `NOW.md` `5bd1f853…`.
+- **Owner acceptance** (verbatim): "I accept."
+- **Not live:** GitHub and the laptop at `7cc6abe`. The update is a pull and a restart; no schema, unit or settings change.
+- **Outstanding:**
+  - the owner's yes to the push and the laptop update, then the owner's look at the student page in Safari;
+  - DEFERRED: who signs the printed заявление (5.3's quote);
+  - before milestone 3: Fable's `NOW.md` amendment naming this task with both bins, Fable's and Opus 5.5's approval of the same version, and the owner's authorization. The governance changes stay uncommitted until then.
