@@ -49,6 +49,23 @@
     </div>
   </fieldset>
 {%- endmacro %}
+{% macro schedule_table() -%}
+  {# The schedule of sessions (constitution 5.13), as the sessions list holds it; on a phone each session stacks, each deadline under its heading. #}
+  <div class="table-wrap">
+  <table class="schedule" id="schedule">
+    <thead><tr>{% for c in t.SCHEDULE_COLUMNS %}<th scope="col">{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for s in schedule %}
+      <tr class="{{ 'passed' if s.passed }}" data-session="{{ s.code }}">
+        <th scope="row">{{ s.date }}{% if s.passed %} <span class="chip plain">{{ t.SCHEDULE_PASSED }}</span>{% endif %}</th>
+        {% for d in s.deadlines %}<td data-label="{{ t.SCHEDULE_COLUMNS[loop.index] }}">{{ d }}</td>{% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="hint" id="schedule-note">{{ t.SCHEDULE_NOTE }}</p>
+{%- endmacro %}
 {% block title %}{{ t.NAV_APPLICATION_TITLE }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -84,6 +101,10 @@
     </div>
   </div></section>
 
+  <section id="session" class="card"><div class="card-h"><div><h2>{{ t.SCHEDULE_TITLE }}</h2><p>{{ t.SCHEDULE_LEAD }}</p></div></div><div class="card-b">
+    {{ schedule_table() }}
+  </div></section>
+
   {% if standing.thesis and standing.answer == "decline" %}
   <section id="choose-again" class="card"><div class="card-h"><h2>{{ t.CHOOSE_AGAIN_TITLE }}</h2></div><div class="card-b">
     <form method="post" action="/application/supervisor">
@@ -107,6 +128,8 @@
       <dt>{{ t.FIELD_LABELS.grad_type }}</dt><dd>{{ t.GRAD_THESIS if standing.thesis else t.GRAD_EXAM }}</dd>
       {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ record[name] }}</dd>{% endfor %}
       <dt>{{ t.EMAIL_LABEL }}</dt><dd>{{ record.email }}</dd>
+      <dt>{{ fields.grad_session }}</dt><dd id="chosen-session">{{ session_label }}</dd>
+      <dt>{{ t.ACKNOWLEDGED }}</dt><dd id="acknowledged">{{ t.ACKNOWLEDGED_VALUE[record.schedule_ack_at is not none] }}</dd>
       {% if standing.thesis %}
         <dt>{{ fields.phone }}</dt><dd>{{ record.phone }}</dd>
         <dt>{{ fields.programme }}</dt><dd>{{ programme_label }}</dd>
@@ -183,6 +206,21 @@
         {{ supervisor_fields(values) }}
       </div></div>
     </div>
+
+    <div class="card" id="session-card"><div class="card-h"><div><h2>{{ t.SCHEDULE_TITLE }}</h2><p>{{ t.SCHEDULE_LEAD }}</p></div></div><div class="card-b">
+      {{ schedule_table() }}
+      <fieldset class="subsection">
+        <legend>{{ t.SESSION_CHOOSE }}</legend>
+        {% if offered %}
+        <div class="choices">
+          {% for code, label in offered %}<label class="choice"><input type="radio" name="grad_session" value="{{ code }}" {% if values.grad_session == code %}checked{% endif %}> {{ label }}</label>{% endfor %}
+        </div>
+        {% else %}<p id="no-session">{{ t.SESSION_NONE_OFFERED }}</p>{% endif %}
+        {% if errors.grad_session %}<p class="error" id="grad_session-error">{{ errors.grad_session }}</p>{% endif %}
+      </fieldset>
+      <label class="choice declare" for="schedule_ack"><input type="checkbox" id="schedule_ack" name="schedule_ack" value="1" {% if values.schedule_ack %}checked{% endif %}> <span>{{ t.ACK_SCHEDULE }}</span></label>
+      {% if errors.schedule_ack %}<p class="error" id="schedule_ack-error">{{ errors.schedule_ack }}</p>{% endif %}
+    </div></div>
 
     <div class="card"><div class="card-b">
       <label class="choice declare" for="credits_declared"><input type="checkbox" id="credits_declared" name="credits_declared" value="1" {% if values.credits_declared %}checked{% endif %}> <span>{{ t.DECLARE_CREDITS }}</span></label>

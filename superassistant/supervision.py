@@ -30,7 +30,8 @@ import hashlib
 import hmac
 import secrets
 
-from superassistant import accounts, applications, db, limits, mail, texts
+from superassistant import (accounts, applications, db, limits, mail,
+                            sessions, texts)
 
 CHOICES = ("confirm", "decline")
 
@@ -194,8 +195,12 @@ def submit(connection, settings, lists, application_id):
     The student's declaration that the credits are covered must be ticked
     ("must be ticked to submit, as he signs the same sentence on paper", the
     owner, 13 October 2026), and is recorded with the moment of submission.
-    The tick is the student's submission's own condition: a staff correction
-    of the type (staff_change_type) neither needs it nor changes it.
+    So must the tick that the student knows the schedule of sessions, and a
+    session the schedule offers today must be chosen (constitution 5.13):
+    "students must see the scheduled dates and choose one; they also must
+    acknowledge the timetable". The ticks and the session are the student's
+    submission's own conditions: a staff correction of the type
+    (staff_change_type) neither needs nor changes them.
 
     A thesis is submitted only once its request to the supervisor has gone:
     if the relay refuses it, mail.MailFailed propagates and nothing changes.
@@ -209,13 +214,17 @@ def submit(connection, settings, lists, application_id):
         missing = applications.missing_for_submission(record)
         if not record["credits_declared"]:
             missing.append(applications.Refusal("credits_declared", "tick"))
+        if record["grad_session"] not in sessions.offered(lists):
+            missing.append(applications.Refusal("grad_session", "session"))
+        if not record["schedule_ack"]:
+            missing.append(applications.Refusal("schedule_ack", "tick"))
         if missing:
             return missing
         stamp = db.now()
         connection.execute(
             "UPDATE applications SET submitted_at = ?, credits_declared_at = ?,"
-            " updated_at = ? WHERE id = ?",
-            (stamp, stamp, stamp, application_id))
+            " schedule_ack_at = ?, updated_at = ? WHERE id = ?",
+            (stamp, stamp, stamp, stamp, application_id))
         if record["grad_type"] == "thesis":
             _send_new_request(connection, settings, lists, application_id)
     return []

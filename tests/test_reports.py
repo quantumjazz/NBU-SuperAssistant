@@ -863,7 +863,8 @@ def test_a_download_that_meets_the_deletion_is_not_found(settings, app,
 
 def test_schema_4_with_reports_upgrades_keeping_them(tmp_path):
     """A database of the application bin (15 October 2026), with a kept
-    report, its student and a report deleted then, becomes version 5 with
+    report, its student and a report deleted then, becomes the latest
+    version (5 with the report bin, 6 with the schedule of sessions) with
     the report kept and the deletion logged, no removal known for it."""
     path = tmp_path / "superassistant.sqlite3"
     connection = sqlite3.connect(str(path))
@@ -894,7 +895,7 @@ def test_schema_4_with_reports_upgrades_keeping_them(tmp_path):
     db.migrate(path)
     connection = db.connect(path)
     assert connection.execute("PRAGMA user_version").fetchone()[0] == len(
-        db.MIGRATIONS) == 5
+        db.MIGRATIONS) == 6
     (kept,) = reports.kept(connection)
     assert (kept["id"], kept["students"], kept["binned_at"],
             kept["binned_by"]) == (2, 1, None, None)

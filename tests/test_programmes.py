@@ -202,7 +202,7 @@ def test_the_old_codes_move_once_as_corrections_under_the_owners_account(
     assert [r["programme"] for r in reports.kept(connection)] == ["BSNADM01"]
     assert [r["key"] for r in connection.execute(
         "SELECT key FROM installation ORDER BY key")] == [
-        "lists", "programme codes"]
+        "lists", "programme codes", "sessions list"]
     count = connection.execute("SELECT COUNT(*) FROM corrections").fetchone()[0]
     connection.close()
     assert count == len(numbers)

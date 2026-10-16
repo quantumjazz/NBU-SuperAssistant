@@ -152,6 +152,38 @@ REFUSED_FN = "Въведете само цифрите на факултетни
 DECLARE_CREDITS = ("Декларирам, че към момента съм покрил(а) всички кредити "
                    "по програмна схема към програмата.")
 TICK_REQUIRED = "Отбележете това поле, за да подадете заявлението."
+# The schedule of sessions (constitution 5.13): built from the sessions list,
+# its column headings and its note as the department's framework schedule
+# prints them. A session's date is always written as SESSION_DATE, a
+# deadline as SESSION_DEADLINE, from the date in the list.
+SCHEDULE_TITLE = "Сесия за дипломиране"
+SCHEDULE_LEAD = "График на сесиите за защита на тези и за държавен изпит"
+SCHEDULE_COLUMNS = (
+    "Сесия",
+    "Подаване на заявления и общи справки за одобряване на теми",
+    "Подаване на заявления и общи справки за държавен изпит",
+    "Предаване на одобрени бакалавърски/магистърски тези – 1 екз. + 2 бр. CD")
+SCHEDULE_PASSED = "отминала"
+SCHEDULE_NOTE = ("В графика са посочени само началните дати на сесиите. "
+                 "Продължителността им зависи от броя на допуснатите до "
+                 "защита и държавен изпит дипломанти.")
+SESSION_CHOOSE = "Изберете сесия"
+SESSION_NONE_OFFERED = ("В графика няма предстояща сесия. Свържете се с "
+                        "администрацията на департамента.")
+# The sentence the student ticks, as the approved plan words it (NOW.md of
+# milestone 3, requirement 4; the owner, 16 October 2026: "Yes, all of it").
+ACK_SCHEDULE = ("Запознат(а) съм с рамковия график на сесиите за защита на "
+                "тези и за държавен изпит и със сроковете в него.")
+REFUSED_SESSION = "Изберете сесия от графика."
+SESSION_DATE = "{day} {month} {year} г. ({weekday})"
+SESSION_DEADLINE = "до {day} {month} {year} г."
+MONTHS = ("януари", "февруари", "март", "април", "май", "юни", "юли",
+          "август", "септември", "октомври", "ноември", "декември")
+WEEKDAYS = ("понеделник", "вторник", "сряда", "четвъртък", "петък", "събота",
+            "неделя")
+SESSION_NONE = "—"
+ACKNOWLEDGED = "Запознат(а) с графика на сесиите"
+ACKNOWLEDGED_VALUE = {True: "да", False: "—"}
 STATUS_TITLE = "Къде е заявлението"
 STATUS_DRAFT = "Не е подадено."
 STATUS_SUBMITTED = "Подадено на {}."
@@ -199,6 +231,7 @@ FIELD_LABELS = {
     "plan": "Примерен план-съдържание",
     "schedule": "Времеви график",
     "grad_type": "Как ще се дипломирате",
+    "grad_session": "Сесия",
 }
 FIELD_HINTS = {
     "rationale": "актуалност, важност и значимост за теорията и практиката",
@@ -330,8 +363,9 @@ STAFF_TO_STUDENTS = "Вход за студенти"
 # --- Staff work: tables, checks, corrections ---------------------------------
 
 STAFF_TABLE_TITLE = "Подадени заявления"
-STAFF_COLUMNS = ("Студент", "F№", "Програма", "Код", "Вид", "Кредити",
-                 "Тема", "Научен ръководител", "Отговор", "Проверка")
+STAFF_COLUMNS = ("Студент", "F№", "Програма", "Код", "Вид", "Сесия",
+                 "Кредити", "График", "Тема", "Научен ръководител",
+                 "Отговор", "Проверка")
 STAFF_PROGRAMME_CODE = "Код на програмата"
 STAFF_DECLARED = "Декларира покрити кредити"
 STAFF_DECLARED_VALUE = {True: "да", False: "—"}
@@ -393,6 +427,11 @@ STAFF_TYPE_MISSING = "За теза липсват: {}."
 STAFF_RETAINED_THESIS = "Запазени данни за теза"
 STAFF_SUPERVISOR_MAIL_FAILED = ("Нищо не е променено: молбата не можа да бъде "
                                 "изпратена.")
+STAFF_SESSION_FORM = "Поправи сесията"
+STAFF_SESSION_HINT = ("Може да бъде избрана всяка сесия от графика, "
+                      "включително отминала.")
+STAFF_SESSION_OPTION_PASSED = "{} – отминала"
+STAFF_SESSION_SAVE = "Запиши сесията"
 
 # The bin (constitution 5.14 and 5.15): an application or a report staff
 # remove waits here, to be put back or deleted.
@@ -576,7 +615,8 @@ CLI_MAIL_TEST_TEXT = ("Това е пробното писмо от команд
 SNAPSHOT_COLUMNS = (
     "№", "Подадено на", "Електронна поща на студента", "Вид",
     "Собствено име", "Бащино име", "Фамилия", "F№",
-    "Декларира покрити кредити", "Телефон", "Програма и форма на обучение",
+    "Декларира покрити кредити", "Запознат(а) с графика на сесиите",
+    "Сесия", "Телефон", "Програма и форма на обучение",
     "Код на програмата", "Тема на тезата", "Среден успех от следването",
     "Научен ръководител", "Електронна поща на научния ръководител",
     "Обосновка на темата", "Цели и задачи",

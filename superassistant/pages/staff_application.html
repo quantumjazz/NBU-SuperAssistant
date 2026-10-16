@@ -45,6 +45,8 @@
   <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
   {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
   <dt>{{ t.STAFF_DECLARED }}</dt><dd id="declared">{{ t.STAFF_DECLARED_VALUE[row.declared] }}</dd>
+  <dt>{{ fields.grad_session }}</dt><dd id="session">{{ row.session }}</dd>
+  <dt>{{ t.ACKNOWLEDGED }}</dt><dd id="acknowledged">{{ t.ACKNOWLEDGED_VALUE[row.acknowledged] }}</dd>
 </dl>
 </div></div>
 {% if r.grad_type == "thesis" or retained %}
@@ -113,6 +115,8 @@
   {% for c in corrections %}
     {% if c.field == "grad_type" %}
     <li>{{ t.STAFF_CORRECTION_LINE.format(fields.grad_type, t.STAFF_TYPE.get(c.old_value, c.old_value), t.STAFF_TYPE.get(c.new_value, c.new_value), c.username, c.at|datetime) }}</li>
+    {% elif c.field == "grad_session" %}
+    <li>{{ t.STAFF_CORRECTION_LINE.format(fields.grad_session, session_label(c.old_value), session_label(c.new_value), c.username, c.at|datetime) }}</li>
     {% else %}
     <li>{{ t.STAFF_CORRECTION_LINE.format(fields.get(c.field, c.field), c.old_value, c.new_value, c.username, c.at|datetime) }}</li>
     {% endif %}
@@ -138,6 +142,24 @@
       </div>
       {% if errors.correction %}<p class="error">{{ errors.correction }}</p>{% endif %}
       <div class="actions"><button type="submit" class="secondary">{{ t.STAFF_CORRECT_SAVE }}</button></div>
+    </fieldset>
+  </form>
+  <form method="post" action="/staff/application/{{ r.id }}/session" id="session-form">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <fieldset class="subsection">
+      <legend>{{ t.STAFF_SESSION_FORM }}</legend>
+      <p class="hint">{{ t.STAFF_SESSION_HINT }}</p>
+      <div class="row two">
+        <div class="f">
+          <label for="grad_session">{{ fields.grad_session }}</label>
+          <select id="grad_session" name="grad_session">
+            {% if not r.grad_session %}<option value="" selected>{{ t.SESSION_NONE }}</option>{% endif %}
+            {% for code, label, passed in schedule %}<option value="{{ code }}" {% if r.grad_session == code %}selected{% endif %}>{{ t.STAFF_SESSION_OPTION_PASSED.format(label) if passed else label }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      {% if errors.session %}<p class="error" id="session-error">{{ errors.session }}</p>{% endif %}
+      <div class="actions"><button type="submit" id="save-session" class="secondary">{{ t.STAFF_SESSION_SAVE }}</button></div>
     </fieldset>
   </form>
   <form method="post" action="/staff/application/{{ r.id }}/type" id="type-form">

@@ -26,7 +26,8 @@ from tests.test_application_flow import (THESIS_TAB_1, THESIS_TAB_2,
 def submit_exam(client, address, extra=None):
     as_student(client, address)
     fields = {"name1": "Калина", "name2": "Иванова", "name3": "Стоева",
-              "fn": "500001", "grad_type": "exam", "credits_declared": "1"}
+              "fn": "500001", "grad_type": "exam", "credits_declared": "1",
+              "grad_session": "2027-01", "schedule_ack": "1"}
     fields.update(extra or {})
     assert save(client, 1, fields, "submit").status_code == 302
 
@@ -36,7 +37,8 @@ def thesis_data():
     data.update(THESIS_TAB_2)
     data.pop("grad_type")
     data.pop("professor")
-    data.pop("credits_declared")
+    for key in ("credits_declared", "grad_session", "schedule_ack"):
+        data.pop(key)
     return data
 
 
@@ -499,13 +501,15 @@ def test_the_signature_block_is_kept_together_in_a_filled_report(settings):
 # --- Found by Opus 5.5's own check of 159925f --------------------------------
 
 def schema_1_installation(data_dir):
-    """A data directory as an installation before schema 2 left it."""
+    """A data directory as an installation before schema 2 left it: the
+    four lists of then, no sessions list."""
     import sqlite3
     data_dir.mkdir(parents=True)
     connection = sqlite3.connect(str(data_dir / "superassistant.sqlite3"))
     connection.executescript(db.MIGRATIONS[0] + ";PRAGMA user_version = 1;")
     connection.close()
-    lists.write_starter(data_dir / "lists")
+    lists.write_starter(data_dir / "lists", [
+        name for name in lists.STARTER if name != lists.SESSIONS])
 
 
 @pytest.mark.parametrize("remove", ["folder", lists.PROFESSORS])
@@ -531,11 +535,14 @@ def test_an_upgraded_installation_is_recorded_as_installed(tmp_path):
     data_dir = tmp_path / "data"
     schema_1_installation(data_dir)
     settings = make_settings(data_dir)
+    assert not (data_dir / "lists" / lists.SESSIONS).exists()
     create_app(settings)
     connection = connect(settings)
+    # Installed already, and the sessions list written by this start.
     assert [r[0] for r in connection.execute("SELECT key FROM installation")] \
-        == ["lists"]
+        == ["lists", "sessions list"]
     connection.close()
+    assert (data_dir / "lists" / lists.SESSIONS).exists()
 
 
 def test_a_failed_first_start_leaves_no_partial_list(tmp_path, monkeypatch):
@@ -592,7 +599,8 @@ def test_a_retained_title_alone_is_shown(client, new_client, settings, staff):
                      "sup_title": "проф. д-р"})
     save(client, 1, {"name1": "Мила", "name2": "Петрова", "name3": "Нейкова",
                      "fn": "700001", "grad_type": "exam",
-                     "credits_declared": "1"}, "submit")
+                     "credits_declared": "1", "grad_session": "2027-01",
+                     "schedule_ack": "1"}, "submit")
     record = record_for(settings, "titleonly@example.org")
     assert record["sup_title"] == "проф. д-р"
     page = as_staff(new_client(), staff).get(

@@ -89,8 +89,10 @@ def live_settings(tmp_path):
 
 
 @pytest.fixture
-def live_server(live_settings, outbox):
-    """The running application, with the fake relay installed."""
+def live_server(live_settings, outbox, clock):
+    """The running application, with the fake relay installed and the test
+    clock (tests/conftest.py Clock), so the sessions it offers do not depend
+    on the day the tests run."""
     with serve(live_settings) as url:
         yield LiveServer(url, live_settings, outbox)
 

@@ -59,6 +59,8 @@ def fill_thesis_tab_1(page, student):
     page.fill("#topic", student[4])
     page.fill("#average_grade", "5,75")
     page.select_option("#professor", "georgieva")
+    page.check("input[name=grad_session][value='2027-01']")
+    page.check("#schedule_ack")
     page.check("#credits_declared")
 
 
@@ -129,6 +131,8 @@ def test_a_state_exam_application_has_no_second_tab(live_server, open_page):
     page.fill("#name3", "Стоев")
     page.fill("#fn", "300123")
     page.check("input[name=grad_type][value=exam]")
+    page.check("input[name=grad_session][value='2027-01']")
+    page.check("#schedule_ack")
     page.check("#credits_declared")
     expect(page.locator("#tab2-link")).to_be_hidden()
     expect(page.locator("#thesis-fields")).to_be_hidden()

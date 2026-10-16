@@ -18,7 +18,8 @@ from tests.test_application_flow import (THESIS_TAB_1, THESIS_TAB_2,
                                          save)
 
 EXAM = {"name1": "Калина", "name2": "Иванова", "name3": "Стоева",
-        "fn": "500002", "grad_type": "exam"}
+        "fn": "500002", "grad_type": "exam", "grad_session": "2027-01",
+        "schedule_ack": "1"}
 
 
 def unticked(fields):
@@ -145,7 +146,8 @@ def test_a_type_correction_neither_needs_nor_changes_the_tick(
                                name3="Вълчева", fn="F600001")
     data = dict(THESIS_TAB_1)
     data.update(THESIS_TAB_2)
-    for key in ("grad_type", "professor", "credits_declared", "fn"):
+    for key in ("grad_type", "professor", "credits_declared", "fn",
+                "grad_session", "schedule_ack"):
         data.pop(key)
     viewer = as_staff(new_client(), make_account(settings, "staff1"))
     base = "/staff/application/{}".format(pilot)

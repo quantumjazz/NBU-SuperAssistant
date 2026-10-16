@@ -7,9 +7,12 @@ A staff change of the supervisor sends a new request; an answer already
 recorded stays with the earlier request.
 
 Staff see the programme's code beside its name, which students never see
-(constitution 5.3), and whether the student ticked the declaration that the
-credits are covered. A correction of F№ takes the digits, with or without
-„F“ or „f“ before them, and stores „F“ and the digits.
+(constitution 5.3), whether the student ticked the declaration that the
+credits are covered, the session the student chose and whether the student
+ticked knowing the schedule (5.13); an application submitted before shows
+„—“. Staff may correct the session to any listed session, passed or not, a
+correction like any other. A correction of F№ takes the digits, with or
+without „F“ or „f“ before them, and stores „F“ and the digits.
 
 Staff may remove an application to the bin, choosing why, and from the bin
 put it back or, after a second page that names it, delete it (constitution
@@ -22,7 +25,8 @@ a bin button twice, or after another member of staff acted first.
 
 from flask import Blueprint, abort, flash, redirect, render_template, request
 
-from superassistant import applications, db, mail, supervision, texts
+from superassistant import applications, db, mail, sessions, supervision
+from superassistant import texts
 from superassistant import web
 
 blueprint = Blueprint("staff", __name__)
@@ -62,6 +66,8 @@ def _row(connection, record, lists):
                       + ", " + programme["form"]) if programme else "",
         "code": record["programme"],
         "declared": record["credits_declared_at"] is not None,
+        "session": sessions.label(lists, record["grad_session"]),
+        "acknowledged": record["schedule_ack_at"] is not None,
         "supervisor": (applications.supervisor_label(record, lists)
                        if record["grad_type"] == "thesis" else ""),
     }
@@ -108,6 +114,10 @@ def _render(record, errors=None, status=200):
         checks=applications.checks_of(connection, record["id"]),
         corrections=applications.corrections_of(connection, record["id"]),
         correctable=CORRECTABLE,
+        schedule=[(code, sessions.label(lists, code),
+                   sessions.is_passed(session))
+                  for code, session in lists.sessions.items()],
+        session_label=lambda code: sessions.label(lists, code),
         programme_label=supervision.programme_label(record, lists),
         fields=texts.FIELD_LABELS, binned=applications.is_binned(record),
         binned_by=_username(connection, record["binned_by"])), status
@@ -169,6 +179,27 @@ def correct(application_id):
     with db.transaction(connection):
         record = applications.require_active(connection, record["id"])
         changed = applications.correct(connection, record, values,
+                                       web.session_staff()["id"])
+    flash(texts.STAFF_CORRECTED if changed else texts.STAFF_NOTHING_CHANGED,
+          "ok")
+    return redirect("/staff/application/{}".format(record["id"]))
+
+
+@blueprint.route("/staff/application/<int:application_id>/session",
+                 methods=["POST"])
+@web.staff_required
+def correct_session(application_id):
+    """Correct the session to any listed one, passed or not (5.13)."""
+    record = _active(application_id)
+    code = request.form.get("grad_session", "")
+    if code not in web.current_lists().sessions:
+        flash(texts.FIX_BELOW, "error")
+        return _render(record, {"session": texts.REFUSED_SESSION}, 400)
+    connection = web.connection()
+    with db.transaction(connection):
+        record = applications.require_active(connection, record["id"])
+        changed = applications.correct(connection, record,
+                                       {"grad_session": code},
                                        web.session_staff()["id"])
     flash(texts.STAFF_CORRECTED if changed else texts.STAFF_NOTHING_CHANGED,
           "ok")

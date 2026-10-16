@@ -17,6 +17,7 @@ THESIS_TAB_1 = {
     "fn": "104999", "grad_type": "thesis", "phone": "0888 000 111",
     "programme": "BSNBUB04", "topic": "Управление на риска в малки фирми",
     "average_grade": "5,50", "professor": "ivanov", "credits_declared": "1",
+    "grad_session": "2027-01", "schedule_ack": "1",
 }
 THESIS_TAB_2 = {
     "rationale": "Обосновка\nвтори ред", "aims": "Цели", "object_subject":
@@ -80,7 +81,9 @@ def test_a_state_exam_asks_names_and_fn_only_and_has_no_second_tab(
     response = save(client, 1, {"name1": "Иван", "name2": "Иванов",
                                 "name3": "Петров", "fn": "12345",
                                 "grad_type": "exam",
-                                "credits_declared": "1"}, "submit")
+                                "credits_declared": "1",
+                                "grad_session": "2027-01",
+                                "schedule_ack": "1"}, "submit")
     assert response.status_code == 302
     record = record_for(settings, "exam@example.org")
     assert record["submitted_at"] and record["fn"] == "F12345"

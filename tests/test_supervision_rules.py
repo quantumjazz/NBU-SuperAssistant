@@ -25,8 +25,8 @@ from hypothesis import HealthCheck, example, given, settings as hsettings
 from hypothesis import strategies as st
 
 from superassistant import applications, db, lists, mail, supervision
-from tests.conftest import (Clock, Outbox, make_account, make_settings,
-                            prepare_data_dir)
+from tests.conftest import (LATER_SESSION, Clock, Outbox, make_account,
+                            make_settings, prepare_data_dir, write_sessions)
 
 FAST = hsettings(max_examples=40, deadline=None,
                  suppress_health_check=[HealthCheck.too_slow])
@@ -44,6 +44,9 @@ def world(**setting_overrides):
     mail.set_relay(box)
     try:
         prepare_data_dir(path / "data")
+        # Requests here are made at moments up to September 2027: a session
+        # offered at every one of them.
+        write_sessions(path / "data" / "lists", [LATER_SESSION])
         settings = make_settings(path / "data", **setting_overrides)
         connection = db.connect(settings.db_path)
         loaded = lists.load(settings.lists_dir)
@@ -65,7 +68,8 @@ def new_thesis(connection, settings, loaded, number, professor="ivanov"):
         programme="BSNADM01", topic="Тема {}".format(number),
         average_grade="5", professor=professor, rationale="а", aims="б",
         object_subject="в", methodology="г", information_base="д", plan="е",
-        schedule="ж", credits_declared=1))
+        schedule="ж", credits_declared=1, grad_session=LATER_SESSION[0],
+        schedule_ack=1))
     assert supervision.submit(connection, settings, loaded, record["id"]) == []
     return record["id"]
 

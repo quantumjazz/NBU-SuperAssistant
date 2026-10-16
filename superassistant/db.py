@@ -224,6 +224,20 @@ MIGRATIONS = [
         at TEXT NOT NULL
     );
     """,
+    # Version 6: the schedule of sessions (16 October 2026; constitution
+    # 5.13). The session the student chooses, by its code in the sessions
+    # list, and the tick that the student knows the schedule, both saved
+    # with the draft; the tick is recorded with when at submission, and the
+    # session with the submission itself, a staff correction of it being a
+    # row in `corrections`. An application submitted before it holds
+    # neither.
+    """
+    ALTER TABLE applications ADD COLUMN grad_session TEXT NOT NULL
+        DEFAULT '';
+    ALTER TABLE applications ADD COLUMN schedule_ack INTEGER NOT NULL
+        DEFAULT 0;
+    ALTER TABLE applications ADD COLUMN schedule_ack_at TEXT;
+    """,
 ]
 
 APPLICATION_TEXT_FIELDS = (

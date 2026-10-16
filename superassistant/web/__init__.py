@@ -88,6 +88,19 @@ def prepare(settings):
                 connection.execute(
                     "INSERT INTO installation (key, value) VALUES "
                     "('lists', ?)", (db.now(),))
+            # The sessions list came later (16 October 2026): the first
+            # start that knows it writes it, beside lists written before,
+            # and is recorded the same way, so it too is written only once.
+            # A lists folder missing from an installation is not made again
+            # for it: that start stops on the lists missing, and the start
+            # after the folder is put back writes the sessions list.
+            if connection.execute(
+                    "SELECT 1 FROM installation WHERE key = 'sessions list'"
+            ).fetchone() is None and settings.lists_dir.is_dir():
+                lists.write_starter(settings.lists_dir, (lists.SESSIONS,))
+                connection.execute(
+                    "INSERT INTO installation (key, value) VALUES "
+                    "('sessions list', ?)", (db.now(),))
         _rename_programmes(settings, connection)
         # A report deletion a stopped process left half-done is finished or
         # undone before anything reads the reports.

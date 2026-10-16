@@ -29,7 +29,8 @@ it, which keeps it text, the apostrophe shown; its line breaks, if any, are
 then written as they are, which opening the file keeps but the text import
 splits.
 
-What the file holds is what staff see of each application: its entries, the
+What the file holds is what staff see of each application: its entries,
+its session and whether the student ticked knowing the schedule, the
 current supervisor's answer and comment, the latest check, whether a kept
 report lists it, and whether it is in the bin and why. It is read in one
 transaction, so it is the records of one moment. Never a sign-in code, an
@@ -50,7 +51,8 @@ import os
 import re
 import sys
 
-from superassistant import accounts, applications, db, mail, supervision
+from superassistant import (accounts, applications, db, mail, sessions,
+                            supervision)
 from superassistant import texts
 from superassistant.settings import from_env
 from superassistant.web import StartupError, prepare
@@ -135,6 +137,8 @@ def _row(connection, record, lists):
         texts.STAFF_TYPE.get(record["grad_type"], ""),
         record["name1"], record["name2"], record["name3"], record["fn"],
         texts.SNAPSHOT_YES_NO[record["credits_declared_at"] is not None],
+        texts.SNAPSHOT_YES_NO[record["schedule_ack_at"] is not None],
+        sessions.label(lists, record["grad_session"]),
         record["phone"],
         supervision.programme_label(record, lists),
         record["programme"],

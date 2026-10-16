@@ -18,7 +18,10 @@ staff correction obey the same ones:
 Refusals name the characters, so the student can find and retype them.
 
 The student's declaration that the credits are covered is a tick, not an
-entry: supervision.submit refuses a submission without it.
+entry: supervision.submit refuses a submission without it. So is the tick
+that the student knows the schedule of sessions; the session itself is a
+choice among those the schedule offers that day (sessions.offered), checked
+when the draft is saved and again at submission.
 
 Staff may remove a submitted application to the bin, saying why, and from
 there put it back or delete it (constitution 5.15): "Users remove the entry
@@ -34,7 +37,7 @@ later application, so the log's number names one application only.
 
 import unicodedata
 
-from superassistant import db
+from superassistant import db, sessions
 
 ONE_LINE_FIELDS = ("name1", "name2", "name3", "fn", "phone", "topic",
                    "average_grade", "sup_name", "sup_email")
@@ -197,8 +200,9 @@ def clean(form, fields, lists=None, fn_letter=False):
     """Normalise and check the given fields of a submitted form.
 
     Returns (values, refusals): the values to store, and one Refusal per field
-    that breaks a rule. Choice fields must name an entry of the owner's lists.
-    F№ follows faculty_number; fn_letter=True is staff's correction.
+    that breaks a rule. Choice fields must name an entry of the owner's lists,
+    and a session one the schedule offers today. F№ follows faculty_number;
+    fn_letter=True is staff's correction.
     """
     values, refusals = {}, []
     for field in fields:
@@ -219,6 +223,9 @@ def clean(form, fields, lists=None, fn_letter=False):
                 refusal = Refusal(field, "choice")
             elif field == "sup_title" and value not in lists.titles:
                 refusal = Refusal(field, "choice")
+            elif (field == "grad_session"
+                  and value not in sessions.offered(lists)):
+                refusal = Refusal(field, "session")
         if refusal is not None:
             refusals.append(refusal)
         else:

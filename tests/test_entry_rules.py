@@ -78,7 +78,9 @@ def test_the_refused_controls_are_shown_by_their_codes(client):
     response = save(client, 1, {"name1": "\x0bИван\x0c", "name2": "Иванов",
                                 "name3": "Петров", "fn": "1",
                                 "grad_type": "exam",
-                                "credits_declared": "1"}, "submit")
+                                "credits_declared": "1",
+                                "grad_session": "2027-01",
+                                "schedule_ack": "1"}, "submit")
     page = response.get_data(as_text=True)
     assert response.status_code == 400
     assert "U+000B" in page and "U+000C" in page

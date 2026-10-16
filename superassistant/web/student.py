@@ -5,7 +5,11 @@ field both paper forms have (names, F№, topic) is asked once, on the first
 tab. A state exam asks only the three names and F№, and has no second tab.
 F№ is typed as digits after a fixed „F“. The first tab also carries, for
 both types, the form's declaration that the credits are covered: a tick saved
-with the draft, without which the application is not submitted.
+with the draft, without which the application is not submitted. And the
+schedule of sessions (constitution 5.13), from which the student chooses a
+session, and the tick that the student knows it: both saved with the draft,
+both needed to submit. A submitted application's page shows the schedule
+again, with the session chosen.
 After submission the page shows where the application stands; the student may
 change only the supervisor, and only after a decline. An application staff
 have removed to the bin (constitution 5.15) shows only that it was removed,
@@ -14,7 +18,7 @@ and nothing the student sends changes it.
 
 from flask import Blueprint, flash, redirect, render_template, request
 
-from superassistant import applications, mail, supervision, texts
+from superassistant import applications, mail, sessions, supervision, texts
 from superassistant import web
 
 blueprint = Blueprint("student", __name__)
@@ -32,10 +36,13 @@ TAB_FIELDS = {
     2: applications.MULTI_LINE_FIELDS,
 }
 COMMON_FIELDS = ("name1", "name2", "name3", "fn")
+SESSION_FIELDS = ("grad_session",)
 FIELD_TAB = dict((field, tab) for tab, fields in TAB_FIELDS.items()
                  for field in fields)
 FIELD_TAB["grad_type"] = 1
 FIELD_TAB["credits_declared"] = 1
+FIELD_TAB["grad_session"] = 1
+FIELD_TAB["schedule_ack"] = 1
 
 
 def _record():
@@ -62,6 +69,8 @@ def _messages(refusals):
             out[refusal.field] = texts.REFUSED_FN
         elif refusal.reason == "tick":
             out[refusal.field] = texts.TICK_REQUIRED
+        elif refusal.reason == "session":
+            out[refusal.field] = texts.REFUSED_SESSION
         else:
             out[refusal.field] = texts.REFUSED_REQUIRED
     return out
@@ -76,8 +85,13 @@ def _render(record, tab, values=None, errors=None, status=200, again=None):
     shown["fn"] = (values["fn"] if values and "fn" in values
                    else applications.fn_digits(record["fn"]))
     standing = applications.standing(web.connection(), record)
+    day = sessions.today()
     return render_template(
         "application.html", record=record, values=shown, tab=tab,
+        schedule=sessions.schedule(lists, day),
+        offered=[(code, sessions.label(lists, code))
+                 for code in sessions.offered(lists, day)],
+        session_label=sessions.label(lists, record["grad_session"]),
         removed=applications.is_binned(record),
         fn_letter=applications.FN_LETTER,
         errors=errors or {}, lists=lists, standing=standing,
@@ -111,7 +125,8 @@ def save():
         # Only what the chosen type asks is checked and saved: the thesis
         # fields of a state exam are hidden, and entries saved in them
         # earlier are kept as they were.
-        fields = TAB_FIELDS[1] if grad_type == "thesis" else COMMON_FIELDS
+        fields = (TAB_FIELDS[1] if grad_type == "thesis"
+                  else COMMON_FIELDS) + SESSION_FIELDS
     else:
         grad_type = record["grad_type"]
         fields = TAB_FIELDS[2]
@@ -121,6 +136,7 @@ def save():
         values["grad_type"] = grad_type
         values["credits_declared"] = 1 if request.form.get(
             "credits_declared") else 0
+        values["schedule_ack"] = 1 if request.form.get("schedule_ack") else 0
         if not refusals and grad_type == "thesis":
             values.update(supervision.supervisor_values(values))
     if refusals:
@@ -128,6 +144,8 @@ def save():
         typed["grad_type"] = grad_type
         typed["credits_declared"] = values.get("credits_declared",
                                                record["credits_declared"])
+        typed["schedule_ack"] = values.get("schedule_ack",
+                                           record["schedule_ack"])
         flash(texts.FIX_BELOW, "error")
         return _render(record, tab, typed, _messages(refusals), 400)
     applications.save_draft(web.connection(), record, values)

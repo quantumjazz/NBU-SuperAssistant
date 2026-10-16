@@ -1,9 +1,17 @@
-"""The owner's lists: academic titles, faculties, programmes and professors.
+"""The owner's lists: academic titles, faculties, programmes, professors and
+the schedule of sessions.
 
-Four CSV files in the data directory's `lists` folder, UTF-8, one entry per
+Five CSV files in the data directory's `lists` folder, UTF-8, one entry per
 line, with a header row in Bulgarian. The owner edits them in any text editor
 or spreadsheet. They start from the values docs/domain.md records (NOW.md,
 requirement 6); the professors list starts empty, for the owner to fill.
+
+The sessions list holds per graduation session a code, its date and the
+three deadlines of the department's framework schedule, dates written
+YYYY-MM-DD (constitution 5.13). It starts from the four sessions of the
+2026/2027 schedule and is written once, at the first start that knows it
+(web.prepare), so the pilot's first start after the update of 16 October
+2026 writes it beside the four lists it already has.
 
 A list that cannot be read, or that no longer holds an entry an application
 uses, stops the service from starting, naming the file and the line: a wrong
@@ -18,18 +26,29 @@ that still hold one to its new code, once (web.prepare).
 import csv
 import io
 import os
+import re
+from datetime import date
 
 TITLES = "titles.csv"
 FACULTIES = "faculties.csv"
 PROGRAMMES = "programmes.csv"
 PROFESSORS = "professors.csv"
+SESSIONS = "sessions.csv"
 
 HEADERS = {
     TITLES: ["звание"],
     FACULTIES: ["код", "факултет", "звание на декана", "декан"],
     PROGRAMMES: ["код", "степен", "програма", "форма", "факултет"],
     PROFESSORS: ["код", "звание", "име", "email"],
+    SESSIONS: ["код", "дата на сесията",
+               "заявления за одобряване на теми до",
+               "заявления за държавен изпит до",
+               "предаване на одобрени тези до"],
 }
+
+# A session's dates, in the order of its row after the code.
+SESSION_DATES = ("date", "topics", "exam", "theses")
+_ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 DEGREES = ("БП", "МП")
 FORMS = ("РО", "ДО")
@@ -84,6 +103,15 @@ STARTER = {
          "ФДЕНО"],
     ],
     PROFESSORS: [],
+    # The department's „График на сесиите … 2026/2027“: each session's date,
+    # then the deadlines for the applications to approve topics, for the
+    # applications for the state exam, and for handing in approved theses.
+    SESSIONS: [
+        ["2026-04", "2026-04-21", "2025-11-14", "2026-02-06", "2026-02-06"],
+        ["2026-07", "2026-07-07", "2026-02-06", "2026-04-30", "2026-04-30"],
+        ["2026-09", "2026-09-26", "2026-04-30", "2026-07-17", "2026-07-17"],
+        ["2027-01", "2027-01-26", "2026-09-11", "2026-11-13", "2026-11-13"],
+    ],
 }
 
 
@@ -108,13 +136,16 @@ class ListError(Exception):
 
 
 class Lists(object):
-    """What the four files hold, read once and checked."""
+    """What the five files hold, read once and checked."""
 
-    def __init__(self, titles, faculties, programmes, professors):
+    def __init__(self, titles, faculties, programmes, professors,
+                 sessions=None):
         self.titles = titles            # [title]
         self.faculties = faculties      # {code: {name, dean_title, dean}}
         self.programmes = programmes    # {code: {degree, name, form, faculty}}
         self.professors = professors    # {code: {title, name, email}}
+        # {code: {date, topics, exam, theses}}, each a date, by session date
+        self.sessions = sessions if sessions is not None else {}
 
     def programme_faculty(self, code):
         """The faculty a programme's report goes to, or None."""
@@ -129,10 +160,13 @@ class Lists(object):
         return professor["title"] + " " + professor["name"]
 
 
-def write_starter(lists_dir):
-    """Write any list that is missing, from the starting values."""
+def write_starter(lists_dir, filenames=None):
+    """Write any list that is missing, from the starting values: every list,
+    or only those named."""
     lists_dir.mkdir(parents=True, exist_ok=True)
     for filename, rows in STARTER.items():
+        if filenames is not None and filename not in filenames:
+            continue
         path = lists_dir / filename
         if path.exists():
             continue
@@ -208,8 +242,19 @@ def _unique(filename, number, code, seen):
     seen.add(code)
 
 
+def _iso_date(filename, number, value):
+    """A date written YYYY-MM-DD, as a date; else ListError."""
+    if _ISO_DATE.fullmatch(value):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            pass
+    raise ListError(filename, number, "the date " + repr(value)
+                    + " is not a date written YYYY-MM-DD")
+
+
 def load(lists_dir):
-    """Read and check the four lists. Raises ListError."""
+    """Read and check the five lists. Raises ListError."""
     titles = []
     for number, (title,) in _rows(lists_dir, TITLES):
         if title in titles:
@@ -251,7 +296,24 @@ def load(lists_dir):
                             + repr(email) + " is not an address")
         professors[code] = {"title": title, "name": name, "email": email}
 
-    return Lists(titles, faculties, programmes, professors)
+    sessions, dates = [], set()
+    for number, row in _rows(lists_dir, SESSIONS):
+        code = row[0]
+        _unique(SESSIONS, number, code, set(c for c, _ in sessions))
+        entry = dict(zip(SESSION_DATES, (_iso_date(SESSIONS, number, value)
+                                         for value in row[1:])))
+        if entry["date"] in dates:
+            raise ListError(SESSIONS, number, "the date " + row[1]
+                            + " is listed twice")
+        dates.add(entry["date"])
+        if any(entry[key] > entry["date"] for key in SESSION_DATES[1:]):
+            raise ListError(SESSIONS, number, "a deadline is after the "
+                            "session's date " + row[1])
+        sessions.append((code, entry))
+    sessions.sort(key=lambda item: item[1]["date"])
+
+    return Lists(titles, faculties, programmes, professors,
+                 dict(sessions))
 
 
 def check_used(lists, connection):
@@ -266,6 +328,9 @@ def check_used(lists, connection):
         (TITLES, "title", set(lists.titles),
          "SELECT id, sup_title AS value FROM applications "
          "WHERE sup_title != ''"),
+        (SESSIONS, "session", lists.sessions,
+         "SELECT id, grad_session AS value FROM applications "
+         "WHERE grad_session != ''"),
     ]
     for filename, what, entries, sql in queries:
         missing = {}

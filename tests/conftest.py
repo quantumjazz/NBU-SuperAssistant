@@ -70,6 +70,28 @@ def write_professors(lists_dir, rows=None):
                                               encoding="utf-8")
 
 
+# The session every test application chooses: the January 2027 session of
+# the starting list, offered at the test clock's moment (Clock). Tests that
+# run at other moments write a list of their own (write_sessions).
+SESSION = "2027-01"
+SESSION_FIELDS = {"grad_session": SESSION, "schedule_ack": "1"}
+# An invented session, offered at any moment a test may run at.
+LATER_SESSION = ["2099-06", "2099-06-30", "2099-01-15", "2099-03-13",
+                 "2099-03-13"]
+
+
+def write_sessions(lists_dir, rows):
+    import csv
+    import io
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(lists.HEADERS[lists.SESSIONS])
+    for row in rows:
+        writer.writerow(row)
+    (lists_dir / lists.SESSIONS).write_text(buffer.getvalue(),
+                                            encoding="utf-8")
+
+
 def make_settings(data_dir, **overrides):
     values = dict(data_dir=data_dir, mail_mode="owner",
                   owner_email=OWNER_EMAIL, base_url="http://127.0.0.1:5002",

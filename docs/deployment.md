@@ -213,7 +213,7 @@ sudo journalctl -u nbu-superassistant -n 20 --no-pager
 One line, after the start, names the records folder, the address, the mail
 mode (with the relay and the sender when it sends) and where the visitor's
 address comes from. It never shows the key. This first start also writes the
-four lists into the records folder (see *The lists*) and makes the session
+five lists into the records folder (see *The lists*) and makes the session
 key there.
 
 ## The owner's account, before the address is public
@@ -468,7 +468,7 @@ next night.
 
 ## The lists
 
-The owner's lists are four CSV files in
+The owner's lists are five CSV files in
 `/home/victor/nbu-superassistant-data/lists`:
 
 | File | Holds | Header row |
@@ -477,6 +477,7 @@ The owner's lists are four CSV files in
 | `faculties.csv` | faculties and their deans | `код,факултет,звание на декана,декан` |
 | `programmes.csv` | programmes, degree, form and faculty | `код,степен,програма,форма,факултет` |
 | `professors.csv` | supervisors students can choose | `код,звание,име,email` |
+| `sessions.csv` | the schedule of sessions | `код,дата на сесията,заявления за одобряване на теми до,заявления за държавен изпит до,предаване на одобрени тези до` |
 
 They are UTF-8, one entry per line, separated by commas, under that header,
 which must stay as it is. The first start writes them from the values in
@@ -490,6 +491,23 @@ only. Until 8.7 is decided, it lists only supervisors who agreed to test,
 with their own addresses: a student who chooses one makes
 NBU-SuperAssistant mail them. A professor's title must be one in
 `titles.csv`.
+
+`sessions.csv` is the department's framework schedule: per session a code,
+the session's date, then its three deadlines (the applications to approve
+topics, the applications for the state exam, handing in approved theses),
+every date written `YYYY-MM-DD`. It starts from the four sessions of the
+2026/2027 schedule, coded `2026-04`, `2026-07`, `2026-09` and `2027-01`.
+Every student sees it on the application, in date order, a session whose
+date has passed marked „отминала“, and chooses one of those dated today or
+later; staff may set any listed one. To add next year's sessions, add rows
+with new codes. Keep a session listed while an application holds it: the
+start refuses a list without it. A session's date or deadline may be changed
+in place, keeping its code; two sessions on one date, or a deadline after
+its session's date, are refused. Unlike the four other lists it was not
+there at the pilot's first start: the first start of the update of 16
+October 2026 writes it, once, as the first start wrote the others, and
+records that, so a `sessions.csv` missing later stops the start like any
+other list.
 
 Edit them on the laptop:
 
@@ -515,8 +533,9 @@ curl -s http://127.0.0.1:8791/healthz
 ```
 
 A list that cannot be read (a changed header, a missing column, a code used
-twice, a title not in `titles.csv`, or an entry an application still uses
-taken out) stops the start, and the journal names the file and the line. Put
+twice, a title not in `titles.csv`, a date not written `YYYY-MM-DD`, or an
+entry an application still uses taken out) stops the start, and the journal
+names the file and the line. Put
 the line right and restart. No answer from the `curl` means it did not start:
 read the journal. The reminder run and the nightly copy read the lists too,
 so a broken list also stops that morning's reminders and that night's copy.
@@ -591,7 +610,10 @@ template changed, compare it with your `.env.production`.
 
 The records are untouched by this, which is why they sit outside the clone.
 A version that changes the database migrates it at its start, keeping every
-row. The `pip install` line is how a new dependency arrives.
+row. The `pip install` line is how a new dependency arrives. The update of
+16 October 2026 (the schedule of sessions) migrates the database to version
+6 and, at that first start, writes `sessions.csv` (*The lists*); it adds no
+unit and no setting.
 
 ## Backups
 

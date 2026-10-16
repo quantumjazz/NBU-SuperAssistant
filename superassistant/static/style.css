@@ -215,3 +215,22 @@ label.choice.declare { align-items: flex-start; font-size: 0.95rem; line-height:
 label.choice.declare input { margin-top: 2px; }
 button.danger { background: var(--error); border-color: var(--error); }
 button.danger:hover { background: #8f1c13; border-color: #8f1c13; }
+
+/* --- The schedule of sessions (16 October 2026) ---------------------------- */
+/* Its long headings wrap; a passed session is greyed. On a phone each
+   session stacks: its date, then each deadline under its heading. */
+table.schedule thead th { white-space: normal; position: static; }
+table.schedule tbody th { font-weight: 600; }
+table.schedule tr.passed th, table.schedule tr.passed td { color: var(--muted); }
+table.schedule .chip { margin-left: 4px; }
+#session-card .table-wrap, #session .table-wrap { margin: 0 0 8px; }
+@media (max-width: 639px) {
+  table.schedule thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.schedule, table.schedule tbody, table.schedule tr, table.schedule th, table.schedule td { display: block; }
+  table.schedule tr { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  table.schedule tbody tr:last-child { border-bottom: 0; }
+  table.schedule th, table.schedule td { padding: 2px 0; border: 0; }
+  table.schedule td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 0.8rem; }
+  table.schedule td + td { margin-top: 6px; }
+  table.schedule tbody tr:hover th, table.schedule tbody tr:hover td { background: none; }
+}
