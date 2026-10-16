@@ -546,3 +546,17 @@
   - the push and the laptop update;
   - before 27 January 2027, the next sessions added to `sessions.csv`;
   - before milestone 3, Fable's `NOW.md` amendment marking requirement 4 as built. The governance changes stay uncommitted until then.
+
+## 2026-10-16 — Sixth task: accepted and live on the laptop; COMPLETE
+
+- **Owner** (verbatim): "I accept. Yes, push and update the laptop.", then "Done, I restarted the service."
+- **Pushed and pulled:** GitHub and the laptop at `6830e40` (code `1267b47`). A copy of the live database was taken first: `/home/victor/nbu-superassistant-pre-update-20261016-183130.sqlite3`, schema 5, 3 applications (1 in the bin), 1 report, integrity ok. No unit or setting changed.
+- **The owner's sudo step:** the restart, 18:32:32 EEST, after the pull.
+- **Checks:**
+  - `/healthz` ok on the laptop and publicly; the start line in the log, mail mode send;
+  - schema 6, integrity ok; the 3 applications and the report kept, the three new columns empty („—“);
+  - `sessions.csv` written at that start with the four 2026/2027 sessions, `sessions list` recorded at 15:32:32 UTC;
+  - signed out, `/application` leads to `/`; the new staff address answers.
+- **The owner's checks:** as a student in Safari on a phone, the schedule, the session choice and the tick on tab 1; as staff, the session in the table and its correction.
+- **Status:** accepted by the owner and live: COMPLETE. The owner's live checks, and any fault they find, go in a new entry.
+- **Outstanding:** before 27 January 2027, the next sessions in `sessions.csv`; before milestone 3, Fable's `NOW.md` amendment marking requirement 4 as built. The governance changes stay uncommitted until then.
