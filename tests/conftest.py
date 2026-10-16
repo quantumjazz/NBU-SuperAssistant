@@ -70,12 +70,10 @@ def write_professors(lists_dir, rows=None):
                                               encoding="utf-8")
 
 
-# The session every test application chooses: the January 2027 session of
-# the starting list, offered at the test clock's moment (Clock). Tests that
-# run at other moments write a list of their own (write_sessions).
-SESSION = "2027-01"
-SESSION_FIELDS = {"grad_session": SESSION, "schedule_ack": "1"}
-# An invented session, offered at any moment a test may run at.
+# Test applications choose „2027-01“, the January 2027 session of the
+# starting list, offered at the test clock's moment (Clock). Tests that run
+# at other moments write a list of their own (write_sessions), such as this
+# invented session, offered at any moment a test may run at.
 LATER_SESSION = ["2099-06", "2099-06-30", "2099-01-15", "2099-03-13",
                  "2099-03-13"]
 

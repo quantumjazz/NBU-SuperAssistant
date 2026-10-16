@@ -516,6 +516,7 @@ def test_every_change_finds_a_removal_committed_before_it():
     ("/correct", {"field": "topic", "value": "Друга тема"}),
     ("/supervisor", {"professor": "georgieva"}),
     ("/type", {"grad_type": "exam"}),
+    ("/session", {"grad_session": "2026-09"}),
 ])
 def test_a_page_read_before_the_removal_changes_nothing(
         settings, app, outbox, monkeypatch, path, data):

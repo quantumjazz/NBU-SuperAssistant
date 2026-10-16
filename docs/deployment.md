@@ -500,7 +500,9 @@ every date written `YYYY-MM-DD`. It starts from the four sessions of the
 Every student sees it on the application, in date order, a session whose
 date has passed marked „отминала“, and chooses one of those dated today or
 later; staff may set any listed one. To add next year's sessions, add rows
-with new codes. Keep a session listed while an application holds it: the
+with new codes, before the last listed session's date has passed: from the
+day after it no session is offered, and no student can submit until a later
+one is listed. Keep a session listed while an application holds it: the
 start refuses a list without it. A session's date or deadline may be changed
 in place, keeping its code; two sessions on one date, or a deadline after
 its session's date, are refused. Unlike the four other lists it was not

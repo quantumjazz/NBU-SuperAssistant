@@ -53,6 +53,8 @@ SLOW = hsettings(max_examples=20, deadline=None,
 EXAM = {"name1": "Калина", "name2": "Иванова", "name3": "Стоева",
         "fn": "500003", "grad_type": "exam", "credits_declared": "1"}
 TICKED = {"grad_session": "2027-01", "schedule_ack": "1"}
+# When the pilot's applications were submitted, before the schedule.
+EARLIER = "2026-10-15T09:00:00+00:00"
 
 # The words, written out here rather than read from texts, as the oracle.
 MONTHS = ["януари", "февруари", "март", "април", "май", "юни", "юли",
@@ -90,9 +92,9 @@ def dd(page, element_id):
 @example(day=date(2026, 9, 26))
 def test_a_sessions_date_and_a_deadline_from_any_date(day):
     shown = sessions.long_date(day)
-    assert shown == "{} {} {} г. ({})".format(day.day, MONTHS[day.month - 1],
-                                              day.year, weekday_of(day))
-    assert sessions.deadline(day) == "до {} {} {} г.".format(
+    assert shown == "{} {} {}\u00a0г. ({})".format(
+        day.day, MONTHS[day.month - 1], day.year, weekday_of(day))
+    assert sessions.deadline(day) == "до {} {} {}\u00a0г.".format(
         day.day, MONTHS[day.month - 1], day.year)
     # Seven days later is the same weekday, the next day the next one.
     assert sessions.long_date(day + timedelta(days=7)).endswith(
@@ -106,17 +108,18 @@ def test_the_starting_schedule_is_the_departments_2026_2027_schedule(
     shown = [(row["code"], row["date"], row["deadlines"])
              for row in sessions.schedule(loaded, date(2026, 10, 16))]
     assert shown == [
-        ("2026-04", "21 април 2026 г. (вторник)",
-         ["до 14 ноември 2025 г.", "до 6 февруари 2026 г.",
-          "до 6 февруари 2026 г."]),
-        ("2026-07", "7 юли 2026 г. (вторник)",
-         ["до 6 февруари 2026 г.", "до 30 април 2026 г.",
-          "до 30 април 2026 г."]),
-        ("2026-09", "26 септември 2026 г. (събота)",
-         ["до 30 април 2026 г.", "до 17 юли 2026 г.", "до 17 юли 2026 г."]),
-        ("2027-01", "26 януари 2027 г. (вторник)",
-         ["до 11 септември 2026 г.", "до 13 ноември 2026 г.",
-          "до 13 ноември 2026 г."]),
+        ("2026-04", "21 април 2026\u00a0г. (вторник)",
+         ["до 14 ноември 2025\u00a0г.", "до 6 февруари 2026\u00a0г.",
+          "до 6 февруари 2026\u00a0г."]),
+        ("2026-07", "7 юли 2026\u00a0г. (вторник)",
+         ["до 6 февруари 2026\u00a0г.", "до 30 април 2026\u00a0г.",
+          "до 30 април 2026\u00a0г."]),
+        ("2026-09", "26 септември 2026\u00a0г. (събота)",
+         ["до 30 април 2026\u00a0г.", "до 17 юли 2026\u00a0г.",
+          "до 17 юли 2026\u00a0г."]),
+        ("2027-01", "26 януари 2027\u00a0г. (вторник)",
+         ["до 11 септември 2026\u00a0г.", "до 13 ноември 2026\u00a0г.",
+          "до 13 ноември 2026\u00a0г."]),
     ]
     assert (tmp_path / "data" / "lists" / lists.SESSIONS).read_text(
         encoding="utf-8").splitlines()[0] == ",".join(
@@ -207,6 +210,9 @@ def a_cell():
                       st.dates().map(date.isoformat)),
        column=st.integers(1, 4))
 @example(text="２０２７-01-26", column=1)
+@example(text="20270126", column=1)
+@example(text="2027-W04-2", column=1)
+@example(text="2027W042", column=2)
 @example(text="2027-02-29", column=1)
 @example(text="2027-01-26T00:00", column=1)
 def test_a_date_not_written_yyyy_mm_dd_stops_the_start_naming_the_line(
@@ -348,9 +354,15 @@ def test_tab_1_shows_the_schedule_and_offers_only_sessions_not_passed(
     for heading in texts.SCHEDULE_COLUMNS:
         assert heading in table
     assert table.count(texts.SCHEDULE_PASSED) == 3
-    assert "26 януари 2027 г. (вторник)" in table
-    assert "до 13 ноември 2026 г." in table
+    assert "26 януари 2027\u00a0г. (вторник)" in table
+    assert "до 13 ноември 2026\u00a0г." in table
     assert texts.SCHEDULE_NOTE in page and texts.ACK_SCHEDULE in page
+    # The plan's sentence and the schedule's note, word for word.
+    assert ("Запознат(а) съм с рамковия график на сесиите за защита на тези "
+            "и за държавен изпит и със сроковете в него.") in page
+    assert ("В графика са посочени само началните дати на сесиите. "
+            "Продължителността им зависи от броя на допуснатите до защита и "
+            "държавен изпит дипломанти.") in page
     assert re.findall(r'name="grad_session" value="([^"]+)"', page) == [
         "2027-01"]
     assert re.search(r'<input type="checkbox" id="schedule_ack" '
@@ -496,8 +508,10 @@ def test_the_submitted_page_shows_the_session_the_tick_and_the_schedule(
     as_student(client, "shown@example.org")
     save(client, 1, dict(EXAM, **TICKED), "submit")
     page = client.get("/application").get_data(as_text=True)
-    assert dd(page, "chosen-session") == "26 януари 2027 г. (вторник)"
+    assert dd(page, "chosen-session") == "26 януари 2027\u00a0г. (вторник)"
     assert dd(page, "acknowledged") == "да"
+    assert ('<p id="chosen-line"><strong>Избрана сесия: 26 януари '
+            '2027\u00a0г. (вторник)</strong></p>') in page
     assert 'id="schedule"' in page and texts.SCHEDULE_NOTE in page
     assert 'name="grad_session"' not in page and "schedule_ack" not in page
     # Nothing the student sends now changes the session.
@@ -514,22 +528,36 @@ def test_staff_see_the_session_and_the_tick_and_an_earlier_one_shows_none(
     as_student(client, "session-staff@example.org")
     save(client, 1, dict(EXAM, **TICKED), "submit")
     chosen = record_for(settings, "session-staff@example.org")["id"]
+    # Submitted before, as the pilot's are: the credits declared, no session
+    # and no tick.
     earlier = insert_application(settings, "pilot@example.org",
                                  grad_type="exam", name1="Пилот",
-                                 name2="Тестов", name3="Студент", fn="F1")
+                                 name2="Тестов", name3="Студент", fn="F1",
+                                 credits_declared=1,
+                                 credits_declared_at=EARLIER)
     viewer = staff_client(new_client, settings)
     table = viewer.get("/staff").get_data(as_text=True)
-    assert "<th>Сесия</th>" in table and "<th>График</th>" in table
+    assert "<th>Сесия</th>" in table
+    # An address may break after its „@“ only, so the table fits.
+    assert '<span class="sub">session-staff@<wbr>example.org</span>' in \
+        row_of(table, chosen)
     for number, session, ticked in (
-            (chosen, "26 януари 2027 г. (вторник)", "да"),
+            (chosen, "26 януари 2027\u00a0г. (вторник)", "да"),
             (earlier, "—", "—")):
         row = row_of(table, number)
-        assert '<td class="session">{}</td>'.format(session) in row
-        assert '<td class="acknowledged">{}</td>'.format(ticked) in row
+        assert ('<td class="session">{}<span class="sub acknowledged">'
+                'график: {}</span></td>').format(session, ticked) in row
+        assert '<td class="declared">да</td>' in row
         page = viewer.get("/staff/application/{}".format(number)).get_data(
             as_text=True)
         assert dd(page, "session") == session
         assert dd(page, "acknowledged") == ticked
+        assert dd(page, "declared") == "да"
+    page = as_student(new_client(), "pilot@example.org").get(
+        "/application").get_data(as_text=True)
+    assert dd(page, "chosen-session") == "—"
+    assert dd(page, "acknowledged") == "—"
+    assert 'id="chosen-line"' not in page
 
 
 def test_staff_correct_the_session_to_any_listed_session(
@@ -546,10 +574,10 @@ def test_staff_correct_the_session_to_any_listed_session(
                              "</select>")[0])
     assert options == [
         ("", "—"),
-        ("2026-04", "21 април 2026 г. (вторник) – отминала"),
-        ("2026-07", "7 юли 2026 г. (вторник) – отминала"),
-        ("2026-09", "26 септември 2026 г. (събота) – отминала"),
-        ("2027-01", "26 януари 2027 г. (вторник)")]
+        ("2026-04", "21 април 2026\u00a0г. (вторник) – отминала"),
+        ("2026-07", "7 юли 2026\u00a0г. (вторник) – отминала"),
+        ("2026-09", "26 септември 2026\u00a0г. (събота) – отминала"),
+        ("2027-01", "26 януари 2027\u00a0г. (вторник)")]
     steps = ["2027-01", "2026-09", "2026-09", "2026-04"]
     for code in steps:
         clock.advance(minutes=1)
@@ -568,10 +596,11 @@ def test_staff_correct_the_session_to_any_listed_session(
                     ("grad_session", "2027-01", "2026-09", "staff1"),
                     ("grad_session", "2026-09", "2026-04", "staff1")]
     page = viewer.get(url).get_data(as_text=True)
-    assert "Сесия: от „—“ на „26 януари 2027 г. (вторник)“" in page
-    assert ("Сесия: от „26 септември 2026 г. (събота)“ на „21 април 2026 г. "
+    assert "Сесия: от „—“ на „26 януари 2027\u00a0г. (вторник)“" in page
+    assert ("Сесия: от „26 септември 2026\u00a0г. (събота)“ на „21 април "
+            "2026\u00a0г. "
             "(вторник)“") in page
-    assert dd(page, "session") == "21 април 2026 г. (вторник)"
+    assert dd(page, "session") == "21 април 2026\u00a0г. (вторник)"
 
 
 @pytest.mark.parametrize("code", ["", "2028-01", "2027-01 x"])
@@ -603,7 +632,7 @@ def test_a_session_correction_in_the_bin_changes_nothing(new_client,
         "reason": "other"}).status_code == 302
     page = viewer.get(url).get_data(as_text=True)
     assert 'id="session-form"' not in page
-    assert dd(page, "session") == "26 януари 2027 г. (вторник)"
+    assert dd(page, "session") == "26 януари 2027\u00a0г. (вторник)"
     response = viewer.post(url + "/session", data={"grad_session": "2026-09"})
     assert response.status_code == 302 and response.headers[
         "Location"].endswith("/staff/bin")
@@ -691,6 +720,9 @@ def test_the_first_start_after_the_update_writes_the_sessions_list_once(
     assert sessions_file.read_text(encoding="utf-8").splitlines()[-1] == \
         "2027-01,2027-01-26,2026-09-11,2026-11-13,2026-11-13"
     connection = connect(settings)
+    assert [tuple(r) for r in connection.execute(
+        "SELECT key, value FROM installation WHERE key = 'sessions list'")] \
+        == [("sessions list", clock().isoformat(timespec="seconds"))]
     assert [r["key"] for r in connection.execute(
         "SELECT key FROM installation ORDER BY key")] == [
         "lists", "sessions list"]
@@ -786,7 +818,9 @@ def test_the_nightly_copy_holds_the_session_and_the_tick(client, settings,
     save(client, 1, dict(EXAM, **TICKED), "submit")
     chosen = record_for(settings, "copy@example.org")["id"]
     earlier = insert_application(settings, "earlier@example.org",
-                                 grad_type="exam", name1="Пилот", fn="F1")
+                                 grad_type="exam", name1="Пилот", fn="F1",
+                                 credits_declared=1,
+                                 credits_declared_at=EARLIER)
     connection = connect(settings)
     try:
         rows, _ = snapshot.table(connection, lists.load(settings.lists_dir))
@@ -796,11 +830,12 @@ def test_the_nightly_copy_holds_the_session_and_the_tick(client, settings,
     assert all(len(row) == len(rows[0]) for row in rows)
     by_number = dict((row[0], row) for row in rows[1:])
     for number, session, ticked in (
-            (chosen, "26 януари 2027 г. (вторник)", "да"),
+            (chosen, "26 януари 2027\u00a0г. (вторник)", "да"),
             (earlier, "—", "не")):
         row = by_number[number]
         assert row[column["Сесия"]] == session
         assert row[column["Запознат(а) с графика на сесиите"]] == ticked
+        assert row[column["Декларира покрити кредити"]] == "да"
 
 
 def test_no_document_prints_the_session_or_the_tick(settings):
@@ -855,7 +890,7 @@ def test_a_code_in_any_characters_is_chosen_recorded_and_shown(code):
         app.config["TESTING"] = True
         student = as_student(Client(app.test_client()), "any@example.org")
         page = student.get("/application").get_data(as_text=True)
-        assert "30 юни 2099 г. (вторник)" in page
+        assert "30 юни 2099\u00a0г. (вторник)" in page
         response = save(student, 1, dict(EXAM, grad_session=code,
                                          schedule_ack="1"), "submit")
         assert response.status_code == 302
@@ -865,7 +900,7 @@ def test_a_code_in_any_characters_is_chosen_recorded_and_shown(code):
                          make_account(settings, "staff1"))
         page = staff.get("/staff/application/{}".format(
             record["id"])).get_data(as_text=True)
-        assert dd(page, "session") == "30 юни 2099 г. (вторник)"
+        assert dd(page, "session") == "30 юни 2099\u00a0г. (вторник)"
         assert staff.post("/staff/application/{}/session".format(
             record["id"]), data={"grad_session": code}).status_code == 302
     finally:

@@ -155,7 +155,8 @@ TICK_REQUIRED = "Отбележете това поле, за да подаде�
 # The schedule of sessions (constitution 5.13): built from the sessions list,
 # its column headings and its note as the department's framework schedule
 # prints them. A session's date is always written as SESSION_DATE, a
-# deadline as SESSION_DEADLINE, from the date in the list.
+# deadline as SESSION_DEADLINE, from the date in the list; the year and „г.“
+# are kept on one line (a no-break space between them).
 SCHEDULE_TITLE = "Сесия за дипломиране"
 SCHEDULE_LEAD = "График на сесиите за защита на тези и за държавен изпит"
 SCHEDULE_COLUMNS = (
@@ -175,13 +176,14 @@ SESSION_NONE_OFFERED = ("В графика няма предстояща сес�
 ACK_SCHEDULE = ("Запознат(а) съм с рамковия график на сесиите за защита на "
                 "тези и за държавен изпит и със сроковете в него.")
 REFUSED_SESSION = "Изберете сесия от графика."
-SESSION_DATE = "{day} {month} {year} г. ({weekday})"
-SESSION_DEADLINE = "до {day} {month} {year} г."
+SESSION_DATE = "{day} {month} {year}\u00a0г. ({weekday})"
+SESSION_DEADLINE = "до {day} {month} {year}\u00a0г."
 MONTHS = ("януари", "февруари", "март", "април", "май", "юни", "юли",
           "август", "септември", "октомври", "ноември", "декември")
 WEEKDAYS = ("понеделник", "вторник", "сряда", "четвъртък", "петък", "събота",
             "неделя")
 SESSION_NONE = "—"
+SESSION_CHOSEN = "Избрана сесия: {}"
 ACKNOWLEDGED = "Запознат(а) с графика на сесиите"
 ACKNOWLEDGED_VALUE = {True: "да", False: "—"}
 STATUS_TITLE = "Къде е заявлението"
@@ -364,8 +366,11 @@ STAFF_TO_STUDENTS = "Вход за студенти"
 
 STAFF_TABLE_TITLE = "Подадени заявления"
 STAFF_COLUMNS = ("Студент", "F№", "Програма", "Код", "Вид", "Сесия",
-                 "Кредити", "График", "Тема", "Научен ръководител",
-                 "Отговор", "Проверка")
+                 "Кредити", "Тема", "Научен ръководител", "Отговор",
+                 "Проверка")
+# Under the session in the table: whether the student ticked knowing the
+# schedule, with ACKNOWLEDGED_VALUE.
+STAFF_ACKNOWLEDGED_SUB = "график: {}"
 STAFF_PROGRAMME_CODE = "Код на програмата"
 STAFF_DECLARED = "Декларира покрити кредити"
 STAFF_DECLARED_VALUE = {True: "да", False: "—"}

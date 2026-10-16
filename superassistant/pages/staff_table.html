@@ -31,14 +31,13 @@
     {% for row in rows %}
       {% set s = row.standing %}
       <tr class="{{ 'waiting' if s.waiting }}" data-id="{{ row.record.id }}">
-        <td><a class="name" href="/staff/application/{{ row.record.id }}">{{ row.name or row.record.email }}</a><span class="sub">{{ row.record.email }}</span></td>
+        <td><a class="name" href="/staff/application/{{ row.record.id }}">{{ row.name or row.record.email }}</a>{# The address may break after „@“ only, so the table fits a desk's screen; <wbr> leaves it whole when copied. #}<span class="sub">{% set at = row.record.email.rfind("@") %}{% if at > 0 %}{{ row.record.email[:at + 1] }}<wbr>{{ row.record.email[at + 1:] }}{% else %}{{ row.record.email }}{% endif %}</span></td>
         <td>{{ row.record.fn }}</td>
         <td>{{ row.programme }}</td>
         <td class="code">{{ row.code }}</td>
         <td>{{ t.STAFF_TYPE.get(row.record.grad_type, "") }}</td>
-        <td class="session">{{ row.session }}</td>
+        <td class="session">{{ row.session }}<span class="sub acknowledged">{{ t.STAFF_ACKNOWLEDGED_SUB.format(t.ACKNOWLEDGED_VALUE[row.acknowledged]) }}</span></td>
         <td class="declared">{{ t.STAFF_DECLARED_VALUE[row.declared] }}</td>
-        <td class="acknowledged">{{ t.ACKNOWLEDGED_VALUE[row.acknowledged] }}</td>
         <td>{{ row.record.topic if row.record.grad_type == "thesis" }}</td>
         <td>{{ row.supervisor }}</td>
         <td>{% if row.record.grad_type == "thesis" %}<div class="marks">
