@@ -527,3 +527,22 @@
   - `1267b47`: fixes from a four-agent read-only verification (staff table fits at 1280 px, „г.“ kept with its year, test gaps from 45 mutations).
 - **Checks:** 396 passed and 11 browser tests on Python 3.9.6 and 3.12.14 (after `1267b47`'s last assertion, `tests/test_sessions.py` again on both); the pilot's first start reproduced 10 times with the reminder and the nightly copy starting together: the list written once. Pages in Chromium only (WebKit not installed).
 - **Not pushed. Outstanding:** Codex's review; the owner's look at the wording; the push and laptop update; acceptance.
+
+## 2026-10-16 — Sixth task: `1267b47` approved
+
+- **Approvals of `1267b47`** (range `e37ee7a..1267b47`, record `5948c6c`):
+  - Codex APPROVED, relayed by the owner (verbatim): "Codex APPROVED `1267b47`, range `e37ee7a..1267b47`, record `5948c6c`. No changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, as Codex reported them:
+  - 396 passed and 11 Chromium browser tests on Python 3.9.6 and 3.12.14, with fake mail;
+  - an `e37ee7a` data folder upgraded to schema 6, its records, lists and report file kept; only the three application columns added;
+  - first starts concurrent, interrupted, after owner edits and with lists missing; the `sessions list` marker prevents writing the list again;
+  - submission, Sofia's date boundaries, the tick's recording, staff corrections, access and earlier records meet requirement 4;
+  - no sideways scrolling at 390 px, nor in the staff table at 1280 px;
+  - governance hashes match: `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `66b60bd9…`, `NOW.md` `5bd1f853…`.
+- **Not live:** GitHub and the laptop at `e37ee7a`. The update migrates to schema 6 and writes `sessions.csv` at its first start; no unit or setting.
+- **Outstanding:**
+  - the owner's look at the wording (dates without a leading zero; „график: да“ under the session in the staff table) and acceptance;
+  - the push and the laptop update;
+  - before 27 January 2027, the next sessions added to `sessions.csv`;
+  - before milestone 3, Fable's `NOW.md` amendment marking requirement 4 as built. The governance changes stay uncommitted until then.
