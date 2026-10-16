@@ -476,3 +476,14 @@
   - the owner's authorization.
 
   The governance changes stay uncommitted until then: `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `bdb5fe14…`.
+
+## 2026-10-16 — Fifth task: staff print each applicant's forms; for Codex's review
+
+- **Owner** (verbatim): "can the staff safely print each Заявление-декларация (.docx) and Приложение of each applicant"; then "Heading: „Попълнени документи“ Line: „Не е нужно да отпечатвате и представяте документите: администрацията на департамента вече разполага с тях. Можете да ги изтеглите за справка.“ must be visible in each case; drop the "If students still sign in person.." version". To Opus 5.5's questions: "Yes, build it now (Recommended)", "Yes, like reports (Recommended)" (the bin), "Yes, fix both (Recommended)" (the templates).
+- **Rules changed**, uncommitted: `CONSTITUTION.md` `66b60bd9…` (2.3, 4.3, 5 introduction, 5.5, a 16.10 row). `CLAUDE_1.md` `a125c54e…` and `NOW.md` `5bd1f853…` unchanged; Fable's amendment should name this task in `NOW.md`'s protected list.
+- **Code** `7cc6abe..1845492`:
+  - `473a99f`: the student's heading and line; staff routes for both forms (bin included, drafts not); templates rebuilt: no empty lines under the заявление's topic, its thesis heading kept with its box, Приложение 2 lines not stretched;
+  - `1845492`: notes from a four-agent read-only verification (no blocker, no gap).
+- **Checks:** 352 passed and 10 browser on Python 3.9.6 and 3.12.14; 15 mutations, each caught; templates rebuilt identical from the samples; Word renders before and after; pages in Chromium (WebKit not installed).
+- **DEFERRED:** 5.3 quotes the tick as signing "the same sentence on paper"; who signs the printed заявление is the owner's question.
+- **Not pushed. Outstanding:** Codex's review; the push and laptop update; the owner's acceptance.
