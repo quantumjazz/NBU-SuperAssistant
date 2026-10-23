@@ -587,3 +587,15 @@
 - **Not live:** GitHub and the laptop at `9a5ac64`. The update needs no unit, setting or schema change; the next 00:00 run after the restart uses it.
 - **DEFERRED** (owner decisions): a length limit per entry; drafts holding a session later taken off `sessions.csv`.
 - **Outstanding:** the owner's acceptance; the push and the laptop update; before milestone 3, Fable's `NOW.md` amendment naming this task. The governance changes stay uncommitted until then.
+
+## 2026-10-23 — Seventh task: accepted and live on the laptop; COMPLETE
+
+- **Owner** (verbatim): "I accept. Yes, push and update the laptop.", then "Done, I restarted the service."
+- **Pushed and pulled:** GitHub and the laptop at `e6956fe` (code `2058196`). A copy of the live database was taken first: `/home/victor/nbu-superassistant-pre-update-20261023-102915.sqlite3`, schema 6, 14 applications (10 submitted, none in the bin), no report, integrity ok. Only the nightly copy unit's comment changed; no setting or schema.
+- **The owner's sudo step:** the unit copied again, `daemon-reload`, the restart at 10:45:17 EEST.
+- **Checks:**
+  - before the restart, the laptop's new code read the live database read-only: 14 rows, 4 not submitted (№8, 10, 14, 18), 73,231 bytes;
+  - after it, the service active, `/healthz` ok on the laptop and publicly, signed out `/application` leads to `/`; schema 6, integrity ok, the 14 applications kept;
+  - the copy's timer next at 00:00 on 24 October, the first nightly copy with unsubmitted applications; the reminders at 09:00.
+- **Status:** accepted by the owner and live: COMPLETE. The owner's look at the 24 October email, and any fault, go in a new entry.
+- **Outstanding:** DEFERRED, a length limit per entry and drafts holding a session later taken off `sessions.csv`; before milestone 3, Fable's `NOW.md` amendment naming this task. The governance changes stay uncommitted until then.
