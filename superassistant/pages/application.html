@@ -70,7 +70,7 @@
 {% block content %}
 <div class="page-head">
   <h1>{{ t.NAV_APPLICATION_TITLE }}</h1>
-  {% if not submitted %}<p class="lead">{{ t.DRAFT_LEAD }}</p>{% endif %}
+  {% if not submitted and not removed %}<p class="lead">{{ t.DRAFT_LEAD }}</p>{% endif %}
 </div>
 
 {% if removed %}

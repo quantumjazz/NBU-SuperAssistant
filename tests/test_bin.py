@@ -17,7 +17,7 @@ import hashlib
 import sqlite3
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import example, given, strategies as st
 
 from superassistant import applications, db, lists, mail, reports, signin
 from superassistant import supervision, texts
@@ -37,10 +37,10 @@ def count(connection, table, application_id):
 
 
 def table_ids(connection):
-    """The applications the staff table lists, as its query selects them."""
+    """The applications the staff table lists, as its query selects them:
+    every one not in the bin, submitted or not (constitution 5.15)."""
     return [row["id"] for row in connection.execute(
-        "SELECT id FROM applications WHERE submitted_at IS NOT NULL AND "
-        "binned_at IS NULL ORDER BY submitted_at DESC, id DESC")]
+        "SELECT id FROM applications WHERE binned_at IS NULL")]
 
 
 # --- The rules, over generated sequences -----------------------------------
@@ -52,19 +52,27 @@ operation = st.one_of(
     st.tuples(st.just("delete"), st.integers(0, 9), st.just(None)),
     st.tuples(st.just("new"), st.just(0), st.just(None)),
     st.tuples(st.just("report"), st.just(0), st.just(None)),
+    st.tuples(st.just("draft"), st.just(0), st.just(None)),
+    st.tuples(st.just("edit"), st.integers(0, 9), st.just(None)),
 )
 
 
 @FAST
 @given(operations=st.lists(operation, min_size=1, max_size=12))
+# A draft (the third application) removed, edited, put back, edited,
+# removed again and deleted: always run, whatever is generated.
+@example(operations=[("draft", 0, None), ("remove", 2, "other"),
+                     ("edit", 2, None), ("restore", 2, None),
+                     ("edit", 2, None), ("remove", 2, "graduated"),
+                     ("delete", 2, None)])
 def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
     with world() as (settings, connection, loaded, clock, box, staff):
         made = []                          # every number ever given
         model = {}                         # number: None or reason in bin
         log = []                           # (number, event, reason)
+        drafts = set()                     # never submitted, nothing recorded
 
-        def new():
-            number = new_thesis(connection, settings, loaded, len(made) + 1)
+        def record_made(number):
             assert all(number > earlier for earlier in made)   # never again
             made.append(number)
             model[number] = None
@@ -75,6 +83,20 @@ def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
                 "link_hash, created_at, expires_at) VALUES (?,?,?,?,?,?,?)",
                 (address, address, "salt", "code", "link" + address,
                  db.now(), db.now()))
+
+        def draft():
+            """An application the student has started and not submitted."""
+            key = "d{}@example.org".format(len(made) + 1)
+            record = applications.get_or_create(connection, key, key)
+            applications.save_draft(connection, record, {
+                "name1": "Чернова", "grad_type": "exam"})
+            record_made(record["id"])
+            drafts.add(record["id"])
+
+        def new():
+            record_made(new_thesis(connection, settings, loaded,
+                                   len(made) + 1))
+            number = made[-1]
             request = applications.current_request(connection, number)
             connection.execute("UPDATE requests SET answer = 'confirm' "
                                "WHERE id = ?", (request["id"],))
@@ -92,6 +114,30 @@ def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
             target = alive[index % len(alive)] if alive else None
             if kind == "new":
                 new()
+            elif kind == "draft":
+                draft()
+            elif kind == "edit" and target in drafts:
+                # The student saves and tries to submit: refused, changing
+                # nothing, while the draft is in the bin.
+                before = applications.get(connection, target)
+                if model[target] is None:
+                    applications.save_draft(connection, before,
+                                            {"name2": "Ново"})
+                    assert applications.get(connection, target)[
+                        "name2"] == "Ново"
+                    assert supervision.submit(connection, settings, loaded,
+                                              target)        # incomplete
+                else:
+                    with pytest.raises(applications.Removed):
+                        applications.save_draft(connection, before,
+                                                {"name2": "Друго"})
+                    with pytest.raises(applications.Removed):
+                        supervision.submit(connection, settings, loaded,
+                                           target)
+                    assert dict(applications.get(connection, target)) \
+                        == dict(before)
+                assert applications.get(connection, target)[
+                    "submitted_at"] is None
             elif kind == "report":
                 try:
                     reports.generate(connection, settings, loaded,
@@ -148,11 +194,12 @@ def test_the_bin_over_any_sequence_of_removals_and_deletions(operations):
                 model[n] for n in binned]
         qualifying = [r["id"] for r in reports.qualifying(connection,
                                                           "BSNADM01")]
-        assert sorted(qualifying) == active
+        assert sorted(qualifying) == [n for n in active if n not in drafts]
         # Every application not deleted keeps its own rows and sign-ins.
         for number in active + binned:
             for table in ("corrections", "checks", "requests"):
-                assert count(connection, table, number) >= 1
+                assert (count(connection, table, number) >= 1) \
+                    == (number not in drafts)
             key = applications.get(connection, number)["email_key"]
             assert connection.execute(
                 "SELECT COUNT(*) FROM signins WHERE email_key = ? AND "
@@ -194,15 +241,14 @@ def test_a_deleted_last_applications_number_is_never_given_again(settings,
     connection.close()
 
 
-def test_removing_needs_a_reason_and_a_submitted_application(settings, app):
+def test_removing_needs_a_reason_and_an_application(settings, app):
+    # Submitted or not (constitution 5.15, the owner, 23 October 2026: "See
+    # it, remove to bin"); a draft's removal is tested with the drafts.
     staff = make_account(settings)
     connection = connect(settings)
-    draft = insert_application(settings, "d@example.org", submitted=False)
     done = insert_application(settings, "s@example.org")
     with pytest.raises(ValueError):
         applications.remove(connection, done, "graduation", "", staff["id"])
-    assert not applications.remove(connection, draft, "other", "",
-                                   staff["id"])
     assert not applications.remove(connection, 999, "other", "", staff["id"])
     assert not applications.restore(connection, done, staff["id"])
     assert not applications.delete(connection, done, staff["id"])

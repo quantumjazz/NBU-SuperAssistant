@@ -199,7 +199,7 @@ dl.fields dd, .card-h p, .lead, h1, .log li { overflow-wrap: anywhere; }
 .marks .chip { white-space: normal; text-align: left; }
 #applications { font-size: 0.85rem; }
 #applications th, #applications td { padding: 10px 10px; }
-#applications th:nth-last-child(-n+2), #applications td:nth-last-child(-n+2) { min-width: 118px; }
+#applications th:nth-last-child(-n+2), #applications td.answer, #applications td.check { min-width: 118px; }
 #applications .chip { font-size: 0.74rem; padding: 2px 8px 2px 7px; }
 @media (max-width: 719px) {
   .who { display: none; }

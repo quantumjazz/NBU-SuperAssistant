@@ -30,13 +30,12 @@ it, which keeps it text, the apostrophe shown; its line breaks, if any, are
 then written as they are, which opening the file keeps but the text import
 splits.
 
-What the file holds is what staff see of each submitted application: its
-entries, its session and whether the student ticked knowing the schedule,
-the current supervisor's answer and comment, the latest check, whether a
-kept report lists it, and whether it is in the bin and why. Of an
-application not yet submitted, which staff do not see, it holds what the
-student has entered so far, the two ticks as they stand, and „неподадено“
-where the moment of submission goes. It is read in one transaction, so it
+What the file holds is what staff see of each application: its entries,
+its session and whether the student ticked knowing the schedule, the
+current supervisor's answer and comment, the latest check, whether a kept
+report lists it, and whether it is in the bin and why. Of an application
+not yet submitted it holds what the student has entered so far, the two
+ticks as they stand, and „неподадено“ where the moment of submission goes. It is read in one transaction, so it
 is the records of one moment. Never a sign-in code, an answer link or a
 password.
 
@@ -128,15 +127,6 @@ def _supervisor_email(record, lists):
     return record["sup_email"]
 
 
-def _ticked(record, field):
-    """A tick: given on submission, or, before it, as the draft holds it.
-    Once submitted the box and its moment agree; the moment is read, as the
-    staff page reads it, because it records the submission."""
-    if record["submitted_at"] is not None:
-        return record[field + "_at"] is not None
-    return bool(record[field])
-
-
 def _row(connection, record, lists):
     standing = applications.standing(connection, record)
     request = applications.current_request(connection, record["id"])
@@ -150,8 +140,9 @@ def _row(connection, record, lists):
         record["email"],
         texts.STAFF_TYPE.get(record["grad_type"], ""),
         record["name1"], record["name2"], record["name3"], record["fn"],
-        texts.SNAPSHOT_YES_NO[_ticked(record, "credits_declared")],
-        texts.SNAPSHOT_YES_NO[_ticked(record, "schedule_ack")],
+        texts.SNAPSHOT_YES_NO[applications.ticked(record,
+                                                "credits_declared")],
+        texts.SNAPSHOT_YES_NO[applications.ticked(record, "schedule_ack")],
         sessions.label(lists, record["grad_session"]),
         record["phone"],
         supervision.programme_label(record, lists),

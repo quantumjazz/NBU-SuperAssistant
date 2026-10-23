@@ -204,10 +204,12 @@ def submit(connection, settings, lists, application_id):
 
     A thesis is submitted only once its request to the supervisor has gone:
     if the relay refuses it, mail.MailFailed propagates and nothing changes.
+    An application staff have removed to the bin before it was submitted
+    (constitution 5.15) is not submitted: applications.Removed.
     """
     with db.transaction(connection):
         record = applications.get(connection, application_id)
-        if record is None:
+        if record is None or applications.is_binned(record):
             raise applications.Removed(application_id)
         if record["submitted_at"] is not None:
             return []

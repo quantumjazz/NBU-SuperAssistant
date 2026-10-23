@@ -442,7 +442,7 @@ def staff(settings):
     return make_account(settings, "staff1")
 
 
-def test_the_table_lists_submitted_applications_and_marks_the_waiting(
+def test_the_table_lists_every_application_and_marks_the_waiting(
         client, new_client, settings, outbox, staff):
     as_student(client, "table@example.org")
     submit_thesis(client)
@@ -451,7 +451,6 @@ def test_the_table_lists_submitted_applications_and_marks_the_waiting(
     save(draft, 1, {"name1": "Чернова", "grad_type": "exam"})
     viewer = as_staff(new_client(), staff)
     page = viewer.get("/staff").get_data(as_text=True)
-    assert "Мария Петрова Тодорова" in page and "Чернова" not in page
     for column in ("Студент", "F№", "Програма", "Вид", "Тема",
                    "Научен ръководител", "Отговор", "Проверка"):
         assert column in page
@@ -459,6 +458,18 @@ def test_the_table_lists_submitted_applications_and_marks_the_waiting(
     table = page.split('id="applications"', 1)[1]
     assert 'class="waiting"' in table
     assert "чака научния ръководител" in table and "чака проверка" in table
+    # The draft too, after the submitted one, marked where the answer and
+    # the check go, waiting for nothing (constitution 5.15).
+    submitted, unsubmitted = table.split("<tr ")[1:]
+    assert "Мария Петрова Тодорова" in submitted
+    assert texts.STAFF_NOT_SUBMITTED not in submitted
+    assert "Чернова" in unsubmitted and 'class=""' in unsubmitted
+    assert '<td colspan="2"><span class="chip not-submitted">{}</span>'.format(
+        texts.STAFF_NOT_SUBMITTED) in unsubmitted
+    assert texts.STAFF_WAITING_CHECK not in unsubmitted
+    assert "<b>2</b>&nbsp;{}".format(texts.STAFF_COUNT_ALL[1]) in page
+    assert "<b>1</b>&nbsp;{}".format(
+        texts.STAFF_COUNT_WAITING["check"][0]) in page
 
 
 def test_staff_see_every_field_and_the_answer_with_its_comment_and_time(

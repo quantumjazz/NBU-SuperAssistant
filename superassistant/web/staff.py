@@ -1,7 +1,11 @@
 """Staff's work: the table, one application, checks and corrections (req. 5).
 
-The table lists submitted applications; those waiting for the supervisor,
-for a check, or, confirmed and passed, for their first report stand out.
+The table lists every application not in the bin, the submitted first; those
+waiting for the supervisor, for a check, or, confirmed and passed, for their
+first report stand out. An application the student has not yet submitted
+follows them, marked „неподадено“, the latest saved first (constitution
+5.15); its page shows what the student has entered so far, read-only, and
+staff may only remove it to the bin: no check, correction or form.
 Every check and every correction is a new row that keeps what came before.
 A staff change of the supervisor sends a new request; an answer already
 recorded stays with the earlier request.
@@ -65,9 +69,10 @@ def _row(connection, record, lists):
         "programme": ("{} {}".format(programme["degree"], programme["name"])
                       + ", " + programme["form"]) if programme else "",
         "code": record["programme"],
-        "declared": record["credits_declared_at"] is not None,
+        "submitted": standing.submitted,
+        "declared": applications.ticked(record, "credits_declared"),
         "session": sessions.label(lists, record["grad_session"]),
-        "acknowledged": record["schedule_ack_at"] is not None,
+        "acknowledged": applications.ticked(record, "schedule_ack"),
         "supervisor": (applications.supervisor_label(record, lists)
                        if record["grad_type"] == "thesis" else ""),
     }
@@ -79,23 +84,36 @@ def table():
     connection = web.connection()
     lists = web.current_lists()
     records = connection.execute(
-        "SELECT * FROM applications WHERE submitted_at IS NOT NULL "
-        "AND binned_at IS NULL ORDER BY submitted_at DESC, id DESC").fetchall()
+        "SELECT * FROM applications WHERE binned_at IS NULL "
+        "ORDER BY submitted_at IS NULL, submitted_at DESC, updated_at DESC, "
+        "id DESC").fetchall()
     rows = [_row(connection, record, lists) for record in records]
     return render_template("staff_table.html", rows=rows)
 
 
-def _submitted(application_id):
-    """A submitted application, in the bin or not; else not found."""
+def _existing(application_id):
+    """An application, submitted or not, in the bin or not; else not
+    found."""
     record = applications.get(web.connection(), application_id)
-    if record is None or record["submitted_at"] is None:
+    if record is None:
         abort(404)
     return record
 
 
+def _removable(application_id):
+    """An application not in the bin, which staff may remove to it."""
+    record = _existing(application_id)
+    if applications.is_binned(record):
+        raise applications.Removed(application_id)
+    return record
+
+
 def _active(application_id):
-    """A submitted application not in the bin, which staff may change."""
-    record = _submitted(application_id)
+    """A submitted application not in the bin, which staff may change; one
+    not yet submitted is not found, as staff only see it."""
+    record = _existing(application_id)
+    if record["submitted_at"] is None:
+        abort(404)
     if applications.is_binned(record):
         raise applications.Removed(application_id)
     return record
@@ -134,7 +152,7 @@ def _username(connection, account_id):
 @blueprint.route("/staff/application/<int:application_id>")
 @web.staff_required
 def application(application_id):
-    return _render(_submitted(application_id))
+    return _render(_existing(application_id))
 
 
 @blueprint.route("/staff/application/<int:application_id>/check",
@@ -287,8 +305,9 @@ def _type_errors(refusals):
                  methods=["POST"])
 @web.staff_required
 def remove(application_id):
-    """The first step: to the bin, with the reason chosen."""
-    record = _active(application_id)
+    """The first step: to the bin, with the reason chosen. An application
+    not yet submitted may be removed too (constitution 5.15)."""
+    record = _removable(application_id)
     reason = request.form.get("reason", "")
     if reason not in applications.BIN_REASONS:
         flash(texts.FIX_BELOW, "error")

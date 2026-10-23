@@ -364,7 +364,7 @@ STAFF_TO_STUDENTS = "Вход за студенти"
 
 # --- Staff work: tables, checks, corrections ---------------------------------
 
-STAFF_TABLE_TITLE = "Подадени заявления"
+STAFF_TABLE_TITLE = "Заявления"
 STAFF_COLUMNS = ("Студент", "F№", "Програма", "Код", "Вид", "Сесия",
                  "Кредити", "Тема", "Научен ръководител", "Отговор",
                  "Проверка")
@@ -374,7 +374,7 @@ STAFF_ACKNOWLEDGED_SUB = "график: {}"
 STAFF_PROGRAMME_CODE = "Код на програмата"
 STAFF_DECLARED = "Декларира покрити кредити"
 STAFF_DECLARED_VALUE = {True: "да", False: "—"}
-STAFF_EMPTY = "Още няма подадени заявления."
+STAFF_EMPTY = "Още няма заявления."
 STAFF_TYPE = {"thesis": "теза", "exam": "държавен изпит"}
 STAFF_ANSWER = {"awaited": "чака отговор", "confirm": "потвърди",
                 "decline": "не потвърди", None: "—"}
@@ -383,7 +383,19 @@ STAFF_WAITING_SUPERVISOR = "чака научния ръководител"
 STAFF_WAITING_CHECK = "чака проверка"
 STAFF_WAITING_REPORT = "чака доклад"
 STAFF_LEGEND = "Оцветените редове чакат действие."
-STAFF_LEAD = "Всяко подадено заявление, с отговора на научния ръководител и последната проверка. Отворете име, за да видите всичко и да запишете проверка."
+STAFF_LEAD = "Всяко заявление, с отговора на научния ръководител и последната проверка; заявление, което студентът още не е подал, е отбелязано „неподадено“. Отворете име, за да видите всичко и да запишете проверка."
+# An application the student has not yet submitted (constitution 5.15): in
+# the table where the answer and the check go, on its page and in the bin;
+# the nightly copy writes the same word.
+STAFF_NOT_SUBMITTED = "неподадено"
+# Its page's first line, after F№ and the programme: when the student last
+# saved it.
+STAFF_LAST_SAVED = "последно записано на {}"
+# Its page says what it is, and that staff only see it.
+STAFF_NOT_SUBMITTED_NOTE = ("Студентът още не е подал това заявление. Тук се "
+                            "вижда попълненото досега; проверка, корекции и "
+                            "документи има след подаването. Заявлението може "
+                            "да бъде премахнато в кошчето.")
 STAFF_COUNT_ALL = ("заявление", "заявления")
 STAFF_COUNT_WAITING = {"supervisor": ("чака научния ръководител", "чакат научния ръководител"),
                        "check": ("чака проверка", "чакат проверка"),
@@ -635,7 +647,7 @@ SNAPSHOT_COLUMNS = (
 SNAPSHOT_YES_NO = {True: "да", False: "не"}
 SNAPSHOT_NOT_BINNED = "не"
 # „Подадено на“ of an application not yet submitted.
-SNAPSHOT_NOT_SUBMITTED = "неподадено"
+SNAPSHOT_NOT_SUBMITTED = STAFF_NOT_SUBMITTED
 SNAPSHOT_SUBJECT = "Копие на заявленията към {date}"
 SNAPSHOT_TEXT = ("Здравейте,\n\n"
                  "прикачен е файлът {name}: копие на всички заявления, "

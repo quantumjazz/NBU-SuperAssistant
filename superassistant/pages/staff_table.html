@@ -31,7 +31,10 @@
     {% for row in rows %}
       {% set s = row.standing %}
       <tr class="{{ 'waiting' if s.waiting }}" data-id="{{ row.record.id }}">
-        <td><a class="name" href="/staff/application/{{ row.record.id }}">{{ row.name or row.record.email }}</a>{# The address may break after „@“ only, so the table fits a desk's screen; <wbr> leaves it whole when copied. #}<span class="sub">{% set at = row.record.email.rfind("@") %}{% if at > 0 %}{{ row.record.email[:at + 1] }}<wbr>{{ row.record.email[at + 1:] }}{% else %}{{ row.record.email }}{% endif %}</span></td>
+        {# The address may break after „@“ only, so the table fits a desk's screen; <wbr> leaves it whole when copied. A draft with no name yet is named by its address alone. #}
+        {% set at = row.record.email.rfind("@") %}
+        {% set address %}{% if at > 0 %}{{ row.record.email[:at + 1] }}<wbr>{{ row.record.email[at + 1:] }}{% else %}{{ row.record.email }}{% endif %}{% endset %}
+        <td><a class="name" href="/staff/application/{{ row.record.id }}">{{ row.name or address }}</a>{% if row.name %}<span class="sub">{{ address }}</span>{% endif %}</td>
         <td>{{ row.record.fn }}</td>
         <td>{{ row.programme }}</td>
         <td class="code">{{ row.code }}</td>
@@ -40,15 +43,20 @@
         <td class="declared">{{ t.STAFF_DECLARED_VALUE[row.declared] }}</td>
         <td>{{ row.record.topic if row.record.grad_type == "thesis" }}</td>
         <td>{{ row.supervisor }}</td>
-        <td>{% if row.record.grad_type == "thesis" %}<div class="marks">
+        {% if row.submitted %}
+        <td class="answer">{% if row.record.grad_type == "thesis" %}<div class="marks">
           <span class="chip {{ 'wait' if s.answer == 'awaited' else 'ok' if s.answer == 'confirm' else 'no' if s.answer == 'decline' else '' }}">{{ t.STAFF_ANSWER[s.answer] }}</span>
           {% if s.waiting_for_supervisor %}<strong class="waiting-mark hint" style="margin:0">{{ t.STAFF_WAITING_SUPERVISOR }}</strong>{% endif %}
         </div>{% endif %}</td>
-        <td><div class="marks">
+        <td class="check"><div class="marks">
           <span class="chip {{ 'ok' if s.check == 'passed' else 'no' if s.check == 'not_passed' else '' }}">{{ t.STAFF_CHECK_CHIP[s.check] }}</span>
           {% if s.waiting_for_check %}<span class="chip wait"><strong class="waiting-mark">{{ t.STAFF_WAITING_CHECK }}</strong></span>{% endif %}
           {% if s.waiting_for_report %}<span class="chip wait"><strong class="waiting-mark">{{ t.STAFF_WAITING_REPORT }}</strong></span>{% endif %}
         </div></td>
+        {% else %}
+        {# Not yet submitted (constitution 5.15): no answer or check yet, one mark where they go. #}
+        <td colspan="2"><span class="chip not-submitted">{{ t.STAFF_NOT_SUBMITTED }}</span></td>
+        {% endif %}
       </tr>
     {% endfor %}
     </tbody>

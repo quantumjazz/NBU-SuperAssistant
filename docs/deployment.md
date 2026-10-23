@@ -442,10 +442,10 @@ the copies 30 days old or older, so the folder holds the last 30 days. The
 journal says where the file is, how many applications it holds and which
 old copies went.
 
-The file holds the submitted applications as staff see them, those in the
-bin included and marked with the reason, and the applications not yet
-submitted, which staff do not see: „Подадено на“ says „неподадено“, and the
-row holds what the student has entered so far. A student who signed in and
+The file holds every application as staff see it, those in the bin
+included and marked with the reason. Of an application not yet submitted
+„Подадено на“ says „неподадено“, and the row holds what the student has
+entered so far. A student who signed in and
 entered nothing has a row too, its entries empty. The message says how many
 applications there are, how many of them are not submitted and how many are
 in the bin.

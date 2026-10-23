@@ -118,6 +118,8 @@ def save():
     record = _record()
     if record["submitted_at"] is not None:
         return redirect("/application")
+    if applications.is_binned(record):          # a draft staff removed
+        raise applications.Removed(record["id"])
     tab = 2 if request.form.get("tab") == "2" else 1
     if tab == 1:
         grad_type = request.form.get("grad_type", "")

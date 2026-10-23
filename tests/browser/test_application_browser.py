@@ -6,7 +6,8 @@ and programmes offered read from the list files and no field asked twice; a
 state-exam application with no second tab, its page then showing
 "submitted"; a supervisor's answer through each button, with a comment, the
 answer then shown to the student and in the staff table. At desktop width:
-the staff table, one opened application and a check recorded.
+the staff table, one opened application and a check recorded; a draft in
+the table, marked, its page read-only, and removed to the bin.
 """
 
 import io
@@ -204,7 +205,13 @@ def test_staff_table_one_application_and_a_check(live_server, open_page):
     desk.get_by_role("button", name=texts.STAFF_SIGNIN_BUTTON).click()
     table = desk.locator("#applications")
     expect(table).to_contain_text("Десислава Петкова Маринова")
-    expect(table).not_to_contain_text("Недовършена")
+    # The draft too, after it, marked where the answer and the check go
+    # (constitution 5.15).
+    draft_row = table.locator("tbody tr").nth(1)
+    expect(draft_row).to_contain_text("Недовършена")
+    expect(draft_row.locator(".chip.not-submitted")).to_have_text(
+        texts.STAFF_NOT_SUBMITTED)
+    expect(draft_row).not_to_have_class("waiting")
     for column in texts.STAFF_COLUMNS:
         expect(table.locator("thead")).to_contain_text(column)
     row = table.locator("tbody tr").first
@@ -225,6 +232,20 @@ def test_staff_table_one_application_and_a_check(live_server, open_page):
     desk.goto(live_server.url + "/staff")
     expect(desk.locator("#applications tbody tr").first).not_to_contain_text(
         texts.STAFF_WAITING_CHECK)
+
+    # The draft's page: what the student entered, nothing to change; staff
+    # remove it to the bin, and the student sees it removed.
+    desk.locator("#applications").get_by_role(
+        "link", name="Недовършена").click()
+    expect(desk.locator("#not-submitted-chip")).to_be_visible()
+    expect(desk.locator("#not-submitted-note")).to_be_visible()
+    for absent in ("#record-check", "#staff-forms", "#corrections"):
+        expect(desk.locator(absent)).to_have_count(0)
+    desk.check("input[name=reason][value=other]")
+    desk.locator("#remove-application").click()
+    expect(desk.locator("#applications")).not_to_contain_text("Недовършена")
+    draft.reload()
+    expect(draft.locator("#removed")).to_be_visible()
 
 
 def test_a_refused_thesis_entry_keeps_the_thesis_choice_and_shows_its_error(

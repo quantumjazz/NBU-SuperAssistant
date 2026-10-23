@@ -23,13 +23,14 @@ that the student knows the schedule of sessions; the session itself is a
 choice among those the schedule offers that day (sessions.offered), checked
 when the draft is saved and again at submission.
 
-Staff may remove a submitted application to the bin, saying why, and from
-there put it back or delete it (constitution 5.15): "Users remove the entry
-(select reason - graduation, else), it goes to a 'bin' and deletion is
-confirmed as a second step" (the owner, 15 October 2026). While it is in the
-bin nothing changes it: every write that would (a check, a correction, a
-supervisor's answer, a reminder, the student's own changes) finds it gone
-inside its own transaction (require_active). Deleting it removes its row and
+Staff may remove an application, submitted or not, to the bin, saying why,
+and from there put it back or delete it (constitution 5.15): "Users remove
+the entry (select reason - graduation, else), it goes to a 'bin' and
+deletion is confirmed as a second step" (the owner, 15 October 2026). While
+it is in the bin nothing changes it: every write that would (a check, a
+correction, a supervisor's answer, a reminder, the student's own changes,
+saving a draft or submitting it) finds it gone inside its own transaction
+(require_active). Deleting it removes its row and
 every row recorded with it; a row in `bin_events` keeps who did what, when
 and why, by the application's number only. That number is never given to a
 later application, so the log's number names one application only.
@@ -390,6 +391,16 @@ def standing(connection, record):
                     in_a_report(connection, record["id"]))
 
 
+def ticked(record, field):
+    """A tick: given on submission, or, before it, as the draft holds it.
+    Once submitted the box and its moment agree; the moment is read because
+    it records the submission. The staff pages and the nightly copy both
+    read a tick this way."""
+    if record["submitted_at"] is not None:
+        return record[field + "_at"] is not None
+    return bool(record[field])
+
+
 def full_name(record):
     return " ".join(part for part in (record["name1"], record["name2"],
                                       record["name3"]) if part)
@@ -414,13 +425,16 @@ def supervisor_email(record, lists):
 # --- Writing ---------------------------------------------------------------
 
 def save_draft(connection, record, values):
-    """Store the student's entries before submission."""
+    """Store the student's entries before submission. Raises Removed, saving
+    nothing, once staff have removed the application to the bin (constitution
+    5.15: an application not yet submitted may be removed too)."""
     if record["submitted_at"] is not None:
         raise ValueError("submitted")
-    if not values:
-        return
     columns = ", ".join(name + " = ?" for name in values)
     with db.transaction(connection):
+        require_active(connection, record["id"])
+        if not values:
+            return
         connection.execute(
             "UPDATE applications SET " + columns + ", updated_at = ? "
             "WHERE id = ? AND submitted_at IS NULL",
@@ -493,19 +507,18 @@ def _bin_event(connection, application_id, event, reason, account_id,
 
 
 def remove(connection, application_id, reason, note, account_id):
-    """Move a submitted application to the bin, saying why. The note is
-    kept with the removal's log row as well, so putting the application back
-    keeps it.
+    """Move an application, submitted or not (constitution 5.15), to the
+    bin, saying why. The note is kept with the removal's log row as well, so
+    putting the application back keeps it.
 
-    Returns False, changing nothing, when there is no such submitted
-    application or it is already in the bin; raises ValueError for a reason
-    that is not one of BIN_REASONS."""
+    Returns False, changing nothing, when there is no such application or it
+    is already in the bin; raises ValueError for a reason that is not one of
+    BIN_REASONS."""
     if reason not in BIN_REASONS:
         raise ValueError(reason)
     with db.transaction(connection):
         record = get(connection, application_id)
-        if (record is None or record["submitted_at"] is None
-                or is_binned(record)):
+        if record is None or is_binned(record):
             return False
         note = (note or "").strip()
         connection.execute(

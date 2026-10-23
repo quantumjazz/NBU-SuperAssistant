@@ -1,17 +1,23 @@
 {% extends "base.html" %}
 {% set r = record %}
 {% set s = row.standing %}
+{# Staff change only a submitted application outside the bin; one not yet submitted they see, and may remove to the bin (constitution 5.15). #}
+{% set editable = row.submitted and not binned %}
 {% block title %}{{ t.STAFF_APPLICATION_TITLE.format(row.name) }}{% endblock %}
 {% block content %}
 {% if binned %}<a class="back" href="/staff/bin"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_BIN }}</a>
 {% else %}<a class="back" href="/staff"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_STAFF }}</a>{% endif %}
 <div class="page-head">
   <h1>{{ row.name or r.email }}</h1>
-  <p class="lead">{{ r.fn }}{% if row.programme %}, {{ row.programme }}{% endif %}, {{ t.STAFF_SUBMITTED_AT|lower }} {{ r.submitted_at|datetime }}.</p>
+  {% set when = (t.STAFF_SUBMITTED_AT|lower ~ " " ~ r.submitted_at|datetime) if row.submitted else (t.STAFF_NOT_SUBMITTED ~ ", " ~ t.STAFF_LAST_SAVED.format(r.updated_at|datetime)) %}
+  <p class="lead">{{ [r.fn, row.programme, when]|select|join(", ") }}.</p>
   <div class="meta">
-    <span class="chip info plain">{{ t.STAFF_TYPE.get(r.grad_type, "") }}</span>
+    {% if r.grad_type %}<span class="chip info plain">{{ t.STAFF_TYPE.get(r.grad_type, "") }}</span>{% endif %}
+    {% if not row.submitted %}<span class="chip not-submitted" id="not-submitted-chip">{{ t.STAFF_NOT_SUBMITTED }}</span>
+    {% else %}
     {% if r.grad_type == "thesis" %}<span class="chip {{ 'wait' if s.answer == 'awaited' else 'ok' if s.answer == 'confirm' else 'no' if s.answer == 'decline' else '' }}">{{ t.STAFF_ANSWER[s.answer] }}</span>{% endif %}
     <span class="chip {{ 'ok' if s.check == 'passed' else 'no' if s.check == 'not_passed' else '' }}">{{ t.STAFF_CHECK_CHIP[s.check] }}</span>
+    {% endif %}
     {% if s.waiting_for_report and not binned %}<span class="chip wait">{{ t.STAFF_WAITING_REPORT }}</span>{% endif %}
     {% if binned %}<span class="chip no" id="binned-chip">{{ t.BIN_IN_BIN }}</span>{% endif %}
   </div>
@@ -31,16 +37,20 @@
 </div></section>
 {% endif %}
 
+{% if not row.submitted and not binned %}<p class="hint" id="not-submitted-note">{{ t.STAFF_NOT_SUBMITTED_NOTE }}</p>{% endif %}
+
+{% if row.submitted %}
 <section id="staff-forms" class="card"><div class="card-h"><h2>{{ t.STAFF_FORMS_TITLE }}</h2></div><div class="card-b">
   <ul class="downloads" role="list">
     <li><a class="btn secondary" id="staff-zaiavlenie" href="/staff/application/{{ r.id }}/zaiavlenie.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.FORMS_ZAIAVLENIE }}</a></li>
     {% if r.grad_type == "thesis" %}<li><a class="btn secondary" id="staff-prilozhenie2" href="/staff/application/{{ r.id }}/prilozhenie2.docx"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>{{ t.FORMS_PRILOZHENIE2 }}</a></li>{% endif %}
   </ul>
 </div></section>
+{% endif %}
 
 <div class="card"><div class="card-h"><h2>{{ t.ENTERED_TITLE }}</h2></div><div class="card-b">
 <dl class="fields" id="fields">
-  <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd>{{ r.submitted_at|datetime }}</dd>
+  <dt>{{ t.STAFF_SUBMITTED_AT }}</dt><dd id="submitted-at">{{ r.submitted_at|datetime if row.submitted else t.STAFF_NOT_SUBMITTED }}</dd>
   <dt>{{ t.STAFF_STUDENT_EMAIL }}</dt><dd>{{ r.email }}</dd>
   <dt>{{ fields.grad_type }}</dt><dd>{{ t.STAFF_TYPE.get(r.grad_type, "") }}</dd>
   {% for name in ["name1", "name2", "name3", "fn"] %}<dt>{{ fields[name] }}</dt><dd>{{ r[name] }}</dd>{% endfor %}
@@ -81,14 +91,14 @@
 </div></section>
 {% endif %}
 
-{% if checks or not binned %}
+{% if checks or editable %}
 <section id="checks" class="card"><div class="card-h"><h2>{{ t.STAFF_CHECKS_TITLE }}</h2></div><div class="card-b">
   {% if checks %}<ul class="log" role="list">
   {% for c in checks %}
     <li><span class="chip {{ 'ok' if c.result == 'passed' else 'no' }}">{{ t.STAFF_CHECK[c.result] }}</span> <span class="when">{{ c.username }}, {{ c.at|datetime }}</span>{% if c.note %}<br>{{ c.note }}{% endif %}</li>
   {% endfor %}
   </ul>{% endif %}
-  {% if not binned %}
+  {% if editable %}
   <form method="post" action="/staff/application/{{ r.id }}/check">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <fieldset class="{{ 'subsection' if checks }}">
@@ -109,7 +119,7 @@
 </div></section>
 {% endif %}
 
-{% if corrections or not binned %}
+{% if corrections or editable %}
 <section id="corrections" class="card"><div class="card-h"><h2>{{ t.STAFF_CORRECTIONS_TITLE }}</h2></div><div class="card-b">
   {% if corrections %}<ul class="log" role="list">
   {% for c in corrections %}
@@ -122,7 +132,7 @@
     {% endif %}
   {% endfor %}
   </ul>{% endif %}
-  {% if not binned %}
+  {% if editable %}
   <form method="post" action="/staff/application/{{ r.id }}/correct">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <fieldset class="{{ 'subsection' if corrections }}">
