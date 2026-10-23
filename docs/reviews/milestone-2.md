@@ -655,3 +655,12 @@
 - **Not checked:** Safari's own password manager; it is the owner's acceptance check.
 - **Not live:** GitHub and the laptop at `05fd12f`. With the ninth task (`1bda292`, approved, record `b7591ca`) every commit up to `b7591ca` is now approved.
 - **Outstanding:** the owner's acceptance of both tasks, the eighth in Safari; the push and laptop update with a restart (no unit, setting or schema change); before milestone 3, Fable's `NOW.md` amendment naming both tasks.
+
+## 2026-10-23 — Eighth and ninth tasks: accepted and live on the laptop; COMPLETE
+
+- **Owner** (verbatim): "I accept both tasks. Yes, push and update the laptop.", then "Done, I restarted the service."
+- **Pushed and pulled:** GitHub and the laptop at `2250487` (code `96a4aa2` and `1bda292`; records `ffb1dd9`, `282084c`, `b7591ca`, `2250487`). A copy of the live database was taken first: `/home/victor/nbu-superassistant-pre-update-20261023-191226.sqlite3`, schema 6, 15 applications (10 submitted, 5 not, none in the bin), 4 accounts, integrity ok. No unit, setting, template of settings or dependency changed.
+- **The owner's sudo step:** the restart at 19:16:06 EEST.
+- **Checks after it:** the service active; `/healthz` ok on the laptop and publicly; signed out, `/staff` leads to the sign-in page; the stylesheet served is the new one (`d666a8428e29`); schema 6, integrity ok, the 15 applications kept, all 15 in the staff table, 5 of them unsubmitted. Timers: the nightly copy at 00:00, the reminders at 09:00.
+- **Status:** accepted by the owner and live: COMPLETE. The owner's checks on the live site (Safari's prompt on the owner page; the drafts in the staff table), and any fault they find, go in a new entry.
+- **Outstanding:** DEFERRED, a student pressing a stale page after staff deleted the draft, and a long word in a topic overflowing the table at 1280 px; before milestone 3, Fable's `NOW.md` amendment naming both tasks. The governance changes stay uncommitted until then.
