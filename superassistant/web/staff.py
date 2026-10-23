@@ -85,7 +85,8 @@ def table():
     lists = web.current_lists()
     records = connection.execute(
         "SELECT * FROM applications WHERE binned_at IS NULL "
-        "ORDER BY submitted_at IS NULL, submitted_at DESC, updated_at DESC, "
+        "ORDER BY submitted_at IS NULL, submitted_at DESC, "
+        "CASE WHEN submitted_at IS NULL THEN updated_at END DESC, "
         "id DESC").fetchall()
     rows = [_row(connection, record, lists) for record in records]
     return render_template("staff_table.html", rows=rows)

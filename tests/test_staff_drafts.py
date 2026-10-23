@@ -14,10 +14,12 @@ Everyone is invented.
 
 import itertools
 
+import pytest
+
 from hypothesis import HealthCheck, given, settings as hsettings
 from hypothesis import strategies as st
 
-from superassistant import applications, texts
+from superassistant import applications, lists, supervision, texts
 from tests.conftest import connect, insert_application, make_account
 from tests.test_application_flow import (THESIS_TAB_1, THESIS_TAB_2,
                                          as_staff, as_student, record_for,
@@ -44,8 +46,10 @@ def rows_of(page):
     return table.split("<tr ")[1:]
 
 
-def test_staff_see_a_draft_read_only(client, new_client, settings):
+def test_staff_see_a_draft_read_only(client, new_client, settings, clock):
     as_student(client, "draft@example.org")
+    client.get("/application")                  # begun
+    clock.advance(minutes=20)                   # then saved
     save(client, 1, DRAFT_TAB_1, "next")
     save(client, 2, THESIS_TAB_2)
     record = record_for(settings, "draft@example.org")
@@ -57,7 +61,8 @@ def test_staff_see_a_draft_read_only(client, new_client, settings):
         assert entered in page
     assert 'id="not-submitted-chip"' in page
     assert texts.STAFF_NOT_SUBMITTED_NOTE in page
-    assert texts.STAFF_LAST_SAVED.split("{}")[0] in page
+    assert texts.STAFF_LAST_SAVED.format("12.10.2026 12:20") in page
+    assert texts.STAFF_STARTED.split("{}")[0] not in page
     assert texts.STAFF_SUBMITTED_AT.lower() not in page
     assert '<dd id="submitted-at">{}</dd>'.format(texts.STAFF_NOT_SUBMITTED) \
         in page
@@ -120,8 +125,8 @@ def test_a_draft_removed_to_the_bin_put_back_and_deleted(
     assert 'id="removed"' in page and texts.DRAFT_LEAD not in page
     assert 'name="action"' not in page
     for action in ("save", "next", "submit"):
-        for typed in ("Друго", "Mixed Латиница"):        # valid, refused
-            answer = save(student, 1, dict(DRAFT_TAB_1, name2=typed), action)
+        for change in ({"name2": "Друго"}, {"fn": "12ab"}):  # valid, refused
+            answer = save(student, 1, dict(DRAFT_TAB_1, **change), action)
             assert answer.headers["Location"].endswith("/application")
             assert dict(record_for(settings, "draft@example.org")) == before
     assert 'id="removed"' in student.get("/application").get_data(
@@ -164,6 +169,94 @@ def test_a_removed_draft_is_not_submitted(client, new_client, settings,
         as_text=True)
     assert record_for(settings, "late@example.org")["submitted_at"] is None
     assert outbox.messages == []            # no request to the supervisor
+
+
+def test_a_complete_draft_read_before_its_removal_is_neither_saved_nor_submitted(
+        client, new_client, settings, outbox):
+    """The guards inside the transactions, which the page reaches when the
+    removal commits between its own read and its writes."""
+    student = as_student(client, "stale@example.org")
+    save(student, 1, THESIS_TAB_1, "next")
+    save(student, 2, THESIS_TAB_2)
+    connection = connect(settings)
+    try:
+        stale = applications.get(connection, record_for(
+            settings, "stale@example.org")["id"])
+        remove(as_staff(new_client(), make_account(settings)), stale["id"])
+        before = dict(applications.get(connection, stale["id"]))
+        with pytest.raises(applications.Removed):
+            applications.save_draft(connection, stale, {"name2": "Друго"})
+        with pytest.raises(applications.Removed):
+            supervision.submit(connection, settings,
+                               lists.load(settings.lists_dir), stale["id"])
+        assert dict(applications.get(connection, stale["id"])) == before
+    finally:
+        connection.close()
+    assert outbox.messages == []
+
+
+def test_a_draft_with_no_name_is_named_by_its_address(
+        client, new_client, settings):
+    as_student(client, "noname@example.org")
+    client.get("/application")              # the first visit makes it
+    number = record_for(settings, "noname@example.org")["id"]
+    viewer = as_staff(new_client(), make_account(settings))
+    row, = rows_of(viewer.get("/staff").get_data(as_text=True))
+    assert ('<a class="name" href="/staff/application/{}">noname@<wbr>'
+            'example.org</a>').format(number) in row
+    assert 'class="sub"' not in row             # the address once
+    page = staff_page(viewer, number).get_data(as_text=True)
+    assert "<title>{} | ".format(texts.STAFF_APPLICATION_TITLE.format(
+        "noname@example.org")) in page
+    # Opened, nothing saved: when it was begun, not "last saved".
+    assert texts.STAFF_STARTED.split("{}")[0] in page
+    assert texts.STAFF_LAST_SAVED.split("{}")[0] not in page
+    remove(viewer, number)
+    assert ('<a class="name" href="/staff/application/{}">noname@'
+            'example.org</a>').format(number) in viewer.get(
+                "/staff/bin").get_data(as_text=True)
+
+
+def test_staff_see_a_drafts_ticks_as_the_student_left_them(
+        client, new_client, settings):
+    """By the rule the nightly copy reads them by (applications.ticked)."""
+    as_student(client, "draft@example.org")
+    save(client, 1, DRAFT_TAB_1)                    # both boxes ticked
+    number = record_for(settings, "draft@example.org")["id"]
+    viewer = as_staff(new_client(), make_account(settings))
+    page = staff_page(viewer, number).get_data(as_text=True)
+    assert '<dd id="declared">{}</dd>'.format(
+        texts.STAFF_DECLARED_VALUE[True]) in page
+    assert '<dd id="acknowledged">{}</dd>'.format(
+        texts.ACKNOWLEDGED_VALUE[True]) in page
+    row, = rows_of(viewer.get("/staff").get_data(as_text=True))
+    assert '<td class="declared">{}</td>'.format(
+        texts.STAFF_DECLARED_VALUE[True]) in row
+
+
+def ids_of(page):
+    return [int(row.split('data-id="', 1)[1].split('"', 1)[0])
+            for row in rows_of(page)]
+
+
+def test_the_order_submitted_as_before_then_drafts_latest_saved_first(
+        new_client, settings):
+    same = "2026-10-12T08:00:00+00:00"
+    first = insert_application(settings, "first@example.org",
+                               submitted_at=same,
+                               updated_at="2026-10-20T08:00:00+00:00")
+    second = insert_application(settings, "second@example.org",
+                                submitted_at=same, updated_at=same)
+    later = insert_application(settings, "later@example.org",
+                               submitted=False, name1="Късна",
+                               updated_at="2026-10-20T08:00:00+00:00")
+    earlier = insert_application(settings, "earlier@example.org",
+                                 submitted=False, name1="Ранна",
+                                 updated_at="2026-10-01T08:00:00+00:00")
+    viewer = as_staff(new_client(), make_account(settings))
+    # Submitted in the same second: the later number first, as before.
+    assert ids_of(viewer.get("/staff").get_data(as_text=True)) == [
+        second, first, later, earlier]
 
 
 # --- The rule, over any set of applications --------------------------------

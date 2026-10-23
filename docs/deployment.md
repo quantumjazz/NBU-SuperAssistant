@@ -445,10 +445,9 @@ old copies went.
 The file holds every application as staff see it, those in the bin
 included and marked with the reason. Of an application not yet submitted
 „Подадено на“ says „неподадено“, and the row holds what the student has
-entered so far. A student who signed in and
-entered nothing has a row too, its entries empty. The message says how many
-applications there are, how many of them are not submitted and how many are
-in the bin.
+entered so far. A student who signed in and entered nothing has a row too,
+its entries empty. The message says how many applications there are, how
+many of them are not submitted and how many are in the bin.
 
 An application deleted from the bin is gone from the database file at once
 and from the next night's copy. It stays in the nightly copies of the
@@ -462,8 +461,8 @@ current figure; an attachment grows by about a third on the way). The
 journal says the size of each night's file; a refused copy fails the unit,
 and the file still stays in the `snapshots` folder. Deleting old
 applications from the bin makes the file smaller. The applications not yet
-submitted are in the file too, and no page removes them: staff do not see
-them.
+submitted are in the file too; staff see them in the table and may remove
+them to the bin and delete them as well.
 
 The file opens in Excel on the Mac: semicolons between cells, as Excel
 expects where numbers have a decimal comma, and the UTF-8 mark, so Cyrillic

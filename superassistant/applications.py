@@ -30,10 +30,10 @@ deletion is confirmed as a second step" (the owner, 15 October 2026). While
 it is in the bin nothing changes it: every write that would (a check, a
 correction, a supervisor's answer, a reminder, the student's own changes,
 saving a draft or submitting it) finds it gone inside its own transaction
-(require_active). Deleting it removes its row and
-every row recorded with it; a row in `bin_events` keeps who did what, when
-and why, by the application's number only. That number is never given to a
-later application, so the log's number names one application only.
+(require_active). Deleting it removes its row and every row recorded with
+it; a row in `bin_events` keeps who did what, when and why, by the
+application's number only. That number is never given to a later
+application, so the log's number names one application only.
 """
 
 import unicodedata

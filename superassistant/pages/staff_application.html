@@ -3,13 +3,13 @@
 {% set s = row.standing %}
 {# Staff change only a submitted application outside the bin; one not yet submitted they see, and may remove to the bin (constitution 5.15). #}
 {% set editable = row.submitted and not binned %}
-{% block title %}{{ t.STAFF_APPLICATION_TITLE.format(row.name) }}{% endblock %}
+{% block title %}{{ t.STAFF_APPLICATION_TITLE.format(row.name or r.email) }}{% endblock %}
 {% block content %}
 {% if binned %}<a class="back" href="/staff/bin"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_BIN }}</a>
 {% else %}<a class="back" href="/staff"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>{{ t.NAV_STAFF }}</a>{% endif %}
 <div class="page-head">
   <h1>{{ row.name or r.email }}</h1>
-  {% set when = (t.STAFF_SUBMITTED_AT|lower ~ " " ~ r.submitted_at|datetime) if row.submitted else (t.STAFF_NOT_SUBMITTED ~ ", " ~ t.STAFF_LAST_SAVED.format(r.updated_at|datetime)) %}
+  {% set when = (t.STAFF_SUBMITTED_AT|lower ~ " " ~ r.submitted_at|datetime) if row.submitted else (t.STAFF_NOT_SUBMITTED ~ ", " ~ (t.STAFF_LAST_SAVED.format(r.updated_at|datetime) if r.updated_at != r.created_at else t.STAFF_STARTED.format(r.created_at|datetime))) %}
   <p class="lead">{{ [r.fn, row.programme, when]|select|join(", ") }}.</p>
   <div class="meta">
     {% if r.grad_type %}<span class="chip info plain">{{ t.STAFF_TYPE.get(r.grad_type, "") }}</span>{% endif %}

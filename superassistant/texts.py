@@ -391,11 +391,13 @@ STAFF_NOT_SUBMITTED = "неподадено"
 # Its page's first line, after F№ and the programme: when the student last
 # saved it.
 STAFF_LAST_SAVED = "последно записано на {}"
+# Or, when the student has opened it and saved nothing: when it was begun.
+STAFF_STARTED = "започнато на {}"
 # Its page says what it is, and that staff only see it.
 STAFF_NOT_SUBMITTED_NOTE = ("Студентът още не е подал това заявление. Тук се "
                             "вижда попълненото досега; проверка, корекции и "
                             "документи има след подаването. Заявлението може "
-                            "да бъде премахнато в кошчето.")
+                            "да бъде преместено в кошчето.")
 STAFF_COUNT_ALL = ("заявление", "заявления")
 STAFF_COUNT_WAITING = {"supervisor": ("чака научния ръководител", "чакат научния ръководител"),
                        "check": ("чака проверка", "чакат проверка"),

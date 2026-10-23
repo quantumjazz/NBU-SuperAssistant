@@ -35,9 +35,9 @@ its session and whether the student ticked knowing the schedule, the
 current supervisor's answer and comment, the latest check, whether a kept
 report lists it, and whether it is in the bin and why. Of an application
 not yet submitted it holds what the student has entered so far, the two
-ticks as they stand, and „неподадено“ where the moment of submission goes. It is read in one transaction, so it
-is the records of one moment. Never a sign-in code, an answer link or a
-password.
+ticks as they stand, and „неподадено“ where the moment of submission goes.
+It is read in one transaction, so it is the records of one moment. Never a
+sign-in code, an answer link or a password.
 
 The message goes through mail.send like every other, so in mode owner it
 goes to SUPERASSISTANT_OWNER_EMAIL and in mode console it is printed. Like
