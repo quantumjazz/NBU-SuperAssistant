@@ -179,6 +179,8 @@ td form.inline-fields { display: flex; gap: 8px; align-items: center; flex-wrap:
 td form.inline-fields input { width: 12.5rem; min-height: 36px; padding: 6px 10px; font-size: 16px; }
 @media (hover: hover) and (pointer: fine) { td form.inline-fields input { font-size: 14px; } }
 td form.inline-fields label { margin: 0; position: absolute; left: -9999px; }
+/* The owner's page: the account a new password is for, shown read-only. */
+td form.inline-fields input[readonly] { color: var(--muted); background: var(--ground); border-color: var(--line-strong); }
 .table-empty { padding: 32px 20px; text-align: center; color: var(--muted); }
 
 dl.fields { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px 24px; }

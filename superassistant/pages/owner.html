@@ -42,6 +42,9 @@
       <td>
         <form method="post" action="/owner/password/{{ row.record.id }}" class="inline-fields">
           <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          {# Whose password this is, for the browser's password manager: without it Safari and Chrome file the new password under the owner's own saved sign-in. Read-only and nameless, so nothing more is sent. #}
+          <label for="username-{{ row.record.id }}">{{ t.OWNER_COL_USERNAME }}</label>
+          <input type="text" id="username-{{ row.record.id }}" value="{{ row.record.username }}" autocomplete="username" autocapitalize="none" spellcheck="false" readonly>
           <label for="password-{{ row.record.id }}">{{ t.OWNER_NEW_PASSWORD }}</label>
           <input type="password" id="password-{{ row.record.id }}" name="password" autocomplete="new-password" placeholder="{{ t.OWNER_NEW_PASSWORD }}" required>
           <label for="password2-{{ row.record.id }}">{{ t.OWNER_NEW_PASSWORD_AGAIN }}</label>

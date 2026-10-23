@@ -10,6 +10,7 @@ import itertools
 import os
 import subprocess
 import sys
+from html.parser import HTMLParser
 
 import pytest
 from hypothesis import HealthCheck, assume, given, settings as hsettings
@@ -167,6 +168,71 @@ def test_the_owner_may_set_their_own_password_and_stay_signed_in(
     assert not signed_in(elsewhere)
     assert sign_in(elsewhere, "owner", OWNER_PASSWORD).status_code == 400
     assert sign_in(elsewhere, "owner", "нова-парола").status_code == 302
+
+
+class PasswordForms(HTMLParser):
+    """The inputs of each password form on the owner's page, by the id of
+    the account it posts to; boolean attributes read as None."""
+
+    def __init__(self, page):
+        HTMLParser.__init__(self)
+        self.forms = {}
+        self._inputs = None
+        self.feed(page)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        action = attrs.get("action") or ""
+        if tag == "form" and action.startswith("/owner/password/"):
+            self._inputs = self.forms.setdefault(
+                int(action.rsplit("/", 1)[1]), [])
+        elif tag == "input" and self._inputs is not None:
+            self._inputs.append(attrs)
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self._inputs = None
+
+
+# Any username registration takes: no "@", nothing a text field cannot hold.
+USERNAME = st.text(alphabet=st.characters(blacklist_categories=("Cs", "Cc"),
+                                          blacklist_characters="@"),
+                   min_size=1, max_size=30).map(str.strip).filter(bool)
+
+
+@SLOW
+@given(name=USERNAME)
+def test_each_password_form_names_its_own_account_to_the_browser(
+        new_client, settings, name):
+    # Without a username in the form, Safari and Chrome file a new password
+    # under the owner's own saved sign-in (the owner, 23 October 2026).
+    number = next(_numbers)
+    make_account(settings, "{} {}".format(name, number),
+                 "named{}@example.org".format(number))
+    page = owner_client(new_client).get("/owner").get_data(as_text=True)
+    forms = PasswordForms(page).forms
+    connection = connect(settings)
+    try:
+        everyone = accounts.all_accounts(connection)
+    finally:
+        connection.close()
+
+    assert sorted(forms) == sorted(record["id"] for record in everyone)
+    for record in everyone:
+        inputs = forms[record["id"]]
+        names = [field for field in inputs
+                 if field.get("autocomplete") == "username"]
+        assert names == [{"type": "text",
+                          "id": "username-{}".format(record["id"]),
+                          "value": record["username"],
+                          "autocomplete": "username",
+                          "autocapitalize": "none", "spellcheck": "false",
+                          "readonly": None}]
+        passwords = [field for field in inputs
+                     if field.get("type") == "password"]
+        assert [field["autocomplete"] for field in passwords] \
+            == ["new-password", "new-password"]
+        assert inputs.index(names[0]) < inputs.index(passwords[0])
 
 
 # --- The host command ------------------------------------------------------

@@ -1,8 +1,9 @@
 """Staff accounts in a real browser at desktop width (NOW.md proof 5's staff
 bullet): registered, approved on the owner's page, signed in by username and
 by email address; a wrong password refused; a password reset on the owner's
-page, after which only the new one works; and the owner's own password set
-by the host command.
+page, after which only the new one works, its form naming the account to
+the browser's password manager without sending it; and the owner's own
+password set by the host command.
 
 /staff belongs to the staff pages; a sign-in here is proved by arriving at
 its address, whatever that page then shows.
@@ -10,6 +11,7 @@ its address, whatever that page then shows.
 
 import io
 import sys
+from urllib.parse import parse_qs
 
 import pytest
 
@@ -96,11 +98,22 @@ def test_staff_accounts_in_the_browser(live_server, open_page, monkeypatch):
     sign_in(wrong, url, "mariya", "Мария-парола-2")
     assert_refused(wrong, url, texts.STAFF_SIGNIN_FAILED)
 
-    # The owner sets a new password; only the new one works.
+    # The owner sets a new password; only the new one works. The form names
+    # the account, read-only, so a password manager files the password under
+    # it and not under the owner's own sign-in; the name is not sent.
     account = owner.locator('#accounts tr[data-username="mariya"]')
+    whose = account.locator('input[autocomplete="username"]')
+    expect(whose).to_be_visible()
+    expect(whose).to_have_value("mariya")
+    expect(whose).not_to_be_editable()
     account.locator('input[name="password"]').fill("Нова-парола-2")
     account.locator('input[name="password2"]').fill("Нова-парола-2")
-    account.get_by_role("button", name=texts.OWNER_SET_PASSWORD).click()
+    with owner.expect_request(
+            lambda request: request.method == "POST"
+            and "/owner/password/" in request.url) as sent:
+        account.get_by_role("button", name=texts.OWNER_SET_PASSWORD).click()
+    assert sorted(parse_qs(sent.value.post_data)) == [
+        "csrf", "password", "password2"]
     expect(owner.get_by_role("status")).to_have_text(
         texts.OWNER_PASSWORD_SET.format("mariya"))
     assert live_server.outbox.messages == []
