@@ -571,3 +571,19 @@
 - **Checks:** 398 passed and 11 browser tests on Python 3.9.6 and 3.12.14; real Excel on the Mac, opened and imported: unsubmitted rows exact. On the live database, read-only: 14 rows, 4 unsubmitted, the 10 submitted equal to that night's copy cell for cell.
 - **DEFERRED:** no length limit per entry, so drafts no page removes could make the copy too large to send; a draft holding a session later taken off the list stops the start (not new).
 - **Not pushed. Outstanding:** Codex's review; the owner's acceptance; the push and laptop update (no unit, setting or schema change).
+
+## 2026-10-23 — Seventh task: `2058196` approved
+
+- **Approvals of `2058196`** (range `9a5ac64..2058196`, record `75f7b38`):
+  - Codex APPROVED, relayed by the owner (verbatim): "Codex APPROVED `2058196`, range `9a5ac64..2058196`, record `75f7b38`. No changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, as Codex reported them:
+  - submitted rows byte-identical to `9a5ac64`'s, in a 128-record differential comparison;
+  - reachable unsubmitted states exported correctly: empty applications, partial entries, retained thesis fields, every combination of ticks; no secret leaks;
+  - the message's counts and punctuation and the command's output correct;
+  - the tests pin inclusion, the marker, the saved ticks, the distinct counts and the exclusion of deleted records and secrets;
+  - 398 passed and 11 browser tests on Python 3.9.6 and 3.12.14, with fake mail;
+  - governance hashes match: `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `8707da35…`, `NOW.md` `5bd1f853…`.
+- **Not live:** GitHub and the laptop at `9a5ac64`. The update needs no unit, setting or schema change; the next 00:00 run after the restart uses it.
+- **DEFERRED** (owner decisions): a length limit per entry; drafts holding a session later taken off `sessions.csv`.
+- **Outstanding:** the owner's acceptance; the push and the laptop update; before milestone 3, Fable's `NOW.md` amendment naming this task. The governance changes stay uncommitted until then.
