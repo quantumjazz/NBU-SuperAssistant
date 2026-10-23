@@ -640,3 +640,18 @@
 - **DEFERRED** (owner decisions): a student pressing a stale page after staff deleted the draft; a long word in a topic overflowing the table at 1280 px.
 - **Not live:** GitHub and the laptop at `05fd12f`. The eighth task's commits (`80266e9`, `96a4aa2`) lie beneath this range, so the push waits for Codex's verdict on `96a4aa2` as well.
 - **Outstanding:** Codex's review of the eighth task; the owner's acceptance of both; the push and laptop update with a restart; before milestone 3, Fable's `NOW.md` amendment naming this task.
+
+## 2026-10-23 — Eighth task: `96a4aa2` approved
+
+- **Approvals of `96a4aa2`** (range `05fd12f..96a4aa2`, record `ffb1dd9`):
+  - Codex APPROVED, relayed by the owner (verbatim): "Codex APPROVED `96a4aa2`, range `05fd12f..96a4aa2`, record `ffb1dd9`. No changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, as Codex reported them, from an isolated archive:
+  - each form names its own account in an escaped, labelled, read-only username field;
+  - the post still carries only `csrf`, `password` and `password2`; who may set a password, and how, unchanged;
+  - Chromium 148 reproduced the old form's pending update (state 7); the new form names the staff account, and the owner's saved login still fills its own password;
+  - the layout at 1280 and 390 px;
+  - 399 passed and 11 Chromium browser tests on Python 3.9.6 and 3.12.14, with fake mail.
+- **Not checked:** Safari's own password manager; it is the owner's acceptance check.
+- **Not live:** GitHub and the laptop at `05fd12f`. With the ninth task (`1bda292`, approved, record `b7591ca`) every commit up to `b7591ca` is now approved.
+- **Outstanding:** the owner's acceptance of both tasks, the eighth in Safari; the push and laptop update with a restart (no unit, setting or schema change); before milestone 3, Fable's `NOW.md` amendment naming both tasks.
