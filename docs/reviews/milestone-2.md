@@ -560,3 +560,14 @@
 - **The owner's checks:** as a student in Safari on a phone, the schedule, the session choice and the tick on tab 1; as staff, the session in the table and its correction.
 - **Status:** accepted by the owner and live: COMPLETE. The owner's live checks, and any fault they find, go in a new entry.
 - **Outstanding:** before 27 January 2027, the next sessions in `sessions.csv`; before milestone 3, Fable's `NOW.md` amendment marking requirement 4 as built. The governance changes stay uncommitted until then.
+
+## 2026-10-23 — Seventh task: unsubmitted applications in the nightly copy; for Codex's review
+
+- **Owner** (verbatim): "can you ensure the daily snapshot includes all student's records (eg Заявления)?"; told the copy held all 10 submitted applications but not 4 unsubmitted ones nor the history of checks and corrections, the owner chose "Unsubmitted too (Recommended)". The history was not chosen.
+- **Rules:** constitution 6.7 and an amendment row (`8707da35…`, uncommitted); `CLAUDE_1.md` `a125c54e…`, `NOW.md` `5bd1f853…` unchanged.
+- **Code** `9a5ac64..2058196`:
+  - `fa723a8`: every application is a row; one not submitted says „неподадено“ under „Подадено на“, with the student's entries and both ticks as saved; submitted rows unchanged; the message counts the unsubmitted;
+  - `2058196`: fixes from a four-agent read-only verification (fit, break, 25 mutations, the live database read on the laptop): the message's punctuation, a test for its two counts, the size paragraph in `docs/deployment.md`.
+- **Checks:** 398 passed and 11 browser tests on Python 3.9.6 and 3.12.14; real Excel on the Mac, opened and imported: unsubmitted rows exact. On the live database, read-only: 14 rows, 4 unsubmitted, the 10 submitted equal to that night's copy cell for cell.
+- **DEFERRED:** no length limit per entry, so drafts no page removes could make the copy too large to send; a draft holding a session later taken off the list stops the start (not new).
+- **Not pushed. Outstanding:** Codex's review; the owner's acceptance; the push and laptop update (no unit, setting or schema change).
