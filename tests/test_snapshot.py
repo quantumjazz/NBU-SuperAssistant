@@ -1,13 +1,14 @@
 """The nightly copy (constitution 6.7; the owner, 15 October 2026: "every
 day, say 00.00 hours the app outputs a csv with all students entries data",
-"Email it to you", "30 days").
+"Email it to you", "30 days"; 23 October 2026: "Unsubmitted too").
 
 Rules over generated input: a cell Excel would change shows in Excel as
 typed, or, too long or on several lines for Excel's text value, with an
-apostrophe before it, and is never a formula; the file holds every submitted application, those
-in the bin marked, and nothing of a draft, a deleted application or a
-secret, in any characters, mixed scripts, line breaks, quotes and
-semicolons included; copies 30 days old or older go and the others stay.
+apostrophe before it, and is never a formula; the file holds every
+application, submitted or not, those not submitted and those in the bin
+marked, and nothing of a deleted application or a secret, in any
+characters, mixed scripts, line breaks, quotes and semicolons included;
+copies 30 days old or older go and the others stay.
 The command, in every mail mode and when the relay refuses. Everyone is
 invented.
 """
@@ -174,6 +175,7 @@ def entries(draw):
         "professor": draw(st.sampled_from(["", "ivanov", "georgieva"])),
         "rationale": draw(any_text(80)), "plan": draw(any_text(80)),
         "submitted": draw(st.booleans()),
+        "credits": draw(st.booleans()), "schedule": draw(st.booleans()),
         "answer": draw(st.sampled_from([None, "confirm", "decline"])),
         "check": draw(st.sampled_from([None, "passed", "not_passed"])),
         "note": draw(any_text(30)),
@@ -184,25 +186,41 @@ def entries(draw):
 
 @FAST
 @given(st.lists(entries(), max_size=6))
-def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
+def test_the_file_holds_every_application_submitted_or_not(made):
+    """Each submitted application as staff see it, and each one not
+    submitted with what the student has entered so far."""
     with Data() as d:
         expected = {}
         gone = []
         for index, entry in enumerate(made):
             address = "s{}@example.org".format(index)
             stamp = db.now()
+            submitted = entry["submitted"]
             fields = dict((k, entry[k]) for k in (
                 "grad_type", "name1", "name2", "name3", "fn", "phone",
                 "programme", "topic", "average_grade", "professor",
                 "rationale", "plan"))
+            # A tick is stored as the student leaves it, and its moment on
+            # submission, which needs it.
+            fields.update(
+                credits_declared=int(entry["credits"]),
+                credits_declared_at=stamp if submitted and entry["credits"]
+                else None,
+                schedule_ack=int(entry["schedule"]),
+                schedule_ack_at=stamp if submitted and entry["schedule"]
+                else None)
             cursor = d.connection.execute(
                 "INSERT INTO applications (email, email_key, created_at, "
                 "updated_at, submitted_at, " + ", ".join(fields)
                 + ") VALUES (?,?,?,?,?," + ",".join("?" * len(fields)) + ")",
-                [address, address, stamp, stamp,
-                 stamp if entry["submitted"] else None]
+                [address, address, stamp, stamp, stamp if submitted else None]
                 + list(fields.values()))
             number = cursor.lastrowid
+            if not submitted:
+                # Nothing but the student's entries: a request goes, a check
+                # and a removal are made, only once it is submitted.
+                expected[number] = (entry, address, stamp)
+                continue
             if entry["answer"] or entry["grad_type"] == "thesis":
                 d.connection.execute(
                     "INSERT INTO requests (application_id, created_at, "
@@ -218,7 +236,7 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
                     "INSERT INTO checks (application_id, result, note, "
                     "by_account, at) VALUES (?,?,?,?,?)",
                     (number, entry["check"], entry["note"], d.account, stamp))
-            if entry["submitted"] and entry["bin"]:
+            if entry["bin"]:
                 reason = "other" if entry["bin"] == "deleted" else entry["bin"]
                 applications.remove(d.connection, number, reason,
                                     entry["bin_note"], d.account)
@@ -226,8 +244,7 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
                     applications.delete(d.connection, number, d.account)
                     gone.append(address)
                     continue
-            if entry["submitted"]:
-                expected[number] = (entry, address)
+            expected[number] = (entry, address, stamp)
         # Secrets the records hold, made recognisable.
         d.connection.execute(
             "UPDATE accounts SET salt = 'secret-salt', hash = 'secret-password', "
@@ -237,7 +254,7 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
             "link_hash, created_at, expires_at) VALUES ('s0@example.org', "
             "'s0@example.org', 'secret-code-salt', 'secret-code', "
             "'secret-link', 't', 't')")
-        rows, binned = snapshot.table(d.connection, d.lists)
+        rows, binned, unsubmitted = snapshot.table(d.connection, d.lists)
         assert not d.connection.in_transaction
         data = snapshot.to_bytes(rows)
         back = read(data)
@@ -245,16 +262,26 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
         assert shown(data)[0] == list(texts.SNAPSHOT_COLUMNS)
         body = back[1:]
         assert [int(excel_shows(row[0])) for row in body] == sorted(expected)
-        assert binned == sum(1 for e, _ in expected.values()
-                             if e["bin"] in ("graduated", "other"))
+        assert binned == sum(1 for e, _, _ in expected.values()
+                             if e["submitted"]
+                             and e["bin"] in ("graduated", "other"))
+        assert unsubmitted == sum(1 for e, _, _ in expected.values()
+                                  if not e["submitted"])
         column = dict((name, i) for i, name in
                       enumerate(texts.SNAPSHOT_COLUMNS))
         cell = snapshot.cell
         for row in body:
             # Each cell is written as cell() writes the value staff see.
-            entry, address = expected[int(excel_shows(row[0]))]
+            entry, address, stamp = expected[int(excel_shows(row[0]))]
+            submitted = entry["submitted"]
             assert len(row) == len(texts.SNAPSHOT_COLUMNS)
+            assert row[column["Подадено на"]] == cell(
+                db.local_datetime(stamp) if submitted else "неподадено")
             assert row[column["Електронна поща на студента"]] == cell(address)
+            assert row[column["Декларира покрити кредити"]] == cell(
+                "да" if entry["credits"] else "не")
+            assert row[column["Запознат(а) с графика на сесиите"]] == cell(
+                "да" if entry["schedule"] else "не")
             for field, name in (("name1", "Собствено име"),
                                 ("name2", "Бащино име"),
                                 ("name3", "Фамилия"), ("fn", "F№"),
@@ -268,17 +295,18 @@ def test_the_file_holds_every_submitted_application_as_staff_see_it(made):
                 assert row[column[name]] == cell(entry[field]), field
             assert row[column["Вид"]] == cell(
                 texts.STAFF_TYPE[entry["grad_type"]])
-            thesis = entry["grad_type"] == "thesis"
+            thesis = submitted and entry["grad_type"] == "thesis"
             answer = (entry["answer"] or "awaited") if thesis else None
             assert row[column["Отговор на научния ръководител"]] == cell(
                 texts.STAFF_ANSWER[answer])
             assert row[column["Коментар на научния ръководител"]] == cell(
                 "коментар" if thesis and entry["answer"] else "")
+            check = entry["check"] if submitted else None
             assert row[column["Последна проверка"]] == cell(
-                texts.STAFF_CHECK[entry["check"]])
+                texts.STAFF_CHECK[check])
             assert row[column["Бележка към проверката"]] == cell(
-                entry["note"] if entry["check"] else "")
-            in_bin = entry["bin"] in ("graduated", "other")
+                entry["note"] if check else "")
+            in_bin = submitted and entry["bin"] in ("graduated", "other")
             assert row[column["В кошчето"]] == cell(
                 texts.BIN_REASON[entry["bin"]] if in_bin
                 else texts.SNAPSHOT_NOT_BINNED)
@@ -306,7 +334,7 @@ def test_in_a_report_follows_the_report_bin(settings):
     column = texts.SNAPSHOT_COLUMNS.index("В доклад")
 
     def in_a_report():
-        rows, _ = snapshot.table(connection, loaded)
+        rows, _, _ = snapshot.table(connection, loaded)
         (row,) = rows[1:]
         return row[column]
     assert in_a_report() == "не"
@@ -363,7 +391,7 @@ def owner_settings(data_dir, **overrides):
 @pytest.fixture
 def records(data_dir, clock):
     """An owner, a staff member, a thesis with an answer and a check, a
-    state exam in the bin, and a draft."""
+    state exam in the bin, and a draft with the declaration ticked."""
     settings = owner_settings(data_dir)
     owner = make_account(settings, OWNER, OWNER_ADDRESS)
     staff = make_account(settings, "staff1")
@@ -380,9 +408,10 @@ def records(data_dir, clock):
     connection = connect(settings)
     applications.remove(connection, exam, "graduated", "сесия", staff["id"])
     connection.close()
-    insert_application(settings, "draft@example.org", submitted=False,
-                       name1="Чернова")
-    return {"owner": owner, "thesis": thesis, "exam": exam}
+    draft = insert_application(settings, "draft@example.org",
+                               submitted=False, name1="Чернова",
+                               credits_declared=1)
+    return {"owner": owner, "thesis": thesis, "exam": exam, "draft": draft}
 
 
 def run(settings):
@@ -414,12 +443,14 @@ def test_mode_send_writes_the_file_and_mails_it_to_the_owners_account(
     name, kind, data = attachment_of(sent)
     assert (name, kind) == (path.name, "text/csv")
     assert data == path.read_bytes()
-    for part in (path.name, "общо 2", "в кошчето 1", "30 дни"):
+    for part in (path.name, "подадени и неподадени", "общо 3",
+                 "неподадени 1", "в кошчето 1", "30 дни"):
         assert part in sent.text, part
     rows = shown(data)              # as Excel shows the cells
     assert [row[0] for row in rows[1:]] == [str(records["thesis"]),
-                                           str(records["exam"])]
-    thesis, exam = rows[1:]
+                                           str(records["exam"]),
+                                           str(records["draft"])]
+    thesis, exam, draft = rows[1:]
     column = dict((n, i) for i, n in enumerate(texts.SNAPSHOT_COLUMNS))
     assert thesis[column["Телефон"]] == "0888123456"
     assert thesis[column["Тема на тезата"]] == "=HYPERLINK(\"x\")"
@@ -428,7 +459,11 @@ def test_mode_send_writes_the_file_and_mails_it_to_the_owners_account(
     assert thesis[column["Научен ръководител"]] == "доц. д-р Петър Иванов"
     assert exam[column["В кошчето"]] == "дипломиран(а)"
     assert exam[column["Бележка при премахване"]] == "сесия"
-    assert "Чернова" not in data.decode("utf-8-sig")
+    assert draft[column["Подадено на"]] == "неподадено"
+    assert draft[column["Собствено име"]] == "Чернова"
+    assert draft[column["Декларира покрити кредити"]] == "да"
+    assert draft[column["Запознат(а) с графика на сесиите"]] == "не"
+    assert draft[column["В кошчето"]] == "не"
     assert str(path) in out
 
 
@@ -512,6 +547,51 @@ def test_the_host_command_runs_it(data_dir, records, outbox, monkeypatch):
     assert cli.main(["snapshot"]) == 0
     assert (data_dir / "snapshots" / "zaiavlenia-2026-10-12.csv").is_file()
     assert "snapshot" in cli.__doc__
+
+
+def test_the_copy_holds_what_students_entered_before_submitting(
+        client, settings, outbox):
+    """Through the student's pages: one signs in and enters nothing, one
+    saves a draft, one submits. The copy holds all three; the two not
+    submitted say „неподадено“, the draft's entries and tick as it stands
+    (the owner, 23 October 2026: "Unsubmitted too")."""
+    from tests.test_application_flow import as_student, record_for, save
+    from tests.test_sessions import EXAM, TICKED
+    as_student(client, "empty@example.org")
+    assert client.get("/application").status_code == 200
+    as_student(client, "draft@example.org")
+    assert save(client, 1, dict(EXAM, name1="Чернова")).status_code == 302
+    as_student(client, "done@example.org")
+    assert save(client, 1, dict(EXAM, **TICKED), "submit").status_code == 302
+    done = record_for(settings, "done@example.org")
+    draft = record_for(settings, "draft@example.org")
+    assert done["submitted_at"] and not draft["submitted_at"]
+    connection = connect(settings)
+    try:
+        rows, binned, unsubmitted = snapshot.table(
+            connection, lists.load(settings.lists_dir))
+    finally:
+        connection.close()
+    assert (len(rows) - 1, binned, unsubmitted) == (3, 0, 2)
+    column = dict((name, i) for i, name in enumerate(rows[0]))
+    by_address = dict((row[column["Електронна поща на студента"]], row)
+                      for row in rows[1:])
+
+    def cells(address, *names):
+        return [by_address[address][column[name]] for name in names]
+    names = ("Подадено на", "Вид", "Собствено име", "F№",
+             "Декларира покрити кредити", "Запознат(а) с графика на сесиите",
+             "Сесия", "Отговор на научния ръководител", "Последна проверка",
+             "В доклад", "В кошчето")
+    assert cells("empty@example.org", *names) == [
+        "неподадено", "", "", "", "не", "не", "—", "—", "—", "не", "не"]
+    assert cells("draft@example.org", *names) == [
+        "неподадено", "държавен изпит", "Чернова", draft["fn"], "да", "не",
+        "—", "—", "—", "не", "не"]
+    assert cells("done@example.org", *names) == [
+        db.local_datetime(done["submitted_at"]), "държавен изпит", "Калина",
+        done["fn"], "да", "да", "26 януари 2027\u00a0г. (вторник)", "—",
+        "—", "не", "не"]
 
 
 def test_the_command_counts_in_words(data_dir, clock, outbox):

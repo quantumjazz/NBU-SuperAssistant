@@ -1,8 +1,8 @@
 # The nightly copy: `python -m superassistant snapshot`, once, started by
-# nbu-superassistant-snapshot.timer. It writes every submitted application as
-# a CSV file in the records folder's snapshots/, emails it to the owner's
-# account address and removes the copies 30 days old (docs/deployment.md,
-# "The nightly copy"; constitution 6.7).
+# nbu-superassistant-snapshot.timer. It writes every application, submitted
+# or not, as a CSV file in the records folder's snapshots/, emails it to the
+# owner's account address and removes the copies 30 days old
+# (docs/deployment.md, "The nightly copy"; constitution 6.7).
 #
 # Install it together with the timer; the timer is what is enabled, not this
 # file:

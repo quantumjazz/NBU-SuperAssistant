@@ -823,7 +823,8 @@ def test_the_nightly_copy_holds_the_session_and_the_tick(client, settings,
                                  credits_declared_at=EARLIER)
     connection = connect(settings)
     try:
-        rows, _ = snapshot.table(connection, lists.load(settings.lists_dir))
+        rows, _, _ = snapshot.table(connection,
+                                    lists.load(settings.lists_dir))
     finally:
         connection.close()
     column = dict((name, i) for i, name in enumerate(rows[0]))

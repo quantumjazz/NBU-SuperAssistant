@@ -1,13 +1,14 @@
 """`python -m superassistant snapshot`: the nightly copy of the applications.
 
 On the host a systemd timer runs it every night at 00:00, Sofia time; it can
-also be run by hand. It writes every submitted application, those in the bin
-included and marked, as one CSV file in the records folder's `snapshots`,
-emails that file to the owner's account address, and removes the copies 30
-days old or older (constitution 6.7; the owner, 15 October 2026: "every day,
-say 00.00 hours the app outputs a csv with all students entries data",
-"Email it to you", "30 days"). A second run on the same day writes that
-day's file again and sends it again.
+also be run by hand. It writes every application, submitted or not, those
+not submitted and those in the bin marked, as one CSV file in the records
+folder's `snapshots`, emails that file to the owner's account address, and
+removes the copies 30 days old or older (constitution 6.7; the owner, 15
+October 2026: "every day, say 00.00 hours the app outputs a csv with all
+students entries data", "Email it to you", "30 days"; 23 October 2026:
+"Unsubmitted too"). A second run on the same day writes that day's file
+again and sends it again.
 
 The file is made for Excel on the owner's Mac, whose numbers use a decimal
 comma. Excel there separates cells by semicolons, so the file does too, and
@@ -29,12 +30,15 @@ it, which keeps it text, the apostrophe shown; its line breaks, if any, are
 then written as they are, which opening the file keeps but the text import
 splits.
 
-What the file holds is what staff see of each application: its entries,
-its session and whether the student ticked knowing the schedule, the
-current supervisor's answer and comment, the latest check, whether a kept
-report lists it, and whether it is in the bin and why. It is read in one
-transaction, so it is the records of one moment. Never a sign-in code, an
-answer link or a password.
+What the file holds is what staff see of each submitted application: its
+entries, its session and whether the student ticked knowing the schedule,
+the current supervisor's answer and comment, the latest check, whether a
+kept report lists it, and whether it is in the bin and why. Of an
+application not yet submitted, which staff do not see, it holds what the
+student has entered so far, the two ticks as they stand, and „неподадено“
+where the moment of submission goes. It is read in one transaction, so it
+is the records of one moment. Never a sign-in code, an answer link or a
+password.
 
 The message goes through mail.send like every other, so in mode owner it
 goes to SUPERASSISTANT_OWNER_EMAIL and in mode console it is printed. Like
@@ -124,6 +128,13 @@ def _supervisor_email(record, lists):
     return record["sup_email"]
 
 
+def _ticked(record, field):
+    """A tick: given on submission, or, before it, as the draft holds it."""
+    if record["submitted_at"] is not None:
+        return record[field + "_at"] is not None
+    return bool(record[field])
+
+
 def _row(connection, record, lists):
     standing = applications.standing(connection, record)
     request = applications.current_request(connection, record["id"])
@@ -132,12 +143,13 @@ def _row(connection, record, lists):
     binned = applications.is_binned(record)
     return [
         record["id"],
-        db.local_datetime(record["submitted_at"]),
+        db.local_datetime(record["submitted_at"]) if standing.submitted
+        else texts.SNAPSHOT_NOT_SUBMITTED,
         record["email"],
         texts.STAFF_TYPE.get(record["grad_type"], ""),
         record["name1"], record["name2"], record["name3"], record["fn"],
-        texts.SNAPSHOT_YES_NO[record["credits_declared_at"] is not None],
-        texts.SNAPSHOT_YES_NO[record["schedule_ack_at"] is not None],
+        texts.SNAPSHOT_YES_NO[_ticked(record, "credits_declared")],
+        texts.SNAPSHOT_YES_NO[_ticked(record, "schedule_ack")],
         sessions.label(lists, record["grad_session"]),
         record["phone"],
         supervision.programme_label(record, lists),
@@ -162,18 +174,20 @@ def _row(connection, record, lists):
 
 
 def table(connection, lists):
-    """The header and one row per submitted application, by number, all
-    read in one transaction; and how many of them are in the bin."""
+    """The header and one row per application, submitted or not, by number,
+    all read in one transaction; how many of them are in the bin; and how
+    many are not submitted."""
     connection.execute("BEGIN")
     try:
         records = connection.execute(
-            "SELECT * FROM applications WHERE submitted_at IS NOT NULL "
-            "ORDER BY id").fetchall()
+            "SELECT * FROM applications ORDER BY id").fetchall()
         rows = [_row(connection, record, lists) for record in records]
     finally:
         connection.execute("ROLLBACK")
     binned = sum(1 for record in records if applications.is_binned(record))
-    return [list(texts.SNAPSHOT_COLUMNS)] + rows, binned
+    unsubmitted = sum(1 for record in records
+                      if record["submitted_at"] is None)
+    return [list(texts.SNAPSHOT_COLUMNS)] + rows, binned, unsubmitted
 
 
 def to_bytes(rows):
@@ -240,7 +254,7 @@ def run(settings, out=None, err=None):
     loaded = prepare(settings)
     connection = db.connect(settings.db_path)
     try:
-        rows, binned = table(connection, loaded)
+        rows, binned, unsubmitted = table(connection, loaded)
         address = owner_address(connection, settings)
     finally:
         connection.close()
@@ -272,7 +286,7 @@ def run(settings, out=None, err=None):
         texts.SNAPSHOT_TEXT.format(name=path.name,
                                    moment=db.local_datetime(moment),
                                    count=len(rows) - 1, binned=binned,
-                                   days=KEEP_DAYS),
+                                   unsubmitted=unsubmitted, days=KEEP_DAYS),
         attachments=[mail.Attachment(path.name, data, "text", "csv")])
     try:
         mail.send(settings, message, out=out)

@@ -634,11 +634,13 @@ SNAPSHOT_COLUMNS = (
     "Бележка при премахване")
 SNAPSHOT_YES_NO = {True: "да", False: "не"}
 SNAPSHOT_NOT_BINNED = "не"
+# „Подадено на“ of an application not yet submitted.
+SNAPSHOT_NOT_SUBMITTED = "неподадено"
 SNAPSHOT_SUBJECT = "Копие на заявленията към {date}"
 SNAPSHOT_TEXT = ("Здравейте,\n\n"
-                 "прикачен е файлът {name}: копие на всички подадени "
-                 "заявления към {moment}, общо {count}, от тях в кошчето "
-                 "{binned}.\n\n"
+                 "прикачен е файлът {name}: копие на всички заявления, "
+                 "подадени и неподадени, към {moment}: общо {count}, от "
+                 "тях неподадени {unsubmitted} и в кошчето {binned}.\n\n"
                  "Файлът се отваря с Excel. На сървъра се пазят копията от "
                  "последните {days} дни.\n")
 # The word after the count: its first form for one, the second otherwise.

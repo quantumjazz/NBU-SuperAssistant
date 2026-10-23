@@ -433,8 +433,7 @@ sudo systemctl start nbu-superassistant-snapshot.service
 sudo journalctl -u nbu-superassistant-snapshot -n 20 --no-pager
 ```
 
-Every night at 00:00, Sofia time, the run writes every submitted
-application, those in the bin included and marked, to
+Every night at 00:00, Sofia time, the run writes every application to
 `/home/victor/nbu-superassistant-data/snapshots/zaiavlenia-YYYY-MM-DD.csv`,
 readable by `victor` only, and emails it as an attachment to the address of
 the owner's account, the one `SUPERASSISTANT_OWNER_USERNAME` names, through
@@ -442,6 +441,14 @@ the relay like every message: one of Resend's 100 a day. It then removes
 the copies 30 days old or older, so the folder holds the last 30 days. The
 journal says where the file is, how many applications it holds and which
 old copies went.
+
+The file holds the submitted applications as staff see them, those in the
+bin included and marked with the reason, and the applications not yet
+submitted, which staff do not see: „Подадено на“ says „неподадено“, and the
+row holds what the student has entered so far. A student who signed in and
+entered nothing has a row too, its entries empty. The message says how many
+applications there are, how many of them are not submitted and how many are
+in the bin.
 
 An application deleted from the bin is gone from the database file at once
 and from the next night's copy. It stays in the nightly copies of the
