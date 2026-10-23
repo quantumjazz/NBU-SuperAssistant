@@ -611,3 +611,16 @@
 - **Checks:** 399 passed and 11 browser tests on Python 3.9.6 and 3.12.14. Chromium 148's password-manager log, one login saved: the old form updated it; the new one names its row's account and leaves it alone. Pages in Chromium and WebKit at 1280 and 390 px.
 - **Not checked:** Safari's own password manager, which needs the owner's keychain.
 - **Not pushed. Outstanding:** Codex's review; the owner's acceptance in Safari; the push and laptop update with a restart (no unit, setting or schema change).
+
+## 2026-10-23 — Ninth task: staff see unsubmitted applications; for Codex's review
+
+- **Owner** (verbatim): "can you make all the entries, even the unsubmitted visible to the staff, it was not right for them to stay hidden from staff and visible only to the code itself"; to Opus 5.5's two questions, "Same table, marked" and "See it, remove to bin".
+- **Rules:** constitution 2.4, 5.15 and an amendment row (`6a0848ed…`, uncommitted); `CLAUDE_1.md` `a125c54e…`, `NOW.md` `5bd1f853…` unchanged. Fable's `NOW.md` amendment should cover draft rows before milestone 3 adds columns.
+- **Code** `ffb1dd9..1bda292`:
+  - `a19bbee`: „Заявления“ lists every application not in the bin, drafts after the submitted, marked „неподадено“ and counted; a draft's page read-only, with no check, correction or form; staff may remove it to the bin, where the student can neither save nor submit it;
+  - `1bda292`: fixes from a three-agent read-only verification (fit, 32 break attempts, 37 mutations).
+- **Tests changed with the rule:** the table and bin tests that kept drafts out.
+- **Checks:** 409 passed and 11 browser tests on Python 3.9.6 and 3.12.14; the nightly copy byte-identical to `ffb1dd9`'s; pages in WebKit and Chromium at 1280 and 390 px.
+- **Not new:** at 1280 px a long word in a topic pushes „Проверка“ partly out of view.
+- **DEFERRED:** a student whose draft staff deleted, pressing an old page, starts a new application untold.
+- **Not pushed. Outstanding:** Codex's review; the owner's acceptance; the push and laptop update with a restart (no unit, setting or schema).
