@@ -599,3 +599,15 @@
   - the copy's timer next at 00:00 on 24 October, the first nightly copy with unsubmitted applications; the reminders at 09:00.
 - **Status:** accepted by the owner and live: COMPLETE. The owner's look at the 24 October email, and any fault, go in a new entry.
 - **Outstanding:** DEFERRED, a length limit per entry and drafts holding a session later taken off `sessions.csv`; before milestone 3, Fable's `NOW.md` amendment naming this task. The governance changes stay uncommitted until then.
+
+## 2026-10-23 — Eighth task: the owner page's password forms name their account; for Codex's review
+
+- **Owner** (verbatim): "i tried to login after i tried to change a user password to qwerty; a menu with my username appeared and now i cannot login"; offered the fix, "Yes, add the username field to the owner page's password forms, following the project's usual review process."
+- **Cause:** the live database, read-only, holds one password change ever, a staff account's, set on the owner page at 08:17 UTC; the owner's own never changed. Each password form there had two new-password fields and no username, so the browser filed the new password under its one saved sign-in for the site, the owner's.
+- **Rules:** none changed; `CLAUDE_1.md` `a125c54e…`, `CONSTITUTION.md` `8707da35…`, `NOW.md` `5bd1f853…`.
+- **Code** `05fd12f..96a4aa2`:
+  - `80266e9`: each form holds its account's username in a greyed read-only field, `autocomplete="username"`, with no name, so the post is unchanged;
+  - `96a4aa2`: test fixes from a three-agent read-only verification (password manager, mutations, fit).
+- **Checks:** 399 passed and 11 browser tests on Python 3.9.6 and 3.12.14. Chromium 148's password-manager log, one login saved: the old form updated it; the new one names its row's account and leaves it alone. Pages in Chromium and WebKit at 1280 and 390 px.
+- **Not checked:** Safari's own password manager, which needs the owner's keychain.
+- **Not pushed. Outstanding:** Codex's review; the owner's acceptance in Safari; the push and laptop update with a restart (no unit, setting or schema change).
