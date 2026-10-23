@@ -129,7 +129,9 @@ def _supervisor_email(record, lists):
 
 
 def _ticked(record, field):
-    """A tick: given on submission, or, before it, as the draft holds it."""
+    """A tick: given on submission, or, before it, as the draft holds it.
+    Once submitted the box and its moment agree; the moment is read, as the
+    staff page reads it, because it records the submission."""
     if record["submitted_at"] is not None:
         return record[field + "_at"] is not None
     return bool(record[field])

@@ -460,7 +460,10 @@ or in the bin, and in every backup taken before the deletion.
 Resend refuses a message above its size limit (its documentation gives the
 current figure; an attachment grows by about a third on the way). The
 journal says the size of each night's file; a refused copy fails the unit,
-and deleting old applications from the bin makes the file smaller.
+and the file still stays in the `snapshots` folder. Deleting old
+applications from the bin makes the file smaller. The applications not yet
+submitted are in the file too, and no page removes them: staff do not see
+them.
 
 The file opens in Excel on the Mac: semicolons between cells, as Excel
 expects where numbers have a decimal comma, and the UTF-8 mark, so Cyrillic

@@ -467,6 +467,18 @@ def test_mode_send_writes_the_file_and_mails_it_to_the_owners_account(
     assert str(path) in out
 
 
+def test_the_message_counts_unsubmitted_and_binned_apart(data_dir, records,
+                                                         outbox):
+    """With 2 applications not submitted and 1 in the bin, the message
+    gives each its own figure."""
+    settings = owner_settings(data_dir)
+    insert_application(settings, "second-draft@example.org", submitted=False)
+    status, out, err = run(settings)
+    assert status == 0, err
+    (sent,) = outbox.messages
+    assert "общо 4, от тях неподадени 2 и в кошчето 1." in sent.text
+
+
 def test_mode_owner_sends_to_the_owners_development_address(
         data_dir, records, outbox):
     settings = owner_settings(data_dir)            # mode owner, OWNER_EMAIL
