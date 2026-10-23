@@ -624,3 +624,19 @@
 - **Not new:** at 1280 px a long word in a topic pushes „Проверка“ partly out of view.
 - **DEFERRED:** a student whose draft staff deleted, pressing an old page, starts a new application untold.
 - **Not pushed. Outstanding:** Codex's review; the owner's acceptance; the push and laptop update with a restart (no unit, setting or schema).
+
+## 2026-10-23 — Ninth task: `1bda292` approved
+
+- **Approvals of `1bda292`** (range `ffb1dd9..1bda292`, record `282084c`):
+  - Codex APPROVED, relayed by the owner (verbatim): "Codex APPROVED `1bda292`, range `ffb1dd9..1bda292`, record `282084c`. No changes requested."
+  - Opus 5.5 (`claude-opus-5-5`), the implementer, APPROVED the same commit.
+- **Codex's checks**, as Codex reported them, from an isolated archive with `CONSTITUTION.md` `6a0848ed…`:
+  - drafts visible, marked and counted; the order of submitted applications kept;
+  - a draft's page read-only; staff changes and document downloads refused;
+  - removal to the bin blocks the student's saves and submission, injected races included; putting back allows editing again;
+  - the nightly copy byte-identical to `ffb1dd9`'s over 192 invented records;
+  - the updated tests keep the protections of submitted applications and cover the new rules;
+  - 409 passed and 11 Chromium browser tests on Python 3.9.6 and 3.12.14, with fake mail; pages at 1280 and 390 px. WebKit not repeated, its runtime missing; Opus 5.5's WebKit renders stand.
+- **DEFERRED** (owner decisions): a student pressing a stale page after staff deleted the draft; a long word in a topic overflowing the table at 1280 px.
+- **Not live:** GitHub and the laptop at `05fd12f`. The eighth task's commits (`80266e9`, `96a4aa2`) lie beneath this range, so the push waits for Codex's verdict on `96a4aa2` as well.
+- **Outstanding:** Codex's review of the eighth task; the owner's acceptance of both; the push and laptop update with a restart; before milestone 3, Fable's `NOW.md` amendment naming this task.
