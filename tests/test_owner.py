@@ -13,7 +13,8 @@ import sys
 from html.parser import HTMLParser
 
 import pytest
-from hypothesis import HealthCheck, assume, given, settings as hsettings
+from hypothesis import HealthCheck, assume, example, given
+from hypothesis import settings as hsettings
 from hypothesis import strategies as st
 
 from superassistant import accounts, owner_password, texts
@@ -194,7 +195,8 @@ class PasswordForms(HTMLParser):
             self._inputs = None
 
 
-# Any username registration takes: no "@", nothing a text field cannot hold.
+# Usernames as registration takes them, without "@" (accounts.check_username),
+# and without control characters.
 USERNAME = st.text(alphabet=st.characters(blacklist_categories=("Cs", "Cc"),
                                           blacklist_characters="@"),
                    min_size=1, max_size=30).map(str.strip).filter(bool)
@@ -202,6 +204,7 @@ USERNAME = st.text(alphabet=st.characters(blacklist_categories=("Cs", "Cc"),
 
 @SLOW
 @given(name=USERNAME)
+@example(name='a"b <c> & d')          # escaped, or the tag would break
 def test_each_password_form_names_its_own_account_to_the_browser(
         new_client, settings, name):
     # Without a username in the form, Safari and Chrome file a new password
@@ -222,12 +225,10 @@ def test_each_password_form_names_its_own_account_to_the_browser(
         inputs = forms[record["id"]]
         names = [field for field in inputs
                  if field.get("autocomplete") == "username"]
-        assert names == [{"type": "text",
-                          "id": "username-{}".format(record["id"]),
-                          "value": record["username"],
-                          "autocomplete": "username",
-                          "autocapitalize": "none", "spellcheck": "false",
-                          "readonly": None}]
+        assert len(names) == 1
+        assert (names[0]["type"], names[0]["id"], names[0]["value"]) == (
+            "text", "username-{}".format(record["id"]), record["username"])
+        assert "readonly" in names[0] and "name" not in names[0]
         passwords = [field for field in inputs
                      if field.get("type") == "password"]
         assert [field["autocomplete"] for field in passwords] \

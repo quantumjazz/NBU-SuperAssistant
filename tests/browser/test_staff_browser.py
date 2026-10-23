@@ -16,7 +16,8 @@ from urllib.parse import parse_qs
 import pytest
 
 from superassistant import accounts, db, owner_password, texts
-from tests.browser.conftest import DESKTOP, OWNER_PASSWORD, OWNER_USERNAME
+from tests.browser.conftest import (DESKTOP, OWNER_PASSWORD, OWNER_USERNAME,
+                                    PHONE)
 
 sync_api = pytest.importorskip("playwright.sync_api")
 expect = sync_api.expect
@@ -104,8 +105,16 @@ def test_staff_accounts_in_the_browser(live_server, open_page, monkeypatch):
     account = owner.locator('#accounts tr[data-username="mariya"]')
     whose = account.locator('input[autocomplete="username"]')
     expect(whose).to_be_visible()
+    expect(whose).to_be_in_viewport()
     expect(whose).to_have_value("mariya")
+    expect(whose).to_have_accessible_name(texts.OWNER_COL_USERNAME)
     expect(whose).not_to_be_editable()
+    expect(owner.locator('#accounts tr[data-username="{}"] '
+                         'input[autocomplete="username"]'.format(
+                             OWNER_USERNAME))).to_have_value(OWNER_USERNAME)
+    owner.set_viewport_size(PHONE)               # on a phone as well
+    expect(whose).to_be_visible()
+    owner.set_viewport_size(DESKTOP)
     account.locator('input[name="password"]').fill("Нова-парола-2")
     account.locator('input[name="password2"]').fill("Нова-парола-2")
     with owner.expect_request(
